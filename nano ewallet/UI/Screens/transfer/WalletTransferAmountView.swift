@@ -270,6 +270,9 @@ struct WalletTransferAmountView: View {
                 CreateBeneficiaryRequest(type: .wallet, benUsername: draft.username, accName: draft.holderName)
             )
         }
+        if let token = draft.payLinkToken {
+            await PayLinkService.consume(reqToken: token, txId: result.transId)
+        }
         await WalletStore.shared.refresh(force: true)
         onSuccess(
             TransferSuccessInfo(

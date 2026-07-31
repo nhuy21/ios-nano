@@ -75,12 +75,15 @@ struct BankTransferDraft: Hashable {
     var prefillContent: String?
     var amountEditable: Bool = true
     var contentEditable: Bool = true
+    /// Vào từ Pay Link (`reqToken`) -> gọi `PayLinkService.consume` sau khi giao dịch SUCCESS.
+    var payLinkToken: String?
 }
 
 /// Người nhận ví-ví đã xác thực — cầu nối giữa WalletTransferView -> WalletTransferAmountView.
 struct WalletTransferDraft: Hashable {
     var username: String
     var holderName: String
+    var payLinkToken: String?
 }
 
 /// Trạng thái gốc của app — quyết định cây điều hướng nào được hiển thị.

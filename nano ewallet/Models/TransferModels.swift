@@ -68,6 +68,9 @@ struct TransferResult: Decodable {
     let status: String?
     let transAmount: Int64?
     let feeAmount: Int64?
+    /// `trans_id` tự sinh của app, dùng làm txId khi gọi `PayLinkService.consume`.
+    let transId: String?
+    let bkTransId: String?
 
     enum CodingKeys: String, CodingKey {
         case pending
@@ -75,6 +78,8 @@ struct TransferResult: Decodable {
         case status
         case transAmount = "trans_amount"
         case feeAmount = "fee_amount"
+        case transId = "trans_id"
+        case bkTransId = "bk_trans_id"
     }
 
     var isPending: Bool { pending == true }

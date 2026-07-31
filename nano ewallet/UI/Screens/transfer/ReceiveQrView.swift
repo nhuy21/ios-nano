@@ -24,6 +24,12 @@ struct ReceiveQrView: View {
     @State private var shareItem: ShareableImage?
     @State private var toastMessage: String?
 
+    @State private var showPayLinkSheet = false
+    @State private var payLinkAmountInput = ""
+    @State private var isCreatingPayLink = false
+    @State private var payLinkError: String?
+    @State private var shareTextItem: ShareableText?
+
     private var qrContent: String? {
         guard let bin = wallet.vaBankNo, !bin.isEmpty,
               let number = wallet.vaNumber, !number.isEmpty else { return nil }
@@ -60,6 +66,12 @@ struct ReceiveQrView: View {
         }
         .sheet(item: $shareItem) { item in
             ActivityShareSheet(items: [item.image])
+        }
+        .sheet(item: $shareTextItem) { item in
+            ActivityShareSheet(items: [item.text])
+        }
+        .sheet(isPresented: $showPayLinkSheet) {
+            payLinkSheet
         }
         .overlay(alignment: .bottom) {
             if let toastMessage {
@@ -168,6 +180,11 @@ struct ReceiveQrView: View {
             actionButton(icon: "square.and.arrow.down", title: "Lưu vào thư viện") {
                 saveQr()
             }
+            actionButton(icon: "link", title: "Link nhận tiền") {
+                payLinkAmountInput = ""
+                payLinkError = nil
+                showPayLinkSheet = true
+            }
         }
         .padding(.vertical, 14)
         .background(Color.white)
@@ -247,6 +264,76 @@ struct ReceiveQrView: View {
         )
     }
 
+    // MARK: - Pay link sheet
+
+    /// Mirror `AmountInputDialog(allowEmpty = true)` ở ReceiveQrScreen.kt — chỉ nhập số
+    /// tiền (để trống = người gửi tự nhập), không có ô nội dung.
+    private var payLinkSheet: some View {
+        VStack(spacing: 16) {
+            Capsule()
+                .fill(AppColor.line)
+                .frame(width: 40, height: 4)
+                .padding(.top, 8)
+
+            Text("Tạo link nhận tiền")
+                .font(AppFont.beVietnamPro(16, .bold))
+                .foregroundStyle(AppColor.payInk)
+
+            Text("Nhập số tiền cần nhận (để trống nếu để người gửi tự nhập)")
+                .font(.system(size: 13))
+                .foregroundStyle(AppColor.payMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+
+            AppTextField(
+                text: payLinkAmountFieldBinding, placeholder: "0",
+                keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
+            )
+            .padding(.horizontal, 20)
+
+            if let payLinkError {
+                FieldError(message: payLinkError, alignment: .leading)
+                    .padding(.horizontal, 20)
+            }
+
+            PrimaryButton(
+                title: "Tạo & chia sẻ", loadingTitle: "Đang tạo...",
+                isLoading: isCreatingPayLink
+            ) {
+                Task { await createAndSharePayLink() }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+        .presentationDetents([.height(320)])
+        .presentationDragIndicator(.hidden)
+    }
+
+    private var payLinkAmountFieldBinding: Binding<String> {
+        Binding(
+            get: { payLinkAmountInput },
+            set: { payLinkAmountInput = String($0.filter(\.isNumber).prefix(9)) }
+        )
+    }
+
+    private func createAndSharePayLink() async {
+        guard !isCreatingPayLink else { return }
+        payLinkError = nil
+        isCreatingPayLink = true
+        defer { isCreatingPayLink = false }
+        do {
+            let result = try await PayLinkService.create(
+                CreatePayLinkRequest(amount: Int(payLinkAmountInput), note: nil)
+            )
+            showPayLinkSheet = false
+            shareTextItem = ShareableText(text: "Chuyển tiền cho tôi qua Nano Wallet: \(result.url)")
+        } catch let error as APIError {
+            payLinkError = error.message
+        } catch {
+            payLinkError = "Tạo link thất bại, vui lòng thử lại"
+        }
+    }
+
     // MARK: - Share / Save
 
     private func shareQr() {
@@ -294,6 +381,11 @@ struct ReceiveQrView: View {
 private struct ShareableImage: Identifiable {
     let id = UUID()
     let image: UIImage
+}
+
+private struct ShareableText: Identifiable {
+    let id = UUID()
+    let text: String
 }
 
 private struct ActivityShareSheet: UIViewControllerRepresentable {

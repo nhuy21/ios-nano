@@ -312,6 +312,9 @@ struct BankTransferAmountView: View {
                 )
             )
         }
+        if let token = draft.payLinkToken {
+            await PayLinkService.consume(reqToken: token, txId: result.transId)
+        }
         await WalletStore.shared.refresh(force: true)
         onSuccess(
             TransferSuccessInfo(

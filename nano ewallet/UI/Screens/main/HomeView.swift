@@ -15,11 +15,13 @@ struct HomeView: View {
     @StateObject private var wallet = WalletStore.shared
     @StateObject private var transactions = TransactionStore.shared
     @StateObject private var authStore = AuthStore.shared
+    @StateObject private var deepLinkStore = DeepLinkStore.shared
 
     @State private var showBalance = false
     @State private var comingSoonFeature: String?
     @State private var detailTransaction: TransactionEntity?
     @State private var path: [HomeRoute] = []
+    @State private var payLinkError: String?
 
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
@@ -31,6 +33,61 @@ struct HomeView: View {
                 .navigationDestination(for: HomeRoute.self) { route in
                     destination(for: route)
                 }
+        }
+        .onChange(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
+            guard let bkUsername = value else { return }
+            _ = deepLinkStore.consumeConversation()
+            path.append(.conversation(otherName: "", otherBkUsername: bkUsername))
+        }
+        .onChange(of: deepLinkStore.pendingPayToken, initial: true) { _, value in
+            guard let token = value else { return }
+            _ = deepLinkStore.consumePayToken()
+            Task { await resolvePayLink(token: token) }
+        }
+        .alert(
+            "Không mở được link nhận tiền", isPresented: payLinkErrorBinding,
+            actions: { Button("Đóng", role: .cancel) {} },
+            message: { Text(payLinkError ?? "") }
+        )
+    }
+
+    private var payLinkErrorBinding: Binding<Bool> {
+        Binding(get: { payLinkError != nil }, set: { if !$0 { payLinkError = nil } })
+    }
+
+    /// App tự động điền (prefill) trực tiếp vào màn chuyển khoản có sẵn sau khi resolve
+    /// — mirror MainActivity.kt: KHÔNG có màn "xác nhận thanh toán qua link" riêng.
+    private func resolvePayLink(token: String) async {
+        do {
+            let info = try await PayLinkService.resolve(reqToken: token)
+            switch info.payKind {
+            case .bank:
+                guard let accNo = info.accNo, let bankNo = info.bankNo else {
+                    payLinkError = "Link nhận tiền không hợp lệ"
+                    return
+                }
+                let bankName = BankCache.shared.bank(bin: bankNo)?.shortName ?? info.bankShortName ?? "Ngân hàng"
+                path.append(.bankTransferAmount(BankTransferDraft(
+                    bin: bankNo, bankName: bankName, accNo: accNo, accType: 0,
+                    holderName: info.accName ?? "Người nhận",
+                    prefillAmount: info.amountValue, prefillContent: info.note,
+                    amountEditable: info.amountValue == nil,
+                    contentEditable: (info.note?.isEmpty ?? true),
+                    payLinkToken: token
+                )))
+            case .wallet:
+                guard let benUsername = info.benUsername else {
+                    payLinkError = "Link nhận tiền không hợp lệ"
+                    return
+                }
+                path.append(.walletTransferAmount(WalletTransferDraft(
+                    username: benUsername, holderName: info.accName ?? benUsername, payLinkToken: token
+                )))
+            }
+        } catch let error as APIError {
+            payLinkError = error.message
+        } catch {
+            payLinkError = "Không mở được link nhận tiền"
         }
     }
 
