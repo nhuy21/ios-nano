@@ -29,6 +29,7 @@ final class WalletStore: ObservableObject {
     @Published private(set) var accNo: String?
     @Published private(set) var accName: String?
     @Published private(set) var limitPin: Int64?
+    @Published private(set) var bankLinkedAt: String?
 
     private var isLoading = false
 
@@ -56,6 +57,7 @@ final class WalletStore: ObservableObject {
             accNo = wallet.accNo
             accName = wallet.accName
             limitPin = wallet.limitPinAmount ?? Self.defaultLimitPin
+            bankLinkedAt = wallet.bankLinkedAt
             persist()
         } catch {
             // Lỗi mạng: giữ nguyên cache đang có. Chưa từng có gì (lần đầu mở app mất
@@ -81,6 +83,7 @@ final class WalletStore: ObservableObject {
         accNo = nil
         accName = nil
         limitPin = nil
+        bankLinkedAt = nil
         Key.allCases.forEach { UserDefaults.standard.removeObject(forKey: $0.rawValue) }
     }
 
@@ -96,6 +99,7 @@ final class WalletStore: ObservableObject {
         case accNo = "wallet_acc_no"
         case accName = "wallet_acc_name"
         case limitPin = "wallet_limit_pin"
+        case bankLinkedAt = "wallet_bank_linked_at"
     }
 
     private func load() {
@@ -109,6 +113,7 @@ final class WalletStore: ObservableObject {
         accNo = d.string(forKey: Key.accNo.rawValue)
         accName = d.string(forKey: Key.accName.rawValue)
         limitPin = d.object(forKey: Key.limitPin.rawValue) != nil ? Int64(d.integer(forKey: Key.limitPin.rawValue)) : nil
+        bankLinkedAt = d.string(forKey: Key.bankLinkedAt.rawValue)
     }
 
     private func persist() {
@@ -122,6 +127,7 @@ final class WalletStore: ObservableObject {
         setOrRemove(d, Key.accNo, accNo)
         setOrRemove(d, Key.accName, accName)
         if let limitPin { d.set(Int(limitPin), forKey: Key.limitPin.rawValue) } else { d.removeObject(forKey: Key.limitPin.rawValue) }
+        setOrRemove(d, Key.bankLinkedAt, bankLinkedAt)
     }
 
     private func setOrRemove(_ d: UserDefaults, _ key: Key, _ value: String?) {

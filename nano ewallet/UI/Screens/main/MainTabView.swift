@@ -21,8 +21,11 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .home:
+                    // HomeView tự sở hữu NavigationStack riêng (push History/Contacts).
                     HomeView()
                 case .settings:
+                    // SettingsView tự sở hữu NavigationStack riêng (cần push nhiều
+                    // route con: Security -> ChangePassword/Devices...).
                     SettingsView()
                 }
             }

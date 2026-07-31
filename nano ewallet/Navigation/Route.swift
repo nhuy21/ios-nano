@@ -19,7 +19,22 @@ enum Route: Hashable {
     case walletOnboardingChoice(phone: String)
 
     // TODO (Phase 3): walletLinkBaoKim, cccdScan, kycReview, walletRules...
-    // TODO (Phase 2): main, và các route con
+}
+
+/// Route con của tab Settings — cây điều hướng riêng (NavigationStack độc lập với Auth).
+enum SettingsRoute: Hashable {
+    case security
+    case changePassword
+    case pinLimit
+    case devices
+    case linkedBanks
+    case termsOfUse
+}
+
+/// Route con của tab Home.
+enum HomeRoute: Hashable {
+    case history
+    case contacts
 }
 
 /// Trạng thái gốc của app — quyết định cây điều hướng nào được hiển thị.

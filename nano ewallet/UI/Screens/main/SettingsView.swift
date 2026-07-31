@@ -37,12 +37,22 @@ struct SettingsView: View {
 
     @State private var pushEnabled = NotificationPrefs.isEnabled
     @State private var speakOnReceiveEnabled = NotificationPrefs.speakOnReceiveEnabled
+    @State private var path: [SettingsRoute] = []
 
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
     }
 
     var body: some View {
+        NavigationStack(path: $path) {
+            settingsContent
+                .navigationDestination(for: SettingsRoute.self) { route in
+                    destination(for: route)
+                }
+        }
+    }
+
+    private var settingsContent: some View {
         ScrollView {
             VStack(spacing: 0) {
                 Text("Cá nhân")
@@ -59,17 +69,11 @@ struct SettingsView: View {
                 Spacer().frame(height: 24)
 
                 menuSection(title: "Tài khoản") {
-                    menuRow(title: "Ngân hàng liên kết", systemImage: "creditcard.fill") {
-                        comingSoonFeature = "Ngân hàng liên kết"
-                    }
+                    navMenuRow(title: "Ngân hàng liên kết", systemImage: "creditcard.fill", route: .linkedBanks)
                     divider
-                    menuRow(title: "Bảo mật & Mật khẩu", systemImage: "lock.fill") {
-                        comingSoonFeature = "Bảo mật & Mật khẩu"
-                    }
+                    navMenuRow(title: "Bảo mật & Mật khẩu", systemImage: "lock.fill", route: .security)
                     divider
-                    menuRow(title: "Ngưỡng xác thực PIN", systemImage: "slider.horizontal.3") {
-                        comingSoonFeature = "Ngưỡng xác thực PIN"
-                    }
+                    navMenuRow(title: "Ngưỡng xác thực PIN", systemImage: "slider.horizontal.3", route: .pinLimit)
                 }
 
                 Spacer().frame(height: 18)
@@ -100,9 +104,7 @@ struct SettingsView: View {
                 Spacer().frame(height: 18)
 
                 menuSection(title: "Khác") {
-                    menuRow(title: "Điều khoản sử dụng", systemImage: "doc.text.fill") {
-                        comingSoonFeature = "Điều khoản sử dụng"
-                    }
+                    navMenuRow(title: "Điều khoản sử dụng", systemImage: "doc.text.fill", route: .termsOfUse)
                     divider
                     menuRow(title: "Hỗ trợ", systemImage: "questionmark.circle.fill") {
                         showSupportDialog = true
@@ -135,6 +137,32 @@ struct SettingsView: View {
         .sheet(isPresented: $showSupportDialog) {
             SupportSheet(onDismiss: { showSupportDialog = false })
                 .presentationDetents([.height(320)])
+        }
+    }
+
+    private func popBack() {
+        if !path.isEmpty { path.removeLast() }
+    }
+
+    @ViewBuilder
+    private func destination(for route: SettingsRoute) -> some View {
+        switch route {
+        case .security:
+            SecurityView(
+                onBack: popBack,
+                onChangePassword: { path.append(.changePassword) },
+                onDevicesClick: { path.append(.devices) }
+            )
+        case .changePassword:
+            ChangePasswordView(onBack: popBack)
+        case .pinLimit:
+            PinLimitView(onBack: popBack)
+        case .devices:
+            DevicesView(onBack: popBack)
+        case .linkedBanks:
+            LinkedBanksView(onBack: popBack)
+        case .termsOfUse:
+            TermsOfUseView(onBack: popBack)
         }
     }
 
@@ -221,6 +249,14 @@ struct SettingsView: View {
             .fill(AppColor.line)
             .frame(height: 1)
             .padding(.leading, 56)
+    }
+
+    /// Mục menu điều hướng sang 1 màn con qua `path` — dùng cho các mục đã có UI thật
+    /// (khác `menuRow` dùng cho ComingSoonSheet hoặc action tuỳ biến khác).
+    private func navMenuRow(title: String, systemImage: String, route: SettingsRoute) -> some View {
+        menuRow(title: title, systemImage: systemImage) {
+            path.append(route)
+        }
     }
 
     private func menuRow(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
