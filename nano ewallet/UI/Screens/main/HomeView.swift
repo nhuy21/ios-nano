@@ -54,7 +54,9 @@ struct HomeView: View {
                     let username = sub.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
                     path.append(.walletTransfer(draft: WalletTransferDraft(username: username, holderName: name)))
                 },
-                onPickForRequest: { _, _ in if !path.isEmpty { path.removeLast() } }
+                onPickForRequest: { name, bkUsername in
+                    path.append(.conversation(otherName: name, otherBkUsername: bkUsername))
+                }
             )
         case .bankTransfer(let draft):
             BankTransferView(
@@ -86,6 +88,11 @@ struct HomeView: View {
                 amount: info.amount, recipientName: info.recipientName,
                 recipientDetail: info.recipientDetail, noteLabel: info.noteLabel, note: info.note,
                 onHome: { path.removeAll() }
+            )
+        case .conversation(let otherName, let otherBkUsername):
+            ConversationView(
+                otherName: otherName, otherBkUsername: otherBkUsername,
+                onBack: { if !path.isEmpty { path.removeLast() } }
             )
         }
     }

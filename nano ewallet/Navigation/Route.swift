@@ -45,6 +45,8 @@ enum HomeRoute: Hashable {
     case walletTransferAmount(WalletTransferDraft)
     /// Màn kết quả — giao dịch đã thực thi xong (SUCCESS hoặc PENDING đối soát).
     case transferSuccess(TransferSuccessInfo)
+    /// Cuộc thoại xin tiền với 1 người (mirror ConversationScreen.kt) — key theo bkUsername.
+    case conversation(otherName: String, otherBkUsername: String)
 }
 
 /// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet.
