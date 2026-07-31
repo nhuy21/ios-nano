@@ -176,7 +176,7 @@ enum AuthService {
         store.clearLastPhone()
         WalletStore.shared.clear()
         TransactionStore.shared.clear()
-        // TODO (Phase kế tiếp): clear BeneficiaryCache khi port xong beneficiaries.
+        BeneficiaryStore.shared.clear()
     }
 
     /// `GET auth/devices` — thiết bị đang đăng nhập, active trước rồi `lastUsedAt` giảm dần.

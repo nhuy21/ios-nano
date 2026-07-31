@@ -18,12 +18,38 @@ struct HomeView: View {
 
     @State private var showBalance = false
     @State private var comingSoonFeature: String?
+    @State private var detailTransaction: TransactionEntity?
+    @State private var path: [HomeRoute] = []
 
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
     }
 
     var body: some View {
+        NavigationStack(path: $path) {
+            homeContent
+                .navigationDestination(for: HomeRoute.self) { route in
+                    destination(for: route)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func destination(for route: HomeRoute) -> some View {
+        switch route {
+        case .history:
+            HistoryView(onBack: { if !path.isEmpty { path.removeLast() } })
+        case .contacts:
+            ContactsView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onPickForTransfer: { _ in if !path.isEmpty { path.removeLast() } },
+                onPickForWalletTransfer: { _, _ in if !path.isEmpty { path.removeLast() } },
+                onPickForRequest: { _, _ in if !path.isEmpty { path.removeLast() } }
+            )
+        }
+    }
+
+    private var homeContent: some View {
         ScrollView {
             VStack(spacing: 0) {
                 header
@@ -57,6 +83,9 @@ struct HomeView: View {
         }
         .background(Color(hex: 0xF3F5F7))
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
+        .sheet(item: $detailTransaction) { tx in
+            TransactionDetailSheet(tx: tx, onDismiss: { detailTransaction = nil })
+        }
         .task {
             // Home luôn revalidate số dư (force: true) — mirror WalletCache.refresh
             // được gọi lại mỗi lần vào Home bên Android, không "trúng cache là thôi".
@@ -176,7 +205,7 @@ struct HomeView: View {
 
             HStack(spacing: 10) {
                 pillButton(systemImage: "clock.arrow.circlepath", title: "Lịch sử") {
-                    comingSoonFeature = "Lịch sử giao dịch"
+                    path.append(.history)
                 }
                 pillButton(systemImage: "link", title: "Liên kết") {
                     comingSoonFeature = "Liên kết ngân hàng"
@@ -342,19 +371,19 @@ struct HomeView: View {
                     .foregroundStyle(AppColor.payInk)
                 Spacer()
                 Button("Xem tất cả") {
-                    comingSoonFeature = "Danh bạ"
+                    path.append(.contacts)
                 }
                 .buttonStyle(.plain)
                 .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(AppColor.brand)
             }
 
-            // TODO (Phase kế tiếp): nối BeneficiaryService, hiện danh bạ thật thay vì
-            // chỉ ô "Danh bạ" cố định.
+            // TODO (Phase kế tiếp): hiện vài danh bạ dùng gần đây thay vì chỉ ô "Danh bạ"
+            // cố định — cần BeneficiaryStore.beneficiaries đã sort theo lastUsedAt.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     contactItem(title: "Danh bạ", systemImage: "person.2.fill", isPlain: true) {
-                        comingSoonFeature = "Danh bạ"
+                        path.append(.contacts)
                     }
                 }
             }
@@ -397,7 +426,7 @@ struct HomeView: View {
                     .foregroundStyle(AppColor.payInk)
                 Spacer()
                 Button("Xem tất cả") {
-                    comingSoonFeature = "Lịch sử giao dịch"
+                    path.append(.history)
                 }
                 .buttonStyle(.plain)
                 .font(AppFont.beVietnamPro(13, .semibold))
@@ -441,21 +470,22 @@ struct HomeView: View {
     }
 
     private func transactionRow(_ tx: TransactionEntity) -> some View {
-        Button {
-            comingSoonFeature = "Chi tiết giao dịch"
+        let icon = TransactionDisplay.iconStyle(for: tx)
+        return Button {
+            detailTransaction = tx
         } label: {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(tx.isIncome ? AppColor.okSoft : AppColor.errorSoft)
+                    .fill(icon.background)
                     .frame(width: 30, height: 30)
                     .overlay {
-                        Image(systemName: tx.isIncome ? "arrow.down.left" : "arrow.up.right")
+                        Image(systemName: icon.systemImage)
                             .font(.system(size: 14))
-                            .foregroundStyle(tx.isIncome ? AppColor.ok : AppColor.error)
+                            .foregroundStyle(icon.tint)
                     }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title(for: tx))
+                    Text(TransactionDisplay.listTitle(for: tx))
                         .font(AppFont.beVietnamPro(14, .semibold))
                         .foregroundStyle(AppColor.payInk)
                         .lineLimit(2)
@@ -469,7 +499,7 @@ struct HomeView: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(signedAmount(for: tx))
                         .font(AppFont.beVietnamPro(13, .semibold))
-                        .foregroundStyle(tx.isIncome ? AppColor.ok : AppColor.payInk)
+                        .foregroundStyle(TransactionDisplay.amountColor(for: tx))
                     Text(formattedTime(tx.createdAt))
                         .font(.system(size: 11))
                         .foregroundStyle(AppColor.payMuted)
@@ -478,23 +508,6 @@ struct HomeView: View {
             .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
-    }
-
-    private func title(for tx: TransactionEntity) -> String {
-        switch tx.kind {
-        case .transferOut:
-            return "Chuyển tiền đến \(tx.benAccName ?? tx.benBankName ?? "người nhận")"
-        case .transferIn:
-            return "Nhận tiền từ \(tx.benAccName ?? "ví nano")"
-        case .topUp:
-            return "Nạp tiền vào ví"
-        case .withdraw:
-            return "Rút tiền về \(tx.benBankName ?? "ngân hàng")"
-        case .refund:
-            return "Hoàn tiền"
-        case .none:
-            return tx.description ?? "Giao dịch"
-        }
     }
 
     private func subtitle(for tx: TransactionEntity) -> String {
