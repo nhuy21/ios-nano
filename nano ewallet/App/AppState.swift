@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Combine
 
 /// Điều phối trạng thái gốc của app — mirror logic trong `SplashScreen.kt`.
 ///
