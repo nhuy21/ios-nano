@@ -76,30 +76,32 @@ enum TransactionDisplay {
         }
     }
 
-    /// (icon SF Symbol, màu nền pastel, màu icon) — theo type, bị status FAILED/PENDING ghi đè.
-    static func iconStyle(for tx: TransactionEntity) -> (systemImage: String, background: Color, tint: Color) {
+    /// (icon vector port từ Android, màu nền pastel, màu icon) — theo type, bị status
+    /// FAILED ghi đè icon (PENDING/PROCESSING giữ nguyên icon gốc theo type, chỉ đổi màu
+    /// — đúng hành vi HistoryScreen.kt).
+    static func iconStyle(for tx: TransactionEntity) -> (icon: TransactionIconKind, background: Color, tint: Color) {
         if isFailedStatus(tx) {
-            return ("xmark.circle.fill", Color(hex: 0xFFE3D6), Color(hex: 0xE8531F))
+            return (.txnFailed, Color(hex: 0xFFE3D6), Color(hex: 0xE8531F))
         }
         if isPendingStatus(tx) {
-            return (pendingIcon(for: tx), Color(hex: 0xFFF6D9), Color(hex: 0xE6A200))
+            return (iconKind(for: tx.kind), Color(hex: 0xFFF6D9), Color(hex: 0xE6A200))
         }
         switch tx.kind {
         case .topUp:
-            return ("wallet.pass.fill", Color(hex: 0xFFF1E0), Color(hex: 0xF5901E))
+            return (.saveMoney, Color(hex: 0xFFF1E0), Color(hex: 0xF5901E))
         case .withdraw:
-            return ("arrow.down.circle.fill", Color(hex: 0xECEAFF), Color(hex: 0x6A6AF5))
+            return (.withdrawArrow, Color(hex: 0xECEAFF), Color(hex: 0x6A6AF5))
         case .transferIn:
-            return ("arrow.down.left.circle.fill", Color(hex: 0xE4F6EC), Color(hex: 0x22A45D))
+            return (.moneyReceive, Color(hex: 0xE4F6EC), Color(hex: 0x22A45D))
         case .refund:
-            return ("arrow.uturn.left.circle.fill", Color(hex: 0xE0EAFF), Color(hex: 0x1A3FBF))
+            return (.refund, Color(hex: 0xE0EAFF), Color(hex: 0x1A3FBF))
         case .transferOut:
             if tx.benBankName != nil {
-                return ("building.columns.fill", Color(hex: 0xE3F1FF), Color(hex: 0x2C93E8))
+                return (.bankTransfer, Color(hex: 0xE3F1FF), Color(hex: 0x2C93E8))
             }
-            return ("arrow.up.right.circle.fill", Color(hex: 0xFFE8E1), Color(hex: 0xE5484D))
+            return (.moneySend, Color(hex: 0xFFE8E1), Color(hex: 0xE5484D))
         case .none:
-            return ("circle.fill", Color(hex: 0xF6F7F9), AppColor.payMuted)
+            return (.transferArrows, Color(hex: 0xF6F7F9), AppColor.payMuted)
         }
     }
 
@@ -136,18 +138,14 @@ enum TransactionDisplay {
         }
     }
 
-    private static func pendingIcon(for tx: TransactionEntity) -> String {
-        iconStyleIgnoringStatus(for: tx.kind)
-    }
-
-    private static func iconStyleIgnoringStatus(for kind: TransactionType?) -> String {
+    private static func iconKind(for kind: TransactionType?) -> TransactionIconKind {
         switch kind {
-        case .topUp: return "wallet.pass.fill"
-        case .withdraw: return "arrow.down.circle.fill"
-        case .transferIn: return "arrow.down.left.circle.fill"
-        case .refund: return "arrow.uturn.left.circle.fill"
-        case .transferOut: return "arrow.up.right.circle.fill"
-        case .none: return "circle.fill"
+        case .topUp: return .saveMoney
+        case .withdraw: return .withdrawArrow
+        case .transferIn: return .moneyReceive
+        case .refund: return .refund
+        case .transferOut: return .moneySend
+        case .none: return .transferArrows
         }
     }
 }
