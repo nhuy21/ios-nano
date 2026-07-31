@@ -19,3 +19,9 @@ Pods/
 
 # Firebase config (nhạy cảm, không commit)
 GoogleService-Info.plist
+
+# Config môi trường — .env.example thì commit, .env thì không
+.env
+Config.xcconfig
+
+PLAN.md

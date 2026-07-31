@@ -35,7 +35,18 @@ thêm vào `nano ewallet/` tự động được Xcode nhận vào target, khôn
 | `INTERNET` / `ACCESS_NETWORK_STATE`  | Không cần khai báo — theo dõi qua `NWPathMonitor` (`NetworkMonitor.swift`) |
 | App Links (`nano.casso.dev/pay`)     | Universal Links qua `com.apple.developer.associated-domains` (entitlements) |
 | Custom scheme `nanowallet://pay`     | `CFBundleURLTypes` (Info.plist)                                 |
-| FCM (`MyFirebaseMessagingService`)   | Cần thêm package `firebase-ios-sdk` (File > Add Package Dependencies) rồi wire vào `AppDelegate.swift` (đã để sẵn TODO) |
+| FCM (`MyFirebaseMessagingService`)   | `FirebaseMessaging` + `MessagingDelegate` trong `AppDelegate.swift` (đã viết sẵn — **cần thêm SPM package**, xem dưới) |
+
+## Firebase
+
+- **Bundle ID: `com.nanowallet.app`** — phải khớp `BUNDLE_ID` trong `GoogleService-Info.plist`,
+  đừng đổi lẻ một bên. Firebase project: `nanocasso26`.
+- `GoogleService-Info.plist` đã có trong `nano ewallet/` nhưng **không commit**
+- Code trong `AppDelegate.swift` / `PushRegistrar.swift` đã `import FirebaseCore` +
+  `FirebaseMessaging` → **project chưa build được cho tới khi thêm SPM package**:
+
+  File > Add Package Dependencies... > `https://github.com/firebase/firebase-ios-sdk`
+  → chọn product **FirebaseMessaging** (tự kéo theo FirebaseCore).
 
 ## Việc cần làm tiếp trên Xcode (Mac)
 
