@@ -22,8 +22,10 @@ struct LoginView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: 28)
 
-                // TODO: thay Image("login_signin") khi copy được asset minh hoạ từ Android.
-                Color.clear.frame(height: 1)
+                Image("login_signin")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
 
                 Spacer().frame(height: 16)
 

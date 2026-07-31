@@ -24,8 +24,11 @@ struct WalletOnboardingChoiceView: View {
 
                 Spacer().frame(height: 24)
 
-                // TODO: thay Color.clear bằng Image("ic_vi") khi copy được asset.
-                Color.clear.frame(width: 150, height: 150)
+                Image("ic_vi")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 150, height: 150)
+                    .frame(maxWidth: .infinity)
 
                 Spacer().frame(height: 20)
 
@@ -67,10 +70,11 @@ struct WalletOnboardingChoiceView: View {
     private var baoKimCard: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
-                // TODO: thay bằng Image("logo_baokim") khi copy được asset.
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(AppColor.brandSoft)
+                Image("logo_baokim")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Đồng bộ từ ví Bảo Kim")

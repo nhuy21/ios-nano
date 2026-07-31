@@ -28,8 +28,11 @@ struct RegisterView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // TODO: thay Color.clear bằng Image("register_signup") khi có asset.
-                    Color.clear.frame(height: 1)
+                    Image("register_signup")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 260)
 
                     Spacer().frame(height: 10)
 
