@@ -53,6 +53,7 @@ struct LoginView: View {
                     focusedField = .password
                 }
                 .focused($focusedField, equals: .phone)
+                .numericKeyboardToolbar { focusedField = .password }
                 if let phoneError = vm.errors["phone"] {
                     FieldError(message: phoneError)
                 }
@@ -68,6 +69,7 @@ struct LoginView: View {
                     submitLabel: .done,
                     onSubmit: submit
                 )
+                .numericKeyboardToolbar(label: "Xong", action: submit)
                 if let passwordError = vm.errors["password"] {
                     FieldError(message: passwordError)
                 }

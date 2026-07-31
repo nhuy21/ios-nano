@@ -53,6 +53,7 @@ struct WelcomeBackView: View {
                     submitLabel: .done,
                     onSubmit: submit
                 )
+                .numericKeyboardToolbar(label: "Xong", action: submit)
 
                 if let errorMsg = vm.errorMsg {
                     FieldError(message: errorMsg)

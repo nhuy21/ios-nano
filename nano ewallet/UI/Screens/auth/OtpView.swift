@@ -115,6 +115,7 @@ struct OtpView: View {
                 .focused($isFocused)
                 .opacity(0)
                 .frame(width: 1, height: 1)
+                .numericKeyboardToolbar(label: "Xong") { isFocused = false }
 
             HStack(spacing: 10) {
                 ForEach(0..<OtpViewModel.otpLength, id: \.self) { index in

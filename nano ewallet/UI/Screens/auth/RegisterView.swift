@@ -51,6 +51,7 @@ struct RegisterView: View {
                         ) {
                             focusedField = .email
                         }
+                        .numericKeyboardToolbar { focusedField = .email }
                     }
                     if let error = vm.errors["phone"] {
                         FieldError(message: error, alignment: .leading)
@@ -86,6 +87,7 @@ struct RegisterView: View {
                             focusedField = .confirm
                         }
                         .focused($focusedField, equals: .password)
+                        .numericKeyboardToolbar { focusedField = .confirm }
                     }
                     if let error = vm.errors["password"] {
                         FieldError(message: error, alignment: .leading)
@@ -103,6 +105,7 @@ struct RegisterView: View {
                             onSubmit: submit
                         )
                         .focused($focusedField, equals: .confirm)
+                        .numericKeyboardToolbar(label: "Xong", action: submit)
                     }
                     if let error = vm.errors["confirmPassword"] {
                         FieldError(message: error, alignment: .leading)

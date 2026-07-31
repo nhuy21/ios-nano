@@ -241,6 +241,10 @@ struct ForgotPasswordView: View {
                 digitsOnly: keyboardType == .numberPad || keyboardType == .phonePad,
                 onSubmit: onSubmit
             )
+            .numericKeyboardToolbar(
+                label: submitLabel == .done ? "Xong" : "Tiếp theo",
+                action: onSubmit
+            )
             if let error {
                 FieldError(message: error)
             }

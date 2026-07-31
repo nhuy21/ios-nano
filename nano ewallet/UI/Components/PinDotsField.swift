@@ -32,6 +32,7 @@ struct PinDotsField: View {
 
     @State private var showValue = false
     @FocusState private var isFocused: Bool
+    @State private var caretVisible = true
 
     private let maxLength = 6
     private let dotSpacing: CGFloat = 14
@@ -96,22 +97,47 @@ struct PinDotsField: View {
         .inputShadow()
         .contentShape(Rectangle())
         .onTapGesture { isFocused = true }
+        .onChange(of: isFocused, initial: true) { _, focused in
+            if focused {
+                startBlinking()
+            } else {
+                caretVisible = false
+            }
+        }
+    }
+
+    /// Nhấp nháy 1s/chu kỳ — giống caret bàn phím thật, để user biết đang gõ tới đâu.
+    private func startBlinking() {
+        caretVisible = true
+        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+            caretVisible.toggle()
+        }
     }
 
     private var dots: some View {
         HStack(spacing: dotSpacing) {
             ForEach(0..<maxLength, id: \.self) { index in
                 let digit = digitAt(index)
+                // Ô đang chờ nhập tiếp theo — chỉ 1 ô duy nhất, và chỉ khi field đang focus.
+                let isActiveSlot = isFocused && index == value.count
+
                 ZStack {
                     if showValue, let digit {
                         Text(String(digit))
                             .font(AppFont.beVietnamPro(18, .semibold))
                             .foregroundStyle(AppColor.payInk)
+                    } else if digit != nil {
+                        Circle()
+                            .fill(AppColor.payInk)
+                            .frame(width: 11, height: 11)
+                    } else if isActiveSlot {
+                        Rectangle()
+                            .fill(AppColor.brand)
+                            .frame(width: 2, height: 24)
+                            .opacity(caretVisible ? 1 : 0)
                     } else {
                         Circle()
-                            .fill(digit != nil
-                                  ? AppColor.payInk
-                                  : AppColor.payPlaceholder.opacity(0.35))
+                            .fill(AppColor.payPlaceholder.opacity(0.35))
                             .frame(width: 11, height: 11)
                     }
                 }
