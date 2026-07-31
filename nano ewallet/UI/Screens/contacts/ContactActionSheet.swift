@@ -32,7 +32,9 @@ struct ContactActionSheet: View {
             actionRow(title: "Chuyển tiền", systemImage: "paperplane.fill", tint: AppColor.brand, action: onTransfer)
 
             if canRequest {
-                actionRow(title: "Cấp cứu ví tui", systemImage: "hand.raised.fill", tint: AppColor.brand, action: onRequest)
+                actionRowCustomIcon(
+                    title: "Cấp cứu ví tui", icon: .requestMoney, tint: AppColor.brand, action: onRequest
+                )
             }
 
             actionRow(title: "Đổi tên gợi nhớ", systemImage: "pencil", tint: AppColor.payInk, action: onEditNickname)
@@ -51,6 +53,25 @@ struct ContactActionSheet: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 16))
                     .foregroundStyle(tint)
+                    .frame(width: 24)
+                Text(title)
+                    .font(AppFont.beVietnamPro(15))
+                    .foregroundStyle(tint)
+                Spacer()
+            }
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// "Cấp cứu ví tui" — icon vẽ tay từ Android (ic_request_money), không phải Material Icon.
+    private func actionRowCustomIcon(
+        title: String, icon: TransactionIconKind, tint: Color, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                TransactionIcon(kind: icon, tint: tint)
+                    .frame(width: 18, height: 18)
                     .frame(width: 24)
                 Text(title)
                     .font(AppFont.beVietnamPro(15))

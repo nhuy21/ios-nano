@@ -121,7 +121,7 @@ struct HistoryView: View {
                 Button {
                     searchText = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(systemName: "xmark")
                         .foregroundStyle(AppColor.payMuted)
                 }
                 .buttonStyle(.plain)
@@ -148,7 +148,7 @@ struct HistoryView: View {
                 dateEnd = nil
                 triggerSearchOrReload()
             } label: {
-                Image(systemName: "xmark.circle.fill")
+                Image(systemName: "xmark")
                     .font(.system(size: 12))
             }
             .buttonStyle(.plain)
@@ -289,9 +289,8 @@ struct HistoryView: View {
                     .fill(icon.background)
                     .frame(width: 30, height: 30)
                     .overlay {
-                        Image(systemName: icon.systemImage)
-                            .font(.system(size: 14))
-                            .foregroundStyle(icon.tint)
+                        TransactionIcon(kind: icon.icon, tint: icon.tint)
+                            .frame(width: 16, height: 16)
                     }
 
                 VStack(alignment: .leading, spacing: 2) {

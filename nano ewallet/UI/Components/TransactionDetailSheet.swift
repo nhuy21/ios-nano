@@ -20,9 +20,8 @@ struct TransactionDetailSheet: View {
                     .padding(.top, 8)
 
                 let icon = TransactionDisplay.iconStyle(for: tx)
-                Image(systemName: icon.systemImage)
-                    .font(.system(size: 40))
-                    .foregroundStyle(icon.tint)
+                TransactionIcon(kind: icon.icon, tint: icon.tint)
+                    .frame(width: 40, height: 40)
 
                 Text(signedAmount)
                     .font(AppFont.baloo2(30, .heavy))

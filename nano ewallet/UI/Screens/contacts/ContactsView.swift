@@ -151,7 +151,7 @@ struct ContactsView: View {
                 Button {
                     searchText = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(AppColor.payMuted)
+                    Image(systemName: "xmark").foregroundStyle(AppColor.payMuted)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Xoá")
@@ -265,8 +265,11 @@ struct ContactsView: View {
             Button {
                 actionTarget = contact
             } label: {
+                // Material "MoreVert" là 3 chấm DỌC — SF Symbol "ellipsis" mặc định nằm
+                // ngang, xoay 90° để đúng ý nghĩa gốc.
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16))
+                    .rotationEffect(.degrees(90))
                     .foregroundStyle(AppColor.payMuted)
                     .frame(width: 32, height: 32)
             }

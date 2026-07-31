@@ -109,7 +109,16 @@ struct HomeView: View {
             iconButton(systemImage: "mic.fill") { comingSoonFeature = "Trợ lý giọng nói" }
 
             ZStack(alignment: .topTrailing) {
-                iconButton(systemImage: "bell.fill") { comingSoonFeature = "Thông báo" }
+                Button {
+                    comingSoonFeature = "Thông báo"
+                } label: {
+                    TransactionIcon(kind: .notificationBell, tint: AppColor.payInk)
+                        .frame(width: 18, height: 18)
+                        .frame(width: 42, height: 42)
+                        .background(Color.black.opacity(0.06))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
                 Circle()
                     .fill(AppColor.error)
                     .frame(width: 8, height: 8)
@@ -313,14 +322,16 @@ struct HomeView: View {
     private struct ServiceItem: Identifiable {
         let id = UUID()
         let title: String
-        let systemImage: String
+        let icon: TransactionIconKind
     }
 
+    /// Icon đúng thứ tự + hình dạng bản gốc Android (SERVICES trong HomeScreen.kt):
+    /// ic_bank_transfer, ic_transfer_arrows, ic_paste_ck, ic_wallet_topup.
     private let services: [ServiceItem] = [
-        .init(title: "Chuyển tiền ngân hàng", systemImage: "building.columns"),
-        .init(title: "Chuyển tiền", systemImage: "arrow.left.arrow.right"),
-        .init(title: "OneTouch", systemImage: "hand.tap"),
-        .init(title: "Nạp/Rút ví", systemImage: "creditcard"),
+        .init(title: "Chuyển tiền ngân hàng", icon: .bankTransfer),
+        .init(title: "Chuyển tiền", icon: .transferArrows),
+        .init(title: "OneTouch", icon: .pasteCk),
+        .init(title: "Nạp/Rút ví", icon: .walletTopup),
     ]
 
     private var servicesSection: some View {
@@ -339,9 +350,8 @@ struct HomeView: View {
                                 .fill(Color(hex: 0xF5F7F6))
                                 .frame(width: 52, height: 52)
                                 .overlay {
-                                    Image(systemName: service.systemImage)
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(Color(hex: 0x12A150))
+                                    TransactionIcon(kind: service.icon, tint: Color(hex: 0x12A150))
+                                        .frame(width: 22, height: 22)
                                 }
                             Text(service.title)
                                 .font(.system(size: 11))
@@ -479,9 +489,8 @@ struct HomeView: View {
                     .fill(icon.background)
                     .frame(width: 30, height: 30)
                     .overlay {
-                        Image(systemName: icon.systemImage)
-                            .font(.system(size: 14))
-                            .foregroundStyle(icon.tint)
+                        TransactionIcon(kind: icon.icon, tint: icon.tint)
+                            .frame(width: 16, height: 16)
                     }
 
                 VStack(alignment: .leading, spacing: 2) {
