@@ -174,8 +174,9 @@ enum AuthService {
         }
         store.clearTokens()
         store.clearLastPhone()
-        // TODO (Phase 2): clear WalletCache / BeneficiaryCache / TransactionRepository
-        // để không lộ dữ liệu user cũ cho lần đăng nhập sau (mirror AuthApi.logout).
+        WalletStore.shared.clear()
+        TransactionStore.shared.clear()
+        // TODO (Phase kế tiếp): clear BeneficiaryCache khi port xong beneficiaries.
     }
 
     /// `GET auth/devices` — thiết bị đang đăng nhập, active trước rồi `lastUsedAt` giảm dần.

@@ -33,20 +33,25 @@ final class PushRegistrar {
     }
 
     /// Firebase cấp/refresh FCM token -> đăng ký với BE.
-    /// Fire-and-forget giống Android (lỗi chỉ log, không chặn UI).
+    /// Fire-and-forget giống Android (lỗi chỉ log, không chặn UI, best-effort).
     func onFcmTokenRefresh(_ token: String?) {
         guard let token, !token.isEmpty else { return }
-        Task {
-            // TODO (Phase 2): POST devices/register
-            //   body: { token, deviceId, platform: "IOS" }
-            //   deviceId lấy từ KeychainStore (UUID sinh 1 lần, giữ nguyên qua các lần cài lại)
-            //   Android gửi platform "ANDROID" — iOS phải gửi "IOS".
+        Task { @MainActor in
+            let deviceId = AuthStore.shared.getOrCreateDeviceId()
+            let body = RegisterDeviceRequest(token: token, deviceId: deviceId)
+            do {
+                try await APIClient.shared.requestVoid(.post, "devices/register", body: body, auth: true)
+            } catch {
+                print("[Push] Đăng ký device token lỗi: \(error)")
+            }
         }
     }
 
-    /// Gọi khi logout hoặc user tắt push — mirror DeviceTokenApi.unregister.
+    /// Gọi khi logout hoặc user tắt push — mirror DeviceTokenApi.unregister. Best-effort.
     func unregister() async {
-        // TODO (Phase 2): POST devices/unregister với body { deviceId }
+        let deviceId = await AuthStore.shared.getOrCreateDeviceId()
+        let body = UnregisterDeviceRequest(deviceId: deviceId)
+        try? await APIClient.shared.requestVoid(.post, "devices/unregister", body: body, auth: true)
     }
 
     /// Lấy FCM token hiện tại (dùng khi bật lại push trong Settings).
