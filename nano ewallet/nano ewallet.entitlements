@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Universal Links: https://nano.casso.dev/pay -> mở app.
+         Cần host file /.well-known/apple-app-site-association trên domain (tương tự assetlinks.json bên Android). -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>applinks:nano.casso.dev</string>
+    </array>
+
+    <!-- Push Notifications (APNs) — tương ứng POST_NOTIFICATIONS -->
+    <key>aps-environment</key>
+    <string>development</string>
+
+    <!-- NFC Tag Reading — tương ứng android.hardware.nfc -->
+    <key>com.apple.developer.nfc.readersession.formats</key>
+    <array>
+        <string>TAG</string>
+    </array>
+</dict>
+</plist>

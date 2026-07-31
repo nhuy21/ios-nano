@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  MainScreen.swift
 //  nano ewallet
 //
 //  Created by Le Tran Nhu Y on 30/7/26.
@@ -7,18 +7,19 @@
 
 import SwiftUI
 
-struct ContentView: View {
+/// Màn hình chính (tab bar) — tương ứng MainScreen.kt phía Android (flash-wallet).
+struct MainScreen: View {
     var body: some View {
         VStack {
-            Image(systemName: "globe")
+            Image(systemName: "wallet.pass")
                 .imageScale(.large)
                 .foregroundStyle(.tint)
-            Text("Hello, world!")
+            Text("NanoWallet")
         }
         .padding()
     }
 }
 
 #Preview {
-    ContentView()
+    MainScreen()
 }

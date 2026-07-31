@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+    </dict>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- Camera: quét CCCD / eKYC face capture — tương ứng android.permission.CAMERA -->
+    <key>NSCameraUsageDescription</key>
+    <string>Ứng dụng cần quyền camera để quét CCCD và xác thực khuôn mặt (eKYC).</string>
+
+    <!-- Microphone: voice command / TTS listener — tương ứng android.permission.RECORD_AUDIO -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Ứng dụng cần quyền micro để nhận diện lệnh giọng nói.</string>
+
+    <!-- Speech recognition: tương ứng RecognitionService query trên Android -->
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Ứng dụng cần quyền nhận diện giọng nói để thực hiện lệnh bằng giọng nói.</string>
+
+    <!-- NFC: đọc chip CCCD/thẻ ngân hàng — tương ứng android.hardware.nfc -->
+    <key>NFCReaderUsageDescription</key>
+    <string>Ứng dụng cần quyền NFC để đọc thông tin chip trên CCCD.</string>
+
+    <!-- Push notification (background remote-notification) — tương ứng POST_NOTIFICATIONS -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+    </array>
+
+    <!-- Custom scheme dự phòng: nanowallet://pay -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.nanowallet.nano-ewallet</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>nanowallet</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

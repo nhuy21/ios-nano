@@ -1,0 +1,21 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcscmblueprint
+DerivedData/
+.build/
+
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# CocoaPods (nếu dùng sau này)
+Pods/
+
+# Firebase config (nhạy cảm, không commit)
+GoogleService-Info.plist
