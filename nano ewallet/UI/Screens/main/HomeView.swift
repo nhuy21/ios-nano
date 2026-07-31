@@ -42,9 +42,50 @@ struct HomeView: View {
         case .contacts:
             ContactsView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onPickForTransfer: { _ in if !path.isEmpty { path.removeLast() } },
-                onPickForWalletTransfer: { _, _ in if !path.isEmpty { path.removeLast() } },
+                onPickForTransfer: { beneficiary in
+                    path.append(.bankTransfer(draft: BankTransferDraft(
+                        bin: beneficiary.bankNo ?? "",
+                        bankName: BankCache.shared.bank(bin: beneficiary.bankNo)?.shortName ?? "Ngân hàng",
+                        accNo: beneficiary.accNo ?? "", accType: 0,
+                        holderName: beneficiary.accName ?? beneficiary.displayName
+                    )))
+                },
+                onPickForWalletTransfer: { name, sub in
+                    let username = sub.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+                    path.append(.walletTransfer(draft: WalletTransferDraft(username: username, holderName: name)))
+                },
                 onPickForRequest: { _, _ in if !path.isEmpty { path.removeLast() } }
+            )
+        case .bankTransfer(let draft):
+            BankTransferView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                initialDraft: draft,
+                onContinue: { draft in path.append(.bankTransferAmount(draft)) },
+                onOpenContacts: { path.append(.contacts) }
+            )
+        case .walletTransfer(let draft):
+            WalletTransferView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                initialDraft: draft,
+                onContinue: { draft in path.append(.walletTransferAmount(draft)) }
+            )
+        case .bankTransferAmount(let draft):
+            BankTransferAmountView(
+                draft: draft,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onSuccess: { info in path.append(.transferSuccess(info)) }
+            )
+        case .walletTransferAmount(let draft):
+            WalletTransferAmountView(
+                draft: draft,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onSuccess: { info in path.append(.transferSuccess(info)) }
+            )
+        case .transferSuccess(let info):
+            TransferSuccessView(
+                amount: info.amount, recipientName: info.recipientName,
+                recipientDetail: info.recipientDetail, noteLabel: info.noteLabel, note: info.note,
+                onHome: { path.removeAll() }
             )
         }
     }
@@ -343,7 +384,14 @@ struct HomeView: View {
             HStack(spacing: 0) {
                 ForEach(services) { service in
                     Button {
-                        comingSoonFeature = service.title
+                        switch service.icon {
+                        case .bankTransfer:
+                            path.append(.bankTransfer(draft: nil))
+                        case .transferArrows:
+                            path.append(.walletTransfer(draft: nil))
+                        default:
+                            comingSoonFeature = service.title
+                        }
                     } label: {
                         VStack(spacing: 6) {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
