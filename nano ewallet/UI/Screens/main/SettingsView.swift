@@ -1,0 +1,398 @@
+//
+//  SettingsView.swift
+//  nano ewallet
+//
+//  Mirror SettingsScreen.kt. Palette riêng của màn này (không hoàn toàn dùng
+//  AppColor chuẩn) — giữ đúng giá trị hex khảo sát được, KỆ tên biến gốc gây
+//  nhầm ("AccentOrange"/"OrangePillBg" đều là hex xanh lá, không phải cam).
+//
+//  Toggle "Thông báo" gọi PushRegistrar.syncCurrentToken()/unregister() thật,
+//  không hardcode. Đăng xuất/hỗ trợ đều có dialog xác nhận như bản gốc.
+//
+
+import SwiftUI
+import UIKit
+
+private enum SettingsColor {
+    static let screenBg = Color(hex: 0xF7F8FA)
+    static let accent = Color(hex: 0x00A85E)
+    static let greenVerify = Color(hex: 0x22A45D)
+    static let greenPillBg = Color(hex: 0xE8F7EF)
+    static let orangePillBg = Color(hex: 0xE6F7EE)
+    static let redLogout = Color(hex: 0xE5484D)
+}
+
+private let supportPhone = "0986995079"
+private let supportEmail = "nhiep9145@gmail.com"
+
+@MainActor
+struct SettingsView: View {
+    @StateObject private var appState = AppState.shared
+    @StateObject private var authStore = AuthStore.shared
+
+    @State private var comingSoonFeature: String?
+    @State private var isLoggingOut = false
+    @State private var showLogoutConfirm = false
+    @State private var showSupportDialog = false
+
+    @State private var pushEnabled = NotificationPrefs.isEnabled
+    @State private var speakOnReceiveEnabled = NotificationPrefs.speakOnReceiveEnabled
+
+    private var showingComingSoon: Binding<Bool> {
+        Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                Text("Cá nhân")
+                    .font(AppFont.beVietnamPro(20, .bold))
+                    .foregroundStyle(AppColor.payInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+
+                Spacer().frame(height: 16)
+
+                profileBlock
+
+                Spacer().frame(height: 24)
+
+                menuSection(title: "Tài khoản") {
+                    menuRow(title: "Ngân hàng liên kết", systemImage: "creditcard.fill") {
+                        comingSoonFeature = "Ngân hàng liên kết"
+                    }
+                    divider
+                    menuRow(title: "Bảo mật & Mật khẩu", systemImage: "lock.fill") {
+                        comingSoonFeature = "Bảo mật & Mật khẩu"
+                    }
+                    divider
+                    menuRow(title: "Ngưỡng xác thực PIN", systemImage: "slider.horizontal.3") {
+                        comingSoonFeature = "Ngưỡng xác thực PIN"
+                    }
+                }
+
+                Spacer().frame(height: 18)
+
+                menuSection(title: "Cài đặt") {
+                    toggleRow(
+                        title: "Thông báo",
+                        systemImage: "bell.fill",
+                        isOn: $pushEnabled
+                    ) { enabled in
+                        NotificationPrefs.isEnabled = enabled
+                        if enabled {
+                            PushRegistrar.shared.syncCurrentToken()
+                        } else {
+                            Task { await PushRegistrar.shared.unregister() }
+                        }
+                    }
+                    divider
+                    toggleRow(
+                        title: "Loa báo nhận tiền",
+                        systemImage: "speaker.wave.2.fill",
+                        isOn: $speakOnReceiveEnabled
+                    ) { enabled in
+                        NotificationPrefs.speakOnReceiveEnabled = enabled
+                    }
+                }
+
+                Spacer().frame(height: 18)
+
+                menuSection(title: "Khác") {
+                    menuRow(title: "Điều khoản sử dụng", systemImage: "doc.text.fill") {
+                        comingSoonFeature = "Điều khoản sử dụng"
+                    }
+                    divider
+                    menuRow(title: "Hỗ trợ", systemImage: "questionmark.circle.fill") {
+                        showSupportDialog = true
+                    }
+                }
+
+                Spacer().frame(height: 24)
+
+                logoutButton
+                    .padding(.horizontal, 20)
+
+                Spacer().frame(height: 16)
+
+                Text("Phiên bản 1.0.0")
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColor.payMuted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                Spacer().frame(height: 120)
+            }
+        }
+        .background(SettingsColor.screenBg)
+        .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
+        .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
+            Button("Huỷ", role: .cancel) {}
+            Button("Đăng xuất", role: .destructive) { logout() }
+        } message: {
+            Text("Bạn có chắc muốn đăng xuất?")
+        }
+        .sheet(isPresented: $showSupportDialog) {
+            SupportSheet(onDismiss: { showSupportDialog = false })
+                .presentationDetents([.height(320)])
+        }
+    }
+
+    // MARK: - Profile block
+
+    private var profileBlock: some View {
+        VStack(spacing: 8) {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: 80, height: 80)
+                .overlay {
+                    Text(initials)
+                        .font(AppFont.baloo2(28, .heavy))
+                        .foregroundStyle(.white)
+                }
+                .shadow(color: SettingsColor.accent.opacity(0.25), radius: 10, x: 0, y: 4)
+
+            Text(displayName)
+                .font(AppFont.baloo2(18, .bold))
+                .foregroundStyle(AppColor.payInk)
+
+            if let phone = authStore.userPhone, !phone.isEmpty {
+                Text(phone)
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppColor.payMuted)
+            }
+
+            verificationBadge
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var isVerified: Bool {
+        UserStatus(raw: authStore.lastKnownStatus) == .active
+    }
+
+    private var verificationBadge: some View {
+        Button {
+            if !isVerified { comingSoonFeature = "Xác thực tài khoản" }
+        } label: {
+            Text(isVerified ? "Đã xác thực" : "Xác thực ngay")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isVerified ? SettingsColor.greenVerify : SettingsColor.accent)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isVerified ? SettingsColor.greenPillBg : SettingsColor.orangePillBg)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isVerified)
+    }
+
+    // MARK: - Menu section
+
+    @ViewBuilder
+    private func menuSection<Content: View>(
+        title: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(AppFont.beVietnamPro(13, .semibold))
+                .foregroundStyle(AppColor.payMuted)
+                .padding(.horizontal, 4)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(AppColor.line)
+            .frame(height: 1)
+            .padding(.leading, 56)
+    }
+
+    private func menuRow(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                rowIcon(systemImage)
+                Text(title)
+                    .font(AppFont.beVietnamPro(14))
+                    .foregroundStyle(AppColor.payInk)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColor.payMuted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleRow(
+        title: String, systemImage: String, isOn: Binding<Bool>, onChange: @escaping (Bool) -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            rowIcon(systemImage)
+            Text(title)
+                .font(AppFont.beVietnamPro(14))
+                .foregroundStyle(AppColor.payInk)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(SettingsColor.accent)
+                .onChange(of: isOn.wrappedValue) { _, newValue in onChange(newValue) }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private func rowIcon(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 16))
+            .foregroundStyle(SettingsColor.accent)
+            .frame(width: 28)
+    }
+
+    // MARK: - Đăng xuất
+
+    private var logoutButton: some View {
+        Button {
+            showLogoutConfirm = true
+        } label: {
+            HStack(spacing: 8) {
+                if isLoggingOut {
+                    ProgressView().tint(SettingsColor.redLogout)
+                } else {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 16))
+                        .foregroundStyle(SettingsColor.redLogout)
+                    Text("Đăng xuất")
+                        .font(AppFont.beVietnamPro(15, .semibold))
+                        .foregroundStyle(SettingsColor.redLogout)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoggingOut)
+    }
+
+    private func logout() {
+        isLoggingOut = true
+        Task {
+            await appState.logout()
+            isLoggingOut = false
+        }
+    }
+
+    // MARK: - Derived
+
+    private var displayName: String {
+        authStore.userFullName ?? "Người dùng Nano"
+    }
+
+    private var initials: String {
+        let parts = displayName.split(separator: " ")
+        guard let last = parts.last else { return "?" }
+        return String(last.prefix(1)).uppercased()
+    }
+}
+
+/// Dialog "Hỗ trợ khách hàng" — mirror dialog trong SettingsScreen.kt.
+private struct SupportSheet: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Capsule()
+                .fill(AppColor.line)
+                .frame(width: 36, height: 4)
+                .padding(.top, 8)
+
+            Text("Hỗ trợ khách hàng")
+                .font(AppFont.beVietnamPro(17, .bold))
+                .foregroundStyle(AppColor.payInk)
+
+            Text("Có thắc mắc hoặc cần hỗ trợ? Liên hệ với chúng tôi qua:")
+                .font(AppFont.beVietnamPro(14))
+                .foregroundStyle(AppColor.payMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            VStack(spacing: 12) {
+                supportRow(icon: "phone.fill", label: "Số điện thoại", value: supportPhone) {
+                    if let url = URL(string: "tel://\(supportPhone)") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                supportRow(icon: "envelope.fill", label: "Email", value: supportEmail) {
+                    if let url = URL(string: "mailto:\(supportEmail)") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Button("Đóng") {
+                onDismiss()
+            }
+            .buttonStyle(.plain)
+            .font(AppFont.beVietnamPro(15, .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(SettingsColor.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 24)
+            .padding(.top, 4)
+            .padding(.bottom, 24)
+        }
+        .presentationDragIndicator(.hidden)
+    }
+
+    private func supportRow(icon: String, label: String, value: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(SettingsColor.orangePillBg)
+                    .frame(width: 38, height: 38)
+                    .overlay {
+                        Image(systemName: icon)
+                            .font(.system(size: 15))
+                            .foregroundStyle(SettingsColor.accent)
+                    }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label)
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppColor.payMuted)
+                    Text(value)
+                        .font(AppFont.beVietnamPro(14, .semibold))
+                        .foregroundStyle(AppColor.payInk)
+                }
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+#Preview {
+    SettingsView()
+}

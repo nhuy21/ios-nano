@@ -1,4 +1,4 @@
-# nano ewallet (iOS / Swift)
+# Nano-Ewallet (iOS / Swift)
 
 Native iOS app.
 

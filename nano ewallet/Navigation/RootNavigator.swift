@@ -5,8 +5,8 @@
 //  Mirror phần AppNavHost liên quan auth/onboarding trong MainActivity.kt.
 //  Chuyển cây điều hướng theo AppRootState do AppState quyết định (bootstrap ở Splash).
 //
-//  Phase 1 chỉ có Auth + WalletOnboardingChoice. Nhánh `.authenticated` và các bước
-//  onboarding sau Choice (CccdScan, KycReview...) sẽ nối ở Phase 2/3.
+//  Phase 1: Auth + WalletOnboardingChoice + khung Main (Home/Settings placeholder).
+//  Các bước onboarding sau Choice (CccdScan, KycReview...) sẽ nối ở Phase 3.
 //
 
 import SwiftUI
@@ -44,8 +44,7 @@ struct RootNavigator: View {
                 }
                 .id(phone) // đảm bảo state reset nếu phone đổi (hiếm khi xảy ra)
             case .authenticated:
-                // TODO (Phase 2): thay bằng MainTabView thật.
-                MainScreen()
+                MainTabView()
             }
         }
         .animation(.default, value: appState.root)
