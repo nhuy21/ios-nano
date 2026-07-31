@@ -348,7 +348,8 @@ struct BankTransferView: View {
 }
 
 /// Sheet "Xem tất cả" — danh sách đầy đủ, tìm kiếm không dấu (mirror BankTransferScreen.kt).
-private struct BankPickerSheet: View {
+/// Không `private` — tái dùng ở WithdrawView (chọn bank khi chưa liên kết).
+struct BankPickerSheet: View {
     let banks: [Bank]
     @Binding var selectedBin: String?
     let onDismiss: () -> Void

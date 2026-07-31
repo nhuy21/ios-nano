@@ -38,6 +38,13 @@ enum TransferService {
         )
     }
 
+    /// `POST wallet/withdraw` — rút về TK ngân hàng.
+    static func withdraw(_ request: WithdrawRequest) async throws -> TransferResult {
+        try await APIClient.shared.request(
+            .post, "wallet/withdraw", body: request, auth: true, slow: true, as: TransferResult.self
+        )
+    }
+
     /// Sinh idempotencyKey 1 lần/session màn chuyển tiền — mirror cách Android sinh
     /// theo timestamp + suffix ngẫu nhiên (chỉ cần duy nhất, không cần bảo mật).
     static func newIdempotencyKey() -> String {

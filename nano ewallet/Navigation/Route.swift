@@ -51,6 +51,9 @@ enum HomeRoute: Hashable {
     /// (camera) KHÔNG nằm trong HomeRoute — mở riêng qua QrScanNavigationView
     /// (fullScreenCover ở MainTabView), vì Android cũng trượt dọc lên như modal riêng.
     case receiveQr
+    /// Rút tiền về TK ngân hàng — mirror WithdrawScreen.kt. "Nạp tiền" không có route
+    /// riêng, chỉ mở lại `.receiveQr` (Android cũng vậy — user tự chuyển khoản vào VA).
+    case withdraw
 }
 
 /// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet.

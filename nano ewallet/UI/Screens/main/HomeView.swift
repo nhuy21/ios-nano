@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var detailTransaction: TransactionEntity?
     @State private var path: [HomeRoute] = []
     @State private var payLinkError: String?
+    @State private var showTopupWithdrawChooser = false
 
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
@@ -49,6 +50,11 @@ struct HomeView: View {
             actions: { Button("Đóng", role: .cancel) {} },
             message: { Text(payLinkError ?? "") }
         )
+        .confirmationDialog("Nạp/Rút ví", isPresented: $showTopupWithdrawChooser, titleVisibility: .visible) {
+            Button("Nạp tiền") { path.append(.receiveQr) }
+            Button("Rút tiền") { path.append(.withdraw) }
+            Button("Đóng", role: .cancel) {}
+        }
     }
 
     private var payLinkErrorBinding: Binding<Bool> {
@@ -153,6 +159,11 @@ struct HomeView: View {
             )
         case .receiveQr:
             ReceiveQrView(onBack: { if !path.isEmpty { path.removeLast() } })
+        case .withdraw:
+            WithdrawView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onSuccess: { info in path.append(.transferSuccess(info)) }
+            )
         }
     }
 
@@ -383,7 +394,10 @@ struct HomeView: View {
 
     private var topUpCta: some View {
         Button {
-            comingSoonFeature = "Nạp / Rút ví"
+            // "Nạp tiền" không có màn riêng — user tự chuyển khoản vào VA hiển thị ở
+            // đây, mirror Android (nút "Nạp tiền" trong dialog chooser cũng mở thẳng
+            // ReceiveQrScreen).
+            path.append(.receiveQr)
         } label: {
             HStack(spacing: 12) {
                 Circle()
@@ -455,6 +469,8 @@ struct HomeView: View {
                             path.append(.bankTransfer(draft: nil))
                         case .transferArrows:
                             path.append(.walletTransfer(draft: nil))
+                        case .walletTopup:
+                            showTopupWithdrawChooser = true
                         default:
                             comingSoonFeature = service.title
                         }

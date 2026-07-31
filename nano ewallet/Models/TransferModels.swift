@@ -53,6 +53,24 @@ struct TransferToBankRequest: Encodable {
     }
 }
 
+/// `POST wallet/withdraw` — rút về TK ngân hàng. BE không bắt buộc khớp với
+/// wallets.accNo/bankNo đã liên kết (chỉ là quy ước phía app) — không có `memo`.
+struct WithdrawRequest: Encodable {
+    let idempotencyKey: String
+    let accNo: String
+    let accType: Int
+    let bankNo: String
+    let transAmount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case idempotencyKey
+        case accNo = "acc_no"
+        case accType = "acc_type"
+        case bankNo = "bank_no"
+        case transAmount = "trans_amount"
+    }
+}
+
 struct VerifyTransferRequest: Encodable {
     let password: String
     let transactionId: String
