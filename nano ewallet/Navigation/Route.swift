@@ -47,6 +47,10 @@ enum HomeRoute: Hashable {
     case transferSuccess(TransferSuccessInfo)
     /// Cuộc thoại xin tiền với 1 người (mirror ConversationScreen.kt) — key theo bkUsername.
     case conversation(otherName: String, otherBkUsername: String)
+    /// "QR của tôi" — mã nhận tiền tự build EMVCo, mirror ReceiveQrScreen.kt. Quét QR
+    /// (camera) KHÔNG nằm trong HomeRoute — mở riêng qua QrScanNavigationView
+    /// (fullScreenCover ở MainTabView), vì Android cũng trượt dọc lên như modal riêng.
+    case receiveQr
 }
 
 /// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet.
@@ -66,6 +70,11 @@ struct BankTransferDraft: Hashable {
     var accNo: String
     var accType: Int
     var holderName: String
+    /// QR "động" cố định sẵn số tiền/nội dung -> field tương ứng bị khoá, không cho sửa.
+    var prefillAmount: Int?
+    var prefillContent: String?
+    var amountEditable: Bool = true
+    var contentEditable: Bool = true
 }
 
 /// Người nhận ví-ví đã xác thực — cầu nối giữa WalletTransferView -> WalletTransferAmountView.

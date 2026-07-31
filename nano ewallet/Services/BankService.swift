@@ -15,6 +15,23 @@ struct LookupAccountResponse: Decodable {
     let accountName: String
 }
 
+struct ParseQrRequest: Encodable {
+    let rawQrData: String
+}
+
+/// Response `POST banks/parse-qr` — mirror bank.service.ts parseAndEnrich(). `amount`/`content`
+/// null nghĩa là QR "động" (không cố định số tiền/nội dung) -> user được sửa (isXxxEditable).
+struct ParsedQr: Decodable {
+    let bankBin: String
+    let bankName: String?
+    let accountNumber: String
+    let accountName: String
+    let amount: Int?
+    let content: String?
+    let isAmountEditable: Bool
+    let isContentEditable: Bool
+}
+
 enum BankService {
     /// `GET banks`
     static func list() async throws -> [Bank] {
@@ -29,6 +46,14 @@ enum BankService {
             auth: true, as: LookupAccountResponse.self
         )
         return response.accountName
+    }
+
+    /// `POST banks/parse-qr` — verify CRC + bóc STK/ngân hàng/số tiền/nội dung từ QR VietQR
+    /// (EMVCo), tự tra tên chủ TK luôn. Dùng cho màn quét QR trước khi vào TransferScreen.
+    static func parseQr(rawQrData: String) async throws -> ParsedQr {
+        try await APIClient.shared.request(
+            .post, "banks/parse-qr", body: ParseQrRequest(rawQrData: rawQrData), auth: true, as: ParsedQr.self
+        )
     }
 }
 

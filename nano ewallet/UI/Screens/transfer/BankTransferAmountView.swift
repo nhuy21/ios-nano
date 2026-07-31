@@ -35,6 +35,14 @@ struct BankTransferAmountView: View {
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
 
+    init(draft: BankTransferDraft, onBack: @escaping () -> Void, onSuccess: @escaping (TransferSuccessInfo) -> Void) {
+        self.draft = draft
+        self.onBack = onBack
+        self.onSuccess = onSuccess
+        _amountText = State(initialValue: draft.prefillAmount.map { String($0) } ?? "")
+        _memo = State(initialValue: draft.prefillContent ?? "")
+    }
+
     private var amount: Int64 { Int64(amountText) ?? 0 }
 
     private var overLimit: Bool {
@@ -148,16 +156,20 @@ struct BankTransferAmountView: View {
     private var amountSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             FieldLabel(text: "Số tiền")
-            AppTextField(
-                text: amountFieldBinding,
-                placeholder: "0",
-                keyboardType: .numberPad,
-                submitLabel: .next,
-                textAlignment: .leading,
-                digitsOnly: true
-            )
-            .focused($isAmountFocused)
-            .numericKeyboardToolbar(label: "Tiếp theo") { isMemoFocused = true }
+            if draft.amountEditable {
+                AppTextField(
+                    text: amountFieldBinding,
+                    placeholder: "0",
+                    keyboardType: .numberPad,
+                    submitLabel: .next,
+                    textAlignment: .leading,
+                    digitsOnly: true
+                )
+                .focused($isAmountFocused)
+                .numericKeyboardToolbar(label: "Tiếp theo") { isMemoFocused = true }
+            } else {
+                lockedField(text: amount > 0 ? Int(amount).vndFormatted : "0")
+            }
 
             if overMaxPerTransfer {
                 FieldError(message: "Số tiền chuyển tối đa 1 lần là 10.000.000đ", alignment: .leading)
@@ -183,29 +195,46 @@ struct BankTransferAmountView: View {
     private var memoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             FieldLabel(text: "Nội dung chuyển khoản")
-            AppTextField(
-                text: $memo, placeholder: "Nhập nội dung chuyển khoản",
-                submitLabel: .done, maxLength: 250
-            )
-            .focused($isMemoFocused)
+            if draft.contentEditable {
+                AppTextField(
+                    text: $memo, placeholder: "Nhập nội dung chuyển khoản",
+                    submitLabel: .done, maxLength: 250
+                )
+                .focused($isMemoFocused)
 
-            HStack(spacing: 8) {
-                ForEach(Self.suggestions, id: \.self) { suggestion in
-                    Button {
-                        memo = suggestion
-                    } label: {
-                        Text(suggestion)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(AppColor.brand)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(AppColor.brandSoft)
-                            .clipShape(Capsule())
+                HStack(spacing: 8) {
+                    ForEach(Self.suggestions, id: \.self) { suggestion in
+                        Button {
+                            memo = suggestion
+                        } label: {
+                            Text(suggestion)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(AppColor.brand)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(AppColor.brandSoft)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+            } else {
+                lockedField(text: memo)
             }
         }
+    }
+
+    /// Field bị khoá vì QR "động" đã cố định giá trị (mirror Android disable input khi
+    /// isAmountEditable/isContentEditable = false).
+    private func lockedField(text: String) -> some View {
+        Text(text)
+            .font(AppFont.beVietnamPro(15, .medium))
+            .foregroundStyle(AppColor.payInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 56)
+            .background(AppColor.bgSoft)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var saveToggle: some View {
