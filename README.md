@@ -38,7 +38,7 @@ Project dùng **PBXFileSystemSynchronizedRootGroup** (Xcode 16+)
 
 ## Firebase
 
-- **Bundle ID: `com.nanowallet.app`** — phải khớp `BUNDLE_ID` trong `GoogleService-Info.plist`,
+- **Bundle ID: `vn.casso.nano`** — phải khớp `BUNDLE_ID` trong `GoogleService-Info.plist`,
   Firebase project: `nanocasso26`.
 - Code trong `AppDelegate.swift` / `PushRegistrar.swift` đã `import FirebaseCore` +
   `FirebaseMessaging` → **project chưa build được cho tới khi thêm SPM package**:

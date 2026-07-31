@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Đọc GoogleService-Info.plist (bundle id com.nanowallet.app, project nanocasso26)
+        // Đọc GoogleService-Info.plist (bundle id vn.casso.nano, project nanocasso26)
         FirebaseApp.configure()
 
         Messaging.messaging().delegate = self
