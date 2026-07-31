@@ -14,7 +14,9 @@ struct MainTabView: View {
     enum Tab { case home, settings }
 
     @State private var selectedTab: Tab = .home
-    @State private var showQrComingSoon = false
+    /// FAB QR mở như modal trượt dọc lên (mirror transition QR_SCAN bên Android),
+    /// không push vào NavigationStack riêng của Home/Settings.
+    @State private var showQrScan = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -34,7 +36,9 @@ struct MainTabView: View {
             floatingTabBar
         }
         .ignoresSafeArea(.keyboard)
-        .comingSoonSheet(isPresented: $showQrComingSoon, feature: "Quét QR")
+        .fullScreenCover(isPresented: $showQrScan) {
+            QrScanNavigationView(onDismiss: { showQrScan = false })
+        }
     }
 
     private var floatingTabBar: some View {
@@ -78,7 +82,7 @@ struct MainTabView: View {
 
     private var qrFab: some View {
         Button {
-            showQrComingSoon = true
+            showQrScan = true
         } label: {
             ZStack {
                 Circle()

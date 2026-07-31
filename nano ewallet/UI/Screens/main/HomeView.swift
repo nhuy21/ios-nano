@@ -94,6 +94,8 @@ struct HomeView: View {
                 otherName: otherName, otherBkUsername: otherBkUsername,
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
+        case .receiveQr:
+            ReceiveQrView(onBack: { if !path.isEmpty { path.removeLast() } })
         }
     }
 
@@ -216,7 +218,7 @@ struct HomeView: View {
                 Spacer()
 
                 Button {
-                    comingSoonFeature = "Nhận tiền qua QR"
+                    path.append(.receiveQr)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "qrcode")

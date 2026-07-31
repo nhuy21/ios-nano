@@ -61,6 +61,10 @@
         <key>NFCReaderUsageDescription</key>
         <string>Ứng dụng cần quyền NFC để đọc thông tin chip trên CCCD.</string>
 
+        <!-- Lưu ảnh QR nhận tiền vào thư viện — tương ứng WRITE_EXTERNAL_STORAGE (MediaStore) -->
+        <key>NSPhotoLibraryAddUsageDescription</key>
+        <string>Ứng dụng cần quyền lưu ảnh để lưu mã QR nhận tiền vào thư viện ảnh.</string>
+
         <!-- Push notification (background remote-notification) — tương ứng POST_NOTIFICATIONS -->
         <key>UIBackgroundModes</key>
         <array>
