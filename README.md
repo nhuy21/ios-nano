@@ -1,6 +1,6 @@
 # nano ewallet (iOS / Swift)
 
-Native iOS app tương ứng `flash-wallet` (Android/Kotlin, package `com.baynet.digiflank`).
+Native iOS app.
 
 ## Cấu trúc thư mục
 
@@ -20,8 +20,7 @@ nano ewallet/
 └── nano ewallet.entitlements  # associated domains, push, NFC
 ```
 
-Project dùng **PBXFileSystemSynchronizedRootGroup** (Xcode 16+) — mọi file/thư mục mới
-thêm vào `nano ewallet/` tự động được Xcode nhận vào target, không cần thao tác "Add file to target".
+Project dùng **PBXFileSystemSynchronizedRootGroup** (Xcode 16+)
 
 ## Mapping quyền (Android -> iOS)
 
@@ -40,8 +39,7 @@ thêm vào `nano ewallet/` tự động được Xcode nhận vào target, khôn
 ## Firebase
 
 - **Bundle ID: `com.nanowallet.app`** — phải khớp `BUNDLE_ID` trong `GoogleService-Info.plist`,
-  đừng đổi lẻ một bên. Firebase project: `nanocasso26`.
-- `GoogleService-Info.plist` đã có trong `nano ewallet/` nhưng **không commit**
+  Firebase project: `nanocasso26`.
 - Code trong `AppDelegate.swift` / `PushRegistrar.swift` đã `import FirebaseCore` +
   `FirebaseMessaging` → **project chưa build được cho tới khi thêm SPM package**:
 
