@@ -35,6 +35,41 @@ enum SettingsRoute: Hashable {
 enum HomeRoute: Hashable {
     case history
     case contacts
+
+    /// Chuyển khoản ngân hàng — nhập tay (chọn bank + STK) hoặc đã có sẵn từ danh bạ.
+    case bankTransfer(draft: BankTransferDraft?)
+    /// Chuyển ví-ví — nhập tay (username) hoặc đã có sẵn từ danh bạ.
+    case walletTransfer(draft: WalletTransferDraft?)
+    /// Màn nhập số tiền/nội dung — người nhận đã xác thực xong ở màn trước.
+    case bankTransferAmount(BankTransferDraft)
+    case walletTransferAmount(WalletTransferDraft)
+    /// Màn kết quả — giao dịch đã thực thi xong (SUCCESS hoặc PENDING đối soát).
+    case transferSuccess(TransferSuccessInfo)
+}
+
+/// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet.
+struct TransferSuccessInfo: Hashable {
+    var amount: Int64
+    var recipientName: String
+    var recipientDetail: String
+    var noteLabel: String
+    var note: String
+}
+
+/// Người nhận ngân hàng đã xác thực (hoặc đang chờ xác thực) — cầu nối giữa
+/// BankTransferView -> TransferAmountView, mirror `TransferDraft` bên Android.
+struct BankTransferDraft: Hashable {
+    var bin: String
+    var bankName: String
+    var accNo: String
+    var accType: Int
+    var holderName: String
+}
+
+/// Người nhận ví-ví đã xác thực — cầu nối giữa WalletTransferView -> WalletTransferAmountView.
+struct WalletTransferDraft: Hashable {
+    var username: String
+    var holderName: String
 }
 
 /// Trạng thái gốc của app — quyết định cây điều hướng nào được hiển thị.
