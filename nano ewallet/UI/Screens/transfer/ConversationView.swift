@@ -161,25 +161,31 @@ struct ConversationView: View {
 
                 if pending && !item.outgoing {
                     HStack(spacing: 8) {
-                        Button("Từ chối") { decline(item) }
-                            .buttonStyle(.plain)
-                            .font(AppFont.beVietnamPro(14, .semibold))
-                            .foregroundStyle(AppColor.payMuted)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
-                            }
+                        Button { decline(item) } label: {
+                            Text("Từ chối")
+                                .font(AppFont.beVietnamPro(14, .semibold))
+                                .foregroundStyle(AppColor.payMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+                                }
+                                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
 
-                        Button("Đồng ý") { approve(item) }
-                            .buttonStyle(.plain)
-                            .font(AppFont.beVietnamPro(14, .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(AppColor.brand)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        Button { approve(item) } label: {
+                            Text("Đồng ý")
+                                .font(AppFont.beVietnamPro(14, .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(AppColor.brand)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                     }
                     .disabled(busyId == item.id)
                     .opacity(busyId == item.id ? 0.6 : 1)

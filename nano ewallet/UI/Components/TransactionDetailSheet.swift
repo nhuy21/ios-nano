@@ -73,16 +73,21 @@ struct TransactionDetailSheet: View {
                     }
                 }
 
-                Button("Đóng") {
+                // Kích thước/nền phải nằm TRONG label kèm contentShape: để ở ngoài Button
+                // thì vùng bấm chỉ là mấy chữ "Đóng", nền xanh chỉ là hình trang trí.
+                Button {
                     onDismiss()
+                } label: {
+                    Text("Đóng")
+                        .font(AppFont.beVietnamPro(15, .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(AppColor.brand)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .font(AppFont.beVietnamPro(15, .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(AppColor.brand)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .padding(.top, 8)
             }
             .padding(.horizontal, 20)

@@ -240,17 +240,20 @@ struct ReceiveQrView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
 
-                Button("Xong") {
+                Button {
                     fixedAmount = Int(amountInput)
                     showAmountSheet = false
+                } label: {
+                    Text("Xong")
+                        .font(AppFont.beVietnamPro(14, .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(AppColor.brand)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .font(AppFont.beVietnamPro(14, .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(AppColor.brand)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)

@@ -39,16 +39,19 @@ struct ComingSoonSheet: View {
             }
             .padding(.horizontal, 24)
 
-            Button("Đã hiểu") {
+            Button {
                 onDismiss()
+            } label: {
+                Text("Đã hiểu")
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(AppColor.brand)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .font(AppFont.beVietnamPro(15, .semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(AppColor.brand)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .padding(.horizontal, 24)
             .padding(.top, 8)
             .padding(.bottom, 24)

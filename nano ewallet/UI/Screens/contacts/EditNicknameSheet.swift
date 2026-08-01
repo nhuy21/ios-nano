@@ -43,27 +43,33 @@ struct EditNicknameSheet: View {
             )
 
             HStack(spacing: 12) {
-                Button("Huỷ") {
+                Button {
                     onCancel()
+                } label: {
+                    Text("Huỷ")
+                        .font(AppFont.beVietnamPro(14, .semibold))
+                        .foregroundStyle(AppColor.payMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: 0xF6F7F9))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .font(AppFont.beVietnamPro(14, .semibold))
-                .foregroundStyle(AppColor.payMuted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color(hex: 0xF6F7F9))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                Button("Lưu") {
+                Button {
                     onSave(value.trimmingCharacters(in: .whitespaces))
+                } label: {
+                    Text("Lưu")
+                        .font(AppFont.beVietnamPro(14, .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(AppColor.brand)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .font(AppFont.beVietnamPro(14, .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(AppColor.brand)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .padding(.top, 8)
         }
