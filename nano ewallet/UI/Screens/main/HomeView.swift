@@ -55,10 +55,29 @@ struct HomeView: View {
             actions: { Button("Đóng", role: .cancel) {} },
             message: { Text(payLinkError ?? "") }
         )
-        .confirmationDialog("Nạp/Rút ví", isPresented: $showTopupWithdrawChooser, titleVisibility: .visible) {
-            Button("Nạp tiền") { path.append(.receiveQr) }
-            Button("Rút tiền") { path.append(.withdraw) }
-            Button("Đóng", role: .cancel) {}
+        // Dialog tuỳ biến (không dùng confirmationDialog) để giữ icon + dòng mô tả
+        // như Android — menu hệ thống chỉ hiện được mỗi tiêu đề nút.
+        .fullScreenCover(isPresented: $showTopupWithdrawChooser) {
+            ActionChooserSheet(
+                title: "Nạp/Rút ví",
+                subtitle: "Chọn thao tác",
+                actions: [
+                    .init(
+                        systemImage: "qrcode",
+                        title: "Nạp tiền",
+                        subtitle: "Quét mã QR để chuyển tiền vào ví",
+                        handler: { path.append(.receiveQr) }
+                    ),
+                    .init(
+                        systemImage: "building.columns",
+                        title: "Rút tiền",
+                        subtitle: "Chuyển tiền từ ví về tài khoản ngân hàng liên kết",
+                        handler: { path.append(.withdraw) }
+                    ),
+                ],
+                onDismiss: { showTopupWithdrawChooser = false }
+            )
+            .presentationBackground(.clear)
         }
     }
 

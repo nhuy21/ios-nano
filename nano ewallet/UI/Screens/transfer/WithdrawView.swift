@@ -11,6 +11,19 @@
 import SwiftUI
 import Combine
 
+/// Bảng màu riêng của màn rút tiền — mirror các hằng Wd* trong WithdrawScreen.kt.
+private enum WdColor {
+    static let green = Color(hex: 0x00A85E)
+    static let greenDark = Color(hex: 0x007E47)
+    static let ink = Color(hex: 0x111C17)
+    static let muted = Color(hex: 0x8A9990)
+    static let line = Color(hex: 0xEEF1EF)
+    static let fieldGray = Color(hex: 0xF1F3F5)
+    static let amountBg = Color(hex: 0xF6F6F7)
+    static let error = Color(hex: 0xE5484D)
+    static let disabled = Color(hex: 0xDDE1E6)
+}
+
 @MainActor
 struct WithdrawView: View {
     let onBack: () -> Void
@@ -94,7 +107,8 @@ struct WithdrawView: View {
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             continueBar
         }
-        .background(Color(hex: 0xF7F8FA))
+        // Kotlin để nền TRẮNG cho màn này (khác các màn chuyển tiền dùng xám nhạt).
+        .background(Color.white)
         .task {
             await wallet.refresh()
             _ = await bankCache.get()
@@ -120,34 +134,30 @@ struct WithdrawView: View {
 
     // MARK: - Header
 
+    /// Header sáng, tiêu đề canh TRÁI cạnh nút back — mirror WithdrawScreen.kt, không
+    /// phải dải gradient xanh với tiêu đề canh giữa như trước.
     private var header: some View {
-        HStack {
+        HStack(spacing: 12) {
             Button(action: onBack) {
                 Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(WdColor.ink)
                     .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
+                    .background(WdColor.fieldGray)
                     .clipShape(Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            Spacer()
-            Text("RÚT TIỀN")
-                .font(AppFont.beVietnamPro(15, .bold))
-                .foregroundStyle(.white)
-                .tracking(2)
-            Spacer()
-            Color.clear.frame(width: 40, height: 40)
+            .accessibilityLabel("Quay lại")
+
+            Text("Rút tiền về ngân hàng")
+                .font(AppFont.beVietnamPro(18, .bold))
+                .foregroundStyle(WdColor.ink)
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        )
+        .padding(.vertical, 12)
     }
 
     // MARK: - Đích rút
@@ -155,34 +165,67 @@ struct WithdrawView: View {
     @ViewBuilder
     private var destinationSection: some View {
         if isLinked {
-            VStack(alignment: .leading, spacing: 8) {
-                FieldLabel(text: "Rút về")
-                HStack(spacing: 12) {
+            // Thẻ thông tin ngân hàng liên kết: nền gradient xanh nhạt -> trắng, viền
+            // xanh 35%, key-value đầy đủ để đối soát. Mirror WithdrawScreen.kt.
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
                     Circle()
-                        .fill(AppColor.brandSoft)
-                        .frame(width: 44, height: 44)
+                        .fill(WdColor.green)
+                        .frame(width: 34, height: 34)
                         .overlay {
-                            Text(String(linkedBankName.prefix(1)).uppercased())
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(AppColor.brand)
+                            Image(systemName: "wallet.pass.fill")
+                                .font(.system(size: 19))
+                                .foregroundStyle(.white)
                         }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(wallet.accName ?? "Tài khoản của bạn")
-                            .font(AppFont.beVietnamPro(15, .semibold))
-                            .foregroundStyle(AppColor.payInk)
-                        Text("\(linkedBankName) • \(wallet.accNo ?? "")")
-                            .font(.system(size: 12))
-                            .foregroundStyle(AppColor.payMuted)
-                    }
-                    Spacer()
+                    Text("Ngân hàng liên kết")
+                        .font(AppFont.beVietnamPro(15, .bold))
+                        .foregroundStyle(WdColor.greenDark)
+                    Spacer(minLength: 0)
                 }
-                .padding(14)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.vertical, 14)
+
+                cardDivider
+                infoRow(label: "Ngân hàng", value: linkedBankName)
+                cardDivider
+                infoRow(label: "Số tài khoản", value: wallet.accNo ?? "—")
+                cardDivider
+                infoRow(label: "Chủ tài khoản", value: wallet.accName ?? "—")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 4)
+            .background(
+                LinearGradient(
+                    colors: [Color(hex: 0xE6F7EE), .white],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(WdColor.green.opacity(0.35), lineWidth: 1)
             }
         } else {
             manualDestinationSection
         }
+    }
+
+    private var cardDivider: some View {
+        Rectangle()
+            .fill(WdColor.green.opacity(0.15))
+            .frame(height: 1)
+    }
+
+    private func infoRow(label: String, value: String) -> some View {
+        HStack(spacing: 16) {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(WdColor.muted)
+            Text(value)
+                .font(AppFont.beVietnamPro(13, .bold))
+                .foregroundStyle(WdColor.ink)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.vertical, 14)
     }
 
     private var manualDestinationSection: some View {
@@ -299,19 +342,53 @@ struct WithdrawView: View {
 
     // MARK: - Số tiền
 
+    /// Ô số tiền kiểu Kotlin: hộp xám bo 14, số 22pt đậm, hậu tố "VNĐ" cố định bên phải,
+    /// viền chuyển đỏ khi vượt số dư.
     private var amountSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "Số tiền")
-            AppTextField(
-                text: amountFieldBinding, placeholder: "0",
-                keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
-            )
-            .focused($isAmountFocused)
+            Text("Số tiền muốn rút")
+                .font(AppFont.beVietnamPro(11, .medium))
+                .foregroundStyle(WdColor.muted)
+                .tracking(1.4)
+
+            if let balance = wallet.balance {
+                Text("Số dư khả dụng: \(Int(balance).vndGrouped) VNĐ")
+                    .font(AppFont.beVietnamPro(13, .medium))
+                    .foregroundStyle(WdColor.muted)
+            }
+
+            HStack(spacing: 8) {
+                TextField("", text: amountFieldBinding, prompt: Text("Nhập số tiền")
+                    .font(AppFont.beVietnamPro(18))
+                    .foregroundColor(WdColor.muted))
+                    .font(AppFont.beVietnamPro(22, .bold))
+                    .foregroundStyle(WdColor.ink)
+                    .keyboardType(.numberPad)
+                    .tint(WdColor.green)
+                    .focused($isAmountFocused)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text("VNĐ")
+                    .font(AppFont.beVietnamPro(16, .bold))
+                    .foregroundStyle(WdColor.muted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(WdColor.amountBg)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(overLimit || overMaxPerWithdraw ? WdColor.error : WdColor.line, lineWidth: 1)
+            }
 
             if overMaxPerWithdraw {
-                FieldError(message: "Số tiền rút tối đa 1 lần là 10.000.000đ", alignment: .leading)
+                Text("Số tiền rút tối đa 1 lần là 10.000.000đ")
+                    .font(.system(size: 12))
+                    .foregroundStyle(WdColor.error)
             } else if overLimit {
-                FieldError(message: "Số tiền vượt quá số dư khả dụng", alignment: .leading)
+                Text("Số tiền vượt quá số dư khả dụng")
+                    .font(.system(size: 12))
+                    .foregroundStyle(WdColor.error)
             }
         }
     }
@@ -330,13 +407,30 @@ struct WithdrawView: View {
 
     private var continueBar: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(AppColor.line).frame(height: 1)
-            PrimaryButton(
-                title: "Rút tiền", loadingTitle: "Đang xử lý...",
-                isLoading: isSubmitting, isEnabled: canContinue
-            ) {
+            Rectangle().fill(WdColor.line).frame(height: 1)
+
+            Button {
                 Task { await submitWithdraw() }
+            } label: {
+                Group {
+                    if isSubmitting {
+                        ProgressView().tint(.white)
+                    } else {
+                        // Khi disable dùng chữ xám đậm (không phải trắng) để không chìm
+                        // vào nền xám — mirror ghi chú trong WithdrawScreen.kt.
+                        Text("Xác nhận")
+                            .font(AppFont.beVietnamPro(16, .bold))
+                            .foregroundStyle(canContinue ? Color.white : WdColor.muted)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(canContinue ? WdColor.green : WdColor.disabled)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .disabled(!canContinue || isSubmitting)
             .padding(16)
         }
         .background(Color.white)
