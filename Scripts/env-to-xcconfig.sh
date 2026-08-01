@@ -37,12 +37,12 @@ fi
         value="$(echo "$value" | xargs)"
 
         if [[ "$value" == *"//"* ]]; then
-            # https://host/path -> dùng $() ghép để '//' không bị coi là comment
             scheme="${value%%//*}"      # "https:"
             rest="${value#*//}"         # "host/path"
             echo "${key}_SCHEME = ${scheme}"
             echo "${key}_REST = ${rest}"
-            echo "${key} = \$(${key}_SCHEME)/\$()/\$(${key}_REST)"
+            echo "SLASH = /"
+            echo "${key} = \$(${key}_SCHEME)\$(SLASH)\$(SLASH)\$(${key}_REST)"
         else
             echo "${key} = ${value}"
         fi

@@ -6,13 +6,32 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		89CBBE5A301D75B30083ACEE /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 89CBBE59301D75B30083ACEE /* FirebaseCore */; };
+		89CBBE5C301D75CE0083ACEE /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 89CBBE5B301D75CE0083ACEE /* FirebaseMessaging */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		5ECA2C37DBF830F3D6D54DD6 /* Config.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		89403DF1301B9CFB002E3549 /* nano ewallet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "nano ewallet.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		89CBBD6C301D72EE0083ACEE /* Exceptions for "nano ewallet" folder in "nano ewallet" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 89403DF0301B9CFB002E3549 /* nano ewallet */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		89403DF3301B9CFB002E3549 /* nano ewallet */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				89CBBD6C301D72EE0083ACEE /* Exceptions for "nano ewallet" folder in "nano ewallet" target */,
+			);
 			path = "nano ewallet";
 			sourceTree = "<group>";
 		};
@@ -23,6 +42,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				89CBBE5C301D75CE0083ACEE /* FirebaseMessaging in Frameworks */,
+				89CBBE5A301D75B30083ACEE /* FirebaseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,7 +54,9 @@
 			isa = PBXGroup;
 			children = (
 				89403DF3301B9CFB002E3549 /* nano ewallet */,
+				89CBBE58301D75B30083ACEE /* Frameworks */,
 				89403DF2301B9CFB002E3549 /* Products */,
+				5ECA2C37DBF830F3D6D54DD6 /* Config.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -43,6 +66,13 @@
 				89403DF1301B9CFB002E3549 /* nano ewallet.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		89CBBE58301D75B30083ACEE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -65,6 +95,8 @@
 			);
 			name = "nano ewallet";
 			packageProductDependencies = (
+				89CBBE59301D75B30083ACEE /* FirebaseCore */,
+				89CBBE5B301D75CE0083ACEE /* FirebaseMessaging */,
 			);
 			productName = "nano ewallet";
 			productReference = 89403DF1301B9CFB002E3549 /* nano ewallet.app */;
@@ -94,6 +126,9 @@
 			);
 			mainGroup = 89403DE8301B9CFB002E3549;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				89CBBE57301D759C0083ACEE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 89403DF2301B9CFB002E3549 /* Products */;
 			projectDirPath = "";
@@ -127,6 +162,7 @@
 /* Begin XCBuildConfiguration section */
 		89403DFA301B9CFC002E3549 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5ECA2C37DBF830F3D6D54DD6 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -190,6 +226,7 @@
 		};
 		89403DFB301B9CFC002E3549 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5ECA2C37DBF830F3D6D54DD6 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -259,7 +296,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "vn.casso.nano";
+				PRODUCT_BUNDLE_IDENTIFIER = vn.casso.nano;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -286,7 +323,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "vn.casso.nano";
+				PRODUCT_BUNDLE_IDENTIFIER = vn.casso.nano;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -320,6 +357,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		89CBBE57301D759C0083ACEE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.17.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		89CBBE59301D75B30083ACEE /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 89CBBE57301D759C0083ACEE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		89CBBE5B301D75CE0083ACEE /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 89CBBE57301D759C0083ACEE /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 89403DE9301B9CFB002E3549 /* Project object */;
 }
