@@ -129,6 +129,10 @@ struct BankCard: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Ba Spacer chia đều chỗ trống dư: khối tên ngân hàng tụt xuống, khối số
+            // tài khoản nhích lên, thay vì cả hai bị ép sát hai mép thẻ.
+            Spacer(minLength: 0)
+
             Text(bankName)
                 .font(AppFont.beVietnamPro(18, .heavy))
                 .foregroundStyle(ink)
@@ -175,6 +179,8 @@ struct BankCard: View {
                     .font(.system(size: 11))
                     .foregroundStyle(ink.opacity(0.6))
             }
+
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
