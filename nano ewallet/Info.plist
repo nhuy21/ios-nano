@@ -19,6 +19,18 @@
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
 
+        <!-- Font nhúng, copy từ flash-wallet/app/src/main/res/font/ để khớp Android.
+             Không khai ở đây thì .custom() rơi về system font và MẤT weight -> chữ mỏng. -->
+        <key>UIAppFonts</key>
+        <array>
+            <string>be_vietnam_pro_regular.ttf</string>
+            <string>be_vietnam_pro_medium.ttf</string>
+            <string>be_vietnam_pro_semibold.ttf</string>
+            <string>be_vietnam_pro_bold.ttf</string>
+            <string>be_vietnam_pro_extrabold.ttf</string>
+            <string>baloo2.ttf</string>
+        </array>
+
         <!-- Base URL cho backend — inject từ .env qua Config.xcconfig lúc build -->
         <key>BE_BASE_URL</key>
         <string>$(BE_BASE_URL)</string>
