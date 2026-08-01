@@ -194,7 +194,7 @@ struct SettingsView: View {
                 .foregroundStyle(AppColor.payInk)
 
             if let phone = authStore.userPhone, !phone.isEmpty {
-                Text(phone)
+                Text("+\(phone)")
                     .font(.system(size: 14))
                     .foregroundStyle(AppColor.payMuted)
             }
@@ -285,9 +285,9 @@ struct SettingsView: View {
         title: String, systemImage: String, isOn: Binding<Bool>, onChange: @escaping (Bool) -> Void
     ) -> some View {
         HStack(spacing: 12) {
-            rowIcon(systemImage)
+            toggleRowIcon(systemImage)
             Text(title)
-                .font(AppFont.beVietnamPro(14))
+                .font(AppFont.beVietnamPro(15, .medium))
                 .foregroundStyle(AppColor.payInk)
             Spacer()
             Toggle("", isOn: isOn)
@@ -295,8 +295,17 @@ struct SettingsView: View {
                 .tint(SettingsColor.accent)
                 .onChange(of: isOn.wrappedValue) { _, newValue in onChange(newValue) }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 24)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+    }
+
+    /// Icon 24pt trong khung 40pt, màu đen (`PayInk`) — mirror `SettingRow` bên Android
+    /// (khác `rowIcon` dùng cho `menuRow`, vốn nhỏ hơn và tô màu accent).
+    private func toggleRowIcon(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 24))
+            .foregroundStyle(AppColor.payInk)
+            .frame(width: 40, height: 40)
     }
 
     private func rowIcon(_ systemImage: String) -> some View {
@@ -348,11 +357,7 @@ struct SettingsView: View {
         authStore.userFullName ?? "Người dùng Nano"
     }
 
-    private var initials: String {
-        let parts = displayName.split(separator: " ")
-        guard let last = parts.last else { return "?" }
-        return String(last.prefix(1)).uppercased()
-    }
+    private var initials: String { displayName.nameInitials }
 }
 
 /// Dialog "Hỗ trợ khách hàng" — mirror dialog trong SettingsScreen.kt.
