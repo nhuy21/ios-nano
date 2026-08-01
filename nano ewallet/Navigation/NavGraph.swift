@@ -11,5 +11,6 @@ struct NavGraph: View {
     var body: some View {
         RootNavigator()
             .dismissesKeyboardOnTapOutside()
+            .opaqueKeyboardBackdrop()
     }
 }
