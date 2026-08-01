@@ -689,11 +689,7 @@ struct HomeView: View {
         authStore.userFullName ?? "Người dùng"
     }
 
-    private var initials: String {
-        let parts = displayName.split(separator: " ")
-        guard let last = parts.last else { return "?" }
-        return String(last.prefix(1)).uppercased()
-    }
+    private var initials: String { displayName.nameInitials }
 }
 
 #Preview {

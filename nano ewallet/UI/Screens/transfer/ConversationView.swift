@@ -404,13 +404,7 @@ struct ConversationView: View {
     // MARK: - Helpers
 
     private static func initials(for name: String) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return "?" }
-        let parts = trimmed.split(separator: " ").filter { !$0.isEmpty }
-        if parts.count >= 2, let first = parts.first?.first, let last = parts.last?.first {
-            return "\(first)\(last)".uppercased()
-        }
-        return String(trimmed.prefix(2)).uppercased()
+        name.nameInitials
     }
 
     /// Gợi ý số tiền từ lời nhắn — mirror suggestAmount() bên Android (regex đơn giản hoá):

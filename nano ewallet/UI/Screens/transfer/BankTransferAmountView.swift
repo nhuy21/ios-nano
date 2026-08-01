@@ -134,7 +134,7 @@ struct BankTransferAmountView: View {
                 .fill(AppColor.brandSoft)
                 .frame(width: 44, height: 44)
                 .overlay {
-                    Text(String(draft.holderName.prefix(1)).uppercased())
+                    Text(draft.holderName.nameInitials)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(AppColor.brand)
                 }

@@ -311,7 +311,7 @@ struct ContactsView: View {
     }
 
     private func initials(for name: String) -> String {
-        String(name.prefix(1)).uppercased()
+        name.nameInitials
     }
 
     private static let avatarColors: [Color] = [
