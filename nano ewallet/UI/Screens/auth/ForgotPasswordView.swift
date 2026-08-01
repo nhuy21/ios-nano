@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ForgotPasswordView: View {
     let onBack: () -> Void
@@ -65,6 +66,7 @@ struct ForgotPasswordView: View {
                 }
                 .padding(.horizontal, 24)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             .background(Color.white)
             .scrollDismissesKeyboard(.interactively)
 
@@ -93,12 +95,13 @@ struct ForgotPasswordView: View {
                 placeholder: "Số điện thoại",
                 text: $vm.phone,
                 keyboardType: .phonePad,
-                submitLabel: vm.codeSent ? .done : .done,
+                submitLabel: .done,
                 maxLength: 11,
                 error: vm.errors["phone"]
             ) {
                 if !vm.codeSent { sendCode() }
             }
+            .focused($focusedField, equals: .phone)
             .disabled(vm.codeSent)
             .opacity(vm.codeSent ? 0.6 : 1)
 
@@ -240,10 +243,6 @@ struct ForgotPasswordView: View {
                 maxLength: maxLength,
                 digitsOnly: keyboardType == .numberPad || keyboardType == .phonePad,
                 onSubmit: onSubmit
-            )
-            .numericKeyboardToolbar(
-                label: submitLabel == .done ? "Xong" : "Tiếp theo",
-                action: onSubmit
             )
             if let error {
                 FieldError(message: error)

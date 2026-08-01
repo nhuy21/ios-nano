@@ -135,6 +135,7 @@ struct ConversationView: View {
                 }
                 .padding(16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
     }
 
@@ -243,7 +244,6 @@ struct ConversationView: View {
                     keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
                 )
                 .focused($isAmountFocused)
-                .numericKeyboardToolbar(label: "Xong") { isAmountFocused = false }
 
                 Button {
                     send()

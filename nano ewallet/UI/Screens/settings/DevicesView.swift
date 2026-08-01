@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct DevicesView: View {
     let onBack: () -> Void
@@ -65,6 +66,7 @@ struct DevicesView: View {
                 }
                 .padding(20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
     }
 
@@ -116,7 +118,8 @@ struct DevicesView: View {
                 .accessibilityLabel("Xoá thiết bị")
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {

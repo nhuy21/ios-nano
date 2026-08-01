@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct LoginView: View {
     let onLogin: (_ phone: String, _ status: String?) -> Void
@@ -22,10 +23,14 @@ struct LoginView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: 28)
 
+                // Cap chiều cao như các màn auth khác (Register 260, WelcomeBack 200):
+                // không cap thì ảnh phình theo bề ngang, đẩy nội dung vượt 1 màn hình
+                // khiến phần dưới bị cắt lúc mới vào (ScrollView còn ở offset 0).
                 Image("login_signin")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity)
+                    .frame(height: 240)
 
                 Spacer().frame(height: 16)
 
@@ -53,7 +58,6 @@ struct LoginView: View {
                     focusedField = .password
                 }
                 .focused($focusedField, equals: .phone)
-                .numericKeyboardToolbar { focusedField = .password }
                 if let phoneError = vm.errors["phone"] {
                     FieldError(message: phoneError)
                 }
@@ -69,7 +73,7 @@ struct LoginView: View {
                     submitLabel: .done,
                     onSubmit: submit
                 )
-                .numericKeyboardToolbar(label: "Xong", action: submit)
+                .focused($focusedField, equals: .password)
                 if let passwordError = vm.errors["password"] {
                     FieldError(message: passwordError)
                 }
@@ -108,6 +112,7 @@ struct LoginView: View {
             }
             .padding(.horizontal, 24)
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(Color.white)
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $vm.showDeviceConflict) {

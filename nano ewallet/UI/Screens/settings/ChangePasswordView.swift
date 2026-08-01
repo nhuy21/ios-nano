@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ChangePasswordView: View {
     let onBack: () -> Void
@@ -51,6 +52,7 @@ struct ChangePasswordView: View {
                 }
                 .padding(20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
         .background(Color(hex: 0xF7F8FA))
         .alert("Đổi mật khẩu thành công", isPresented: $vm.showSuccess) {
@@ -72,7 +74,6 @@ struct ChangePasswordView: View {
                     focusedField = .new
                 }
                 .focused($focusedField, equals: .current)
-                .numericKeyboardToolbar { focusedField = .new }
             }
 
             fieldBlock(label: "Mật khẩu mới", error: vm.newError) {
@@ -85,7 +86,6 @@ struct ChangePasswordView: View {
                     focusedField = .confirm
                 }
                 .focused($focusedField, equals: .new)
-                .numericKeyboardToolbar { focusedField = .confirm }
             }
 
             fieldBlock(label: "Xác nhận mật khẩu mới", error: vm.confirmError) {
@@ -98,9 +98,6 @@ struct ChangePasswordView: View {
                     Task { await vm.sendOtp() }
                 }
                 .focused($focusedField, equals: .confirm)
-                .numericKeyboardToolbar(label: "Xong") {
-                    Task { await vm.sendOtp() }
-                }
             }
         }
         .padding(16)
@@ -121,9 +118,6 @@ struct ChangePasswordView: View {
                 Task { await vm.confirmChange() }
             }
             .focused($focusedField, equals: .otp)
-            .numericKeyboardToolbar(label: "Xong") {
-                Task { await vm.confirmChange() }
-            }
 
             Button {
                 Task { await vm.resendOtp() }

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct SplashView: View {
     @StateObject private var appState = AppState.shared

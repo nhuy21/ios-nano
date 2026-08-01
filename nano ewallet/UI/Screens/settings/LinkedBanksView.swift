@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct LinkedBanksView: View {
     let onBack: () -> Void
@@ -41,6 +42,7 @@ struct LinkedBanksView: View {
                 }
                 .padding(20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
         .background(Color(hex: 0xF7F8FA))
         .task {
@@ -97,7 +99,8 @@ struct LinkedBanksView: View {
                     .foregroundStyle(AppColor.payMuted)
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 8, x: 0, y: 3)
@@ -164,7 +167,7 @@ struct LinkedBanksView: View {
                 .foregroundStyle(AppColor.payInk)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 24)
     }
 
     private var pinLimitValue: Int {

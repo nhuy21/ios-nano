@@ -64,6 +64,7 @@ struct WalletOnboardingChoiceView: View {
             }
             .padding(.horizontal, 24)
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(Color.white)
     }
 

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 @MainActor
 struct BankTransferAmountView: View {
@@ -74,6 +75,7 @@ struct BankTransferAmountView: View {
                 }
                 .padding(16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             continueBar
         }
         .background(Color(hex: 0xF7F8FA))
@@ -166,7 +168,6 @@ struct BankTransferAmountView: View {
                     digitsOnly: true
                 )
                 .focused($isAmountFocused)
-                .numericKeyboardToolbar(label: "Tiếp theo") { isMemoFocused = true }
             } else {
                 lockedField(text: amount > 0 ? Int(amount).vndFormatted : "0")
             }
@@ -306,7 +307,7 @@ struct BankTransferAmountView: View {
         }
         pendingTransactionId = nil
         if saveRecipient {
-            try? await BeneficiaryStore.shared.create(
+            _ = try? await BeneficiaryStore.shared.create(
                 CreateBeneficiaryRequest(
                     type: .bankAccount, bankNo: draft.bin, accNo: draft.accNo, accName: draft.holderName
                 )

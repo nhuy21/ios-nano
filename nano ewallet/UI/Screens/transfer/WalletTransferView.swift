@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 import UIKit
 
 @MainActor
@@ -42,6 +43,7 @@ struct WalletTransferView: View {
                 }
                 .padding(16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             continueBar
         }
         .background(Color(hex: 0xF7F8FA))
@@ -114,7 +116,6 @@ struct WalletTransferView: View {
                     keyboardType: .numberPad, submitLabel: .done
                 )
                 .focused($isFocused)
-                .numericKeyboardToolbar(label: "Xong") { isFocused = false }
                 .onChange(of: isFocused) { wasFocused, isFocusedNow in
                     if wasFocused && !isFocusedNow { runVerifyIfNeeded() }
                 }

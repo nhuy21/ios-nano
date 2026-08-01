@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct PinLimitView: View {
     let onBack: () -> Void
@@ -41,6 +42,7 @@ struct PinLimitView: View {
                 }
                 .padding(20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
         .background(Color(hex: 0xF7F8FA))
     }
@@ -145,7 +147,7 @@ struct PinLimitView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(isSelected ? AppColor.brand : AppColor.payInk)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 18)
                         .background(isSelected ? AppColor.brandSoft : Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
@@ -184,9 +186,6 @@ struct PinLimitView: View {
                 Task { await confirm() }
             }
             .focused($otpFocused)
-            .numericKeyboardToolbar(label: "Xong") {
-                Task { await confirm() }
-            }
 
             if let error = vm.error {
                 FieldError(message: error)

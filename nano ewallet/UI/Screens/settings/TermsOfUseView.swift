@@ -113,6 +113,7 @@ struct TermsOfUseView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 28)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
         .background(Color(hex: 0xF5F7F6))
     }

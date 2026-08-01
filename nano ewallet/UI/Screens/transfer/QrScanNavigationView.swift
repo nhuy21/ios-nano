@@ -28,24 +28,31 @@ struct QrScanNavigationView: View {
                 onParsed: { draft in path.append(.bankTransferAmount(draft)) },
                 onReceiveQr: { path.append(.receiveQr) }
             )
+            .hidesSystemNavigationBar()
             .navigationDestination(for: QrFlowRoute.self) { route in
-                switch route {
-                case .bankTransferAmount(let draft):
-                    BankTransferAmountView(
-                        draft: draft,
-                        onBack: { if !path.isEmpty { path.removeLast() } },
-                        onSuccess: { info in path.append(.transferSuccess(info)) }
-                    )
-                case .transferSuccess(let info):
-                    TransferSuccessView(
-                        amount: info.amount, recipientName: info.recipientName,
-                        recipientDetail: info.recipientDetail, noteLabel: info.noteLabel, note: info.note,
-                        onHome: onDismiss
-                    )
-                case .receiveQr:
-                    ReceiveQrView(onBack: { if !path.isEmpty { path.removeLast() } })
-                }
+                qrDestination(for: route)
+                    .hidesSystemNavigationBar()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func qrDestination(for route: QrFlowRoute) -> some View {
+        switch route {
+        case .bankTransferAmount(let draft):
+            BankTransferAmountView(
+                draft: draft,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onSuccess: { info in path.append(.transferSuccess(info)) }
+            )
+        case .transferSuccess(let info):
+            TransferSuccessView(
+                amount: info.amount, recipientName: info.recipientName,
+                recipientDetail: info.recipientDetail, noteLabel: info.noteLabel, note: info.note,
+                onHome: onDismiss
+            )
+        case .receiveQr:
+            ReceiveQrView(onBack: { if !path.isEmpty { path.removeLast() } })
         }
     }
 }

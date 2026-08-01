@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import Combine
 import AVFoundation
 import PhotosUI
 
@@ -172,7 +173,7 @@ struct QrScanView: View {
         .padding(.bottom, 24)
     }
 
-    private func bottomItem(icon: String, title: String) -> some View {
+    private nonisolated func bottomItem(icon: String, title: String) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 20))

@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import Combine
 import UIKit
 
 private enum SettingsColor {
@@ -46,8 +47,10 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             settingsContent
+                .hidesSystemNavigationBar()
                 .navigationDestination(for: SettingsRoute.self) { route in
                     destination(for: route)
+                        .hidesSystemNavigationBar()
                 }
         }
     }
@@ -126,6 +129,7 @@ struct SettingsView: View {
                 Spacer().frame(height: 120)
             }
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(SettingsColor.screenBg)
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
@@ -272,7 +276,7 @@ struct SettingsView: View {
                     .foregroundStyle(AppColor.payMuted)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 24)
         }
         .buttonStyle(.plain)
     }
@@ -292,7 +296,7 @@ struct SettingsView: View {
                 .onChange(of: isOn.wrappedValue) { _, newValue in onChange(newValue) }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 24)
     }
 
     private func rowIcon(_ systemImage: String) -> some View {
@@ -321,7 +325,7 @@ struct SettingsView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .padding(.vertical, 24)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)

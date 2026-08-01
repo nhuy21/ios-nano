@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 @MainActor
 struct WalletTransferAmountView: View {
@@ -61,6 +62,7 @@ struct WalletTransferAmountView: View {
                 }
                 .padding(16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             continueBar
         }
         .background(Color(hex: 0xF7F8FA))
@@ -148,7 +150,6 @@ struct WalletTransferAmountView: View {
                 keyboardType: .numberPad, submitLabel: .next, digitsOnly: true
             )
             .focused($isAmountFocused)
-            .numericKeyboardToolbar(label: "Tiếp theo") { isMessageFocused = true }
 
             if overMaxPerTransfer {
                 FieldError(message: "Số tiền chuyển tối đa 1 lần là 10.000.000đ", alignment: .leading)
@@ -266,8 +267,8 @@ struct WalletTransferAmountView: View {
         }
         pendingTransactionId = nil
         if saveRecipient {
-            try? await BeneficiaryStore.shared.create(
-                CreateBeneficiaryRequest(type: .wallet, benUsername: draft.username, accName: draft.holderName)
+            _ = try? await BeneficiaryStore.shared.create(
+                CreateBeneficiaryRequest(type: .wallet, accName: draft.holderName, benUsername: draft.username)
             )
         }
         if let token = draft.payLinkToken {

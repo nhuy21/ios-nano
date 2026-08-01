@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct RegisterView: View {
     let onBack: () -> Void
@@ -17,7 +18,7 @@ struct RegisterView: View {
     @StateObject private var vm = RegisterViewModel()
     @FocusState private var focusedField: Field?
 
-    private enum Field: Hashable { case email, password, confirm }
+    private enum Field: Hashable { case phone, email, password, confirm }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,7 +33,8 @@ struct RegisterView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 260)
+                        // 260 làm form 4 ô vượt 1 màn hình ~110pt -> đáy bị cắt lúc mới vào.
+                        .frame(height: 150)
 
                     Spacer().frame(height: 10)
 
@@ -51,7 +53,7 @@ struct RegisterView: View {
                         ) {
                             focusedField = .email
                         }
-                        .numericKeyboardToolbar { focusedField = .email }
+                        .focused($focusedField, equals: .phone)
                     }
                     if let error = vm.errors["phone"] {
                         FieldError(message: error, alignment: .leading)
@@ -87,7 +89,6 @@ struct RegisterView: View {
                             focusedField = .confirm
                         }
                         .focused($focusedField, equals: .password)
-                        .numericKeyboardToolbar { focusedField = .confirm }
                     }
                     if let error = vm.errors["password"] {
                         FieldError(message: error, alignment: .leading)
@@ -105,7 +106,6 @@ struct RegisterView: View {
                             onSubmit: submit
                         )
                         .focused($focusedField, equals: .confirm)
-                        .numericKeyboardToolbar(label: "Xong", action: submit)
                     }
                     if let error = vm.errors["confirmPassword"] {
                         FieldError(message: error, alignment: .leading)
@@ -135,6 +135,7 @@ struct RegisterView: View {
                 .padding(.top, 4)
             }
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(Color.white)
         .scrollDismissesKeyboard(.interactively)
     }

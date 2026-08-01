@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 @MainActor
 struct BankTransferView: View {
@@ -69,6 +70,7 @@ struct BankTransferView: View {
                 }
                 .padding(16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             continueBar
         }
         .background(Color(hex: 0xF7F8FA))
@@ -209,7 +211,6 @@ struct BankTransferView: View {
                     digitsOnly: true
                 )
                 .focused($isAccountFocused)
-                .numericKeyboardToolbar(label: "Xong") { isAccountFocused = false }
                 .onChange(of: isAccountFocused) { wasFocused, isFocused in
                     if wasFocused && !isFocused { runLookupIfNeeded() }
                 }
@@ -415,6 +416,7 @@ struct BankPickerSheet: View {
                 }
                 .padding(.horizontal, 20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
         .presentationDetents([.large])
     }

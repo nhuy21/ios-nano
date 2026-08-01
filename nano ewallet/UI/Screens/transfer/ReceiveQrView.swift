@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import Combine
 import CoreImage.CIFilterBuiltins
 import UIKit
 
@@ -52,6 +53,7 @@ struct ReceiveQrView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             actionRow
         }
         .background(

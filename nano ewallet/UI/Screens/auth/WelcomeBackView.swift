@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct WelcomeBackView: View {
     let phone: String
@@ -53,7 +54,6 @@ struct WelcomeBackView: View {
                     submitLabel: .done,
                     onSubmit: submit
                 )
-                .numericKeyboardToolbar(label: "Xong", action: submit)
 
                 if let errorMsg = vm.errorMsg {
                     FieldError(message: errorMsg)
@@ -102,6 +102,7 @@ struct WelcomeBackView: View {
             }
             .padding(.horizontal, 24)
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(Color.white)
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $vm.showDeviceConflict) {

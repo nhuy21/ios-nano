@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Combine
 import UIKit
 
 @MainActor
@@ -31,8 +32,10 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             homeContent
+                .hidesSystemNavigationBar()
                 .navigationDestination(for: HomeRoute.self) { route in
                     destination(for: route)
+                        .hidesSystemNavigationBar()
                 }
         }
         .onChange(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
@@ -199,6 +202,7 @@ struct HomeView: View {
                 Spacer().frame(height: 140) // chừa chỗ cho floating tab bar
             }
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(Color(hex: 0xF3F5F7))
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .sheet(item: $detailTransaction) { tx in

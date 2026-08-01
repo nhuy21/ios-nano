@@ -36,6 +36,7 @@ struct SecurityView: View {
                 }
                 .padding(20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
         .background(Color(hex: 0xF7F8FA))
     }
@@ -56,7 +57,7 @@ struct SecurityView: View {
                     .foregroundStyle(AppColor.payMuted)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 24)
         }
         .buttonStyle(.plain)
     }

@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import Combine
 
 @MainActor
 struct WithdrawView: View {
@@ -90,6 +91,7 @@ struct WithdrawView: View {
                 }
                 .padding(16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             continueBar
         }
         .background(Color(hex: 0xF7F8FA))
@@ -217,7 +219,6 @@ struct WithdrawView: View {
                     keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
                 )
                 .focused($isAccountFocused)
-                .numericKeyboardToolbar(label: "Xong") { isAccountFocused = false }
                 .onChange(of: isAccountFocused) { wasFocused, isFocused in
                     if wasFocused && !isFocused { runLookupIfNeeded() }
                 }
@@ -306,7 +307,6 @@ struct WithdrawView: View {
                 keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
             )
             .focused($isAmountFocused)
-            .numericKeyboardToolbar(label: "Xong") { isAmountFocused = false }
 
             if overMaxPerWithdraw {
                 FieldError(message: "Số tiền rút tối đa 1 lần là 10.000.000đ", alignment: .leading)

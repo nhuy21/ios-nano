@@ -81,6 +81,7 @@ struct AddContactSheet: View {
                 }
                 .padding(20)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
 
             PrimaryButton(
                 title: "LƯU VÀO DANH BẠ",

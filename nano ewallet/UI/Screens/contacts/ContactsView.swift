@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ContactsView: View {
     let onBack: () -> Void
@@ -203,6 +204,7 @@ struct ContactsView: View {
                 }
                 .padding(.horizontal, 16)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
     }
 

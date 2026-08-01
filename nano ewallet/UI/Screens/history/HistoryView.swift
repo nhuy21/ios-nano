@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct HistoryView: View {
     let onBack: () -> Void
@@ -212,6 +213,7 @@ struct HistoryView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 120)
             }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
     }
 

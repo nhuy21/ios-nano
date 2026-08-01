@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct RootNavigator: View {
     @StateObject private var appState = AppState.shared
@@ -29,6 +30,7 @@ struct RootNavigator: View {
                         onBack: { appState.route(status: nil, phone: nil) },
                         onVerified: { appState.route(status: UserStatus.kycPending.rawValue, phone: phone) }
                     )
+                    .hidesSystemNavigationBar()
                 }
             case .onboarding(let phone):
                 NavigationStack {
@@ -41,6 +43,7 @@ struct RootNavigator: View {
                             // TODO (Phase 3): điều hướng CccdScanView(phone)
                         }
                     )
+                    .hidesSystemNavigationBar()
                 }
                 .id(phone) // đảm bảo state reset nếu phone đổi (hiếm khi xảy ra)
             case .authenticated:
@@ -62,8 +65,10 @@ private struct AuthFlow: View {
     var body: some View {
         NavigationStack(path: $path) {
             rootView
+                .hidesSystemNavigationBar()
                 .navigationDestination(for: Route.self) { route in
                     destination(for: route)
+                        .hidesSystemNavigationBar()
                 }
         }
     }
