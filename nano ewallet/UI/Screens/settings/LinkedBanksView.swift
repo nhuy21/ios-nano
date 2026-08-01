@@ -151,7 +151,7 @@ struct LinkedBanksView: View {
                 Image(systemName: "info.circle.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(LinkedBanksColor.accentGreen)
-                Text("Giao dịch từ \(pinLimitValue.vndFormatted) trở lên cần nhập mã PIN để xác thực. Bạn có thể hạ ngưỡng này trong mục Cá nhân → Ngưỡng xác thực PIN.")
+                Text("Giao dịch từ \(pinLimitValue.vndFormatted) trở lên cần nhập mã PIN để xác thực. Bạn có thể điều chỉnh ngưỡng này trong mục Cá nhân → Ngưỡng xác thực PIN.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(LinkedBanksColor.labelGray)
                     .lineSpacing(4)

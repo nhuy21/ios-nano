@@ -48,7 +48,7 @@ struct PinLimitView: View {
     }
 
     private var explanationBox: some View {
-        Text("Giao dịch từ ngưỡng này trở lên sẽ cần nhập mã PIN. Bạn chỉ có thể HẠ ngưỡng xuống (tối đa 500.000đ, thấp nhất 0đ = luôn hỏi PIN), không nâng lên cao hơn.")
+        Text("Giao dịch từ ngưỡng này trở lên sẽ cần nhập mã PIN. Bạn có thể điều chỉnh ngưỡng (tối đa 500.000đ, thấp nhất 0đ = luôn hỏi PIN), không nâng lên cao hơn.")
             .font(.system(size: 13))
             .foregroundStyle(AppColor.payInk)
             .padding(14)
