@@ -32,21 +32,30 @@ struct WalletTransferView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    usernameSection
-                    if !recentWalletContacts.isEmpty {
-                        recentSection
+        ZStack {
+            VStack(spacing: 0) {
+                header
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        usernameSection
+                        if !recentWalletContacts.isEmpty {
+                            recentSection
+                        }
                     }
+                    .padding(16)
                 }
-                .padding(16)
+                .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
+                continueBar
             }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-            continueBar
+            .background(Color(hex: 0xF7F8FA))
+
+            if showSupport {
+                SupportDialog(onDismiss: { showSupport = false })
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
         }
-        .background(Color(hex: 0xF7F8FA))
+        .animation(.easeOut(duration: 0.18), value: showSupport)
         .task { await beneficiaryStore.refresh() }
         .onAppear {
             if let initialDraft {
@@ -54,14 +63,6 @@ struct WalletTransferView: View {
                 verifiedName = initialDraft.holderName
                 lastVerified = initialDraft.username
             }
-        }
-        .confirmationDialog("Hỗ trợ", isPresented: $showSupport, titleVisibility: .visible) {
-            Button("Gọi hotline 0966 585 328") {
-                if let url = URL(string: "tel://0966585328") {
-                    UIApplication.shared.open(url)
-                }
-            }
-            Button("Đóng", role: .cancel) {}
         }
     }
 
@@ -178,7 +179,7 @@ struct WalletTransferView: View {
                                 .fill(AppColor.brandSoft)
                                 .frame(width: 36, height: 36)
                                 .overlay {
-                                    Text(String(contact.displayName.prefix(1)).uppercased())
+                                    Text(contact.displayName.nameInitials)
                                         .font(.system(size: 14, weight: .bold))
                                         .foregroundStyle(AppColor.brand)
                                 }
