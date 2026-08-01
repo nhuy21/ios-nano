@@ -16,7 +16,6 @@ struct DateFilterSheet: View {
 
     @State private var customStart: Date = Date()
     @State private var customEnd: Date = Date()
-    @State private var showingCustomPicker = false
 
     private var presets: [(label: String, start: Date?, end: Date?)] {
         let today = Calendar.current.startOfDay(for: Date())
@@ -43,48 +42,43 @@ struct DateFilterSheet: View {
 
             FlowChips(presets: presets, dateStart: $dateStart, dateEnd: $dateEnd)
 
-            if !showingCustomPicker {
-                Button {
-                    customStart = dateStart ?? Date()
-                    customEnd = dateEnd ?? Date()
-                    showingCustomPicker = true
-                } label: {
-                    HStack {
-                        Image(systemName: "calendar")
-                        Text("Chọn khoảng ngày cụ thể")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColor.payInk)
-                    .padding(14)
-                    .background(Color(hex: 0xF6F7F9))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            // Hiện thẳng 2 ô ngày, không phải bấm "Chọn khoảng ngày cụ thể" rồi mới
+            // hiện — bỏ 1 bước thừa. Chọn preset ở trên sẽ tự đổ vào 2 ô này, và
+            // ngược lại đổi ngày ở đây ghi thẳng vào bộ lọc.
+            VStack(spacing: 12) {
+                // DatePicker chỉ nhận ClosedRange/PartialRangeFrom cho `in:`, không có
+                // overload PartialRangeThrough — dùng distantPast làm cận dưới giả.
+                DatePicker(
+                    "Từ ngày", selection: $customStart,
+                    in: Date.distantPast...customEnd, displayedComponents: .date
+                )
+                DatePicker(
+                    "Đến ngày", selection: $customEnd,
+                    in: customStart...Date(), displayedComponents: .date
+                )
+            }
+            .datePickerStyle(.compact)
+            .onChange(of: customStart) { _, value in
+                if dateStart == nil || !Calendar.current.isDate(value, inSameDayAs: dateStart!) {
+                    dateStart = value
                 }
-                .buttonStyle(.plain)
-            } else {
-                VStack(spacing: 12) {
-                    // DatePicker chỉ nhận ClosedRange/PartialRangeFrom cho `in:`, không có
-                    // overload PartialRangeThrough — dùng distantPast làm cận dưới giả.
-                    DatePicker(
-                        "Từ ngày", selection: $customStart,
-                        in: Date.distantPast...customEnd, displayedComponents: .date
-                    )
-                    DatePicker(
-                        "Đến ngày", selection: $customEnd,
-                        in: customStart...Date(), displayedComponents: .date
-                    )
+            }
+            .onChange(of: customEnd) { _, value in
+                if dateEnd == nil || !Calendar.current.isDate(value, inSameDayAs: dateEnd!) {
+                    dateEnd = value
                 }
-                .datePickerStyle(.compact)
-
-                Button("Áp dụng khoảng ngày") {
-                    dateStart = customStart
-                    dateEnd = customEnd
-                    showingCustomPicker = false
+            }
+            // Bấm preset -> đổ ngược vào 2 ô cho khớp. "Tất cả" (nil) giữ nguyên ngày
+            // đang hiện, không ghi đè ngược lại bộ lọc.
+            .onChange(of: dateStart) { _, value in
+                if let value, !Calendar.current.isDate(value, inSameDayAs: customStart) {
+                    customStart = value
                 }
-                .buttonStyle(.plain)
-                .font(AppFont.beVietnamPro(14, .semibold))
-                .foregroundStyle(AppColor.brand)
+            }
+            .onChange(of: dateEnd) { _, value in
+                if let value, !Calendar.current.isDate(value, inSameDayAs: customEnd) {
+                    customEnd = value
+                }
             }
 
             PrimaryButton(title: "Áp dụng", action: {
@@ -94,6 +88,12 @@ struct DateFilterSheet: View {
         }
         .padding(20)
         .presentationDragIndicator(.hidden)
+        .onAppear {
+            // Mở sheet: 2 ô hiện đúng khoảng đang lọc; chưa lọc thì mặc định 7 ngày qua.
+            let today = Date()
+            customStart = dateStart ?? Calendar.current.date(byAdding: .day, value: -6, to: today) ?? today
+            customEnd = dateEnd ?? today
+        }
     }
 }
 
