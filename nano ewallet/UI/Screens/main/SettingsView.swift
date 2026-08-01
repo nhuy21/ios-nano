@@ -55,18 +55,37 @@ struct SettingsView: View {
         }
     }
 
+    /// Tiêu đề "Cá nhân" cố định, không cuộn — mirror header slim riêng bên Android
+    /// (`SettingsScreen.kt`: title nằm ngoài `verticalScroll` Column).
     private var settingsContent: some View {
+        VStack(spacing: 0) {
+            Text("Cá nhân")
+                .font(AppFont.beVietnamPro(20, .bold))
+                .foregroundStyle(AppColor.payInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+
+            settingsScrollContent
+        }
+        .background(SettingsColor.screenBg)
+        .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
+        .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
+            Button("Huỷ", role: .cancel) {}
+            Button("Đăng xuất", role: .destructive) { logout() }
+        } message: {
+            Text("Bạn có chắc muốn đăng xuất?")
+        }
+        .sheet(isPresented: $showSupportDialog) {
+            SupportSheet(onDismiss: { showSupportDialog = false })
+                .presentationDetents([.height(320)])
+        }
+    }
+
+    private var settingsScrollContent: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Text("Cá nhân")
-                    .font(AppFont.beVietnamPro(20, .bold))
-                    .foregroundStyle(AppColor.payInk)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                Spacer().frame(height: 16)
-
                 profileBlock
 
                 Spacer().frame(height: 24)
@@ -130,18 +149,6 @@ struct SettingsView: View {
             }
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-        .background(SettingsColor.screenBg)
-        .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
-        .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
-            Button("Huỷ", role: .cancel) {}
-            Button("Đăng xuất", role: .destructive) { logout() }
-        } message: {
-            Text("Bạn có chắc muốn đăng xuất?")
-        }
-        .sheet(isPresented: $showSupportDialog) {
-            SupportSheet(onDismiss: { showSupportDialog = false })
-                .presentationDetents([.height(320)])
-        }
     }
 
     private func popBack() {
@@ -395,16 +402,21 @@ private struct SupportSheet: View {
             }
             .padding(.horizontal, 24)
 
-            Button("Đóng") {
+            // Kích thước/nền phải nằm TRONG label, kèm contentShape: để ở ngoài
+            // Button thì vùng bấm chỉ là mấy chữ "Đóng", nền xanh chỉ là trang trí.
+            Button {
                 onDismiss()
+            } label: {
+                Text("Đóng")
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(SettingsColor.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .font(AppFont.beVietnamPro(15, .semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(SettingsColor.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .padding(.horizontal, 24)
             .padding(.top, 4)
             .padding(.bottom, 24)
@@ -433,6 +445,9 @@ private struct SupportSheet: View {
                 }
                 Spacer()
             }
+            // Không có contentShape thì khoảng trống do Spacer chiếm không bấm được,
+            // phải chạm đúng icon/chữ mới ăn.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
