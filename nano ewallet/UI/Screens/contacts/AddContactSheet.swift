@@ -262,16 +262,6 @@ struct AddContactSheet: View {
     }
 }
 
-private extension Color {
-    /// Parse "#RRGGBB" từ `brandColor` do BE trả (dùng cho fallback logo bank).
-    init?(hexString: String) {
-        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
-        hex = hex.replacingOccurrences(of: "#", with: "")
-        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
-        self.init(hex: value)
-    }
-}
-
 #Preview {
     AddContactSheet(onSaved: {}, onCancel: {})
 }

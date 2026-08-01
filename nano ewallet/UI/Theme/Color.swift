@@ -17,6 +17,14 @@ extension Color {
             opacity: 1
         )
     }
+
+    /// Parse "#RRGGBB" từ `brandColor` do BE trả (logo/thẻ ngân hàng).
+    init?(hexString: String) {
+        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        hex = hex.replacingOccurrences(of: "#", with: "")
+        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
+        self.init(hex: value)
+    }
 }
 
 /// Bảng màu app. Theme là **light-only** (Android không có dark scheme).
