@@ -7,8 +7,7 @@
 //  tay từ flash-wallet/app/src/main/res/drawable/*.xml, tránh vẽ lại thủ công dễ
 //  sai lệch hình dạng.
 //
-//  Hỗ trợ lệnh: M/m, L/l, H/h, V/v, C/c, Q/q, A/a, Z/z (đủ cho toàn bộ icon giao dịch
-//  đang cần port — không icon nào dùng S/s hay T/T).
+//  Hỗ trợ lệnh: M/m, L/l, H/h, V/v, C/c, S/s, Q/q, T/t, A/a, Z/z.
 //
 
 import SwiftUI
@@ -33,6 +32,10 @@ struct SVGPath: Shape {
         /// đơn vị viewBox gốc, không phải theo pixel đã scale.
         var currentLogical = (x: 0.0, y: 0.0)
         var startLogical = (x: 0.0, y: 0.0)
+        /// Control point cuối của lệnh cong trước đó (toạ độ logic) — S/T phản chiếu
+        /// điểm này qua điểm hiện tại để nối cong trơn. nil nếu lệnh trước không phải cong.
+        var lastCubicControl: (x: Double, y: Double)?
+        var lastQuadControl: (x: Double, y: Double)?
 
         let tokens = SVGPathTokenizer.tokenize(pathData)
         var index = 0
@@ -61,6 +64,8 @@ struct SVGPath: Shape {
                 current = point(nx, ny)
                 startOfSubpath = current
                 path.move(to: current)
+                lastCubicControl = nil
+                lastQuadControl = nil
                 // Các cặp toạ độ tiếp theo sau M (không có lệnh mới) ngầm định là L.
                 while index < tokens.count, tokens[index].isNumber {
                     let lx = nextNumber(), ly = nextNumber()
@@ -81,6 +86,8 @@ struct SVGPath: Shape {
                     path.addLine(to: current)
                     if index >= tokens.count || !tokens[index].isNumber { break }
                 }
+                lastCubicControl = nil
+                lastQuadControl = nil
 
             case "H":
                 while true {
@@ -91,6 +98,8 @@ struct SVGPath: Shape {
                     path.addLine(to: current)
                     if index >= tokens.count || !tokens[index].isNumber { break }
                 }
+                lastCubicControl = nil
+                lastQuadControl = nil
 
             case "V":
                 while true {
@@ -101,6 +110,8 @@ struct SVGPath: Shape {
                     path.addLine(to: current)
                     if index >= tokens.count || !tokens[index].isNumber { break }
                 }
+                lastCubicControl = nil
+                lastQuadControl = nil
 
             case "C":
                 while true {
@@ -112,9 +123,35 @@ struct SVGPath: Shape {
                     let c2 = point(isRelative ? base.x + x2 : x2, isRelative ? base.y + y2 : y2)
                     let nx = isRelative ? base.x + x : x
                     let ny = isRelative ? base.y + y : y
+                    let c2Logical = (x: isRelative ? base.x + x2 : x2, y: isRelative ? base.y + y2 : y2)
                     currentLogical = (nx, ny)
                     current = point(nx, ny)
                     path.addCurve(to: current, control1: c1, control2: c2)
+                    lastCubicControl = c2Logical
+                    lastQuadControl = nil
+                    if index >= tokens.count || !tokens[index].isNumber { break }
+                }
+
+            case "S":
+                // Smooth cubic: control1 = phản chiếu control2 của lệnh cong trước qua
+                // điểm hiện tại; nếu lệnh trước không phải C/S thì trùng điểm hiện tại.
+                while true {
+                    let x2 = nextNumber(), y2 = nextNumber()
+                    let x = nextNumber(), y = nextNumber()
+                    let base = currentLogical
+                    let reflected = lastCubicControl.map {
+                        (x: 2 * base.x - $0.x, y: 2 * base.y - $0.y)
+                    } ?? base
+                    let c1 = point(reflected.x, reflected.y)
+                    let c2Logical = (x: isRelative ? base.x + x2 : x2, y: isRelative ? base.y + y2 : y2)
+                    let c2 = point(c2Logical.x, c2Logical.y)
+                    let nx = isRelative ? base.x + x : x
+                    let ny = isRelative ? base.y + y : y
+                    currentLogical = (nx, ny)
+                    current = point(nx, ny)
+                    path.addCurve(to: current, control1: c1, control2: c2)
+                    lastCubicControl = c2Logical
+                    lastQuadControl = nil
                     if index >= tokens.count || !tokens[index].isNumber { break }
                 }
 
@@ -123,12 +160,34 @@ struct SVGPath: Shape {
                     let x1 = nextNumber(), y1 = nextNumber()
                     let x = nextNumber(), y = nextNumber()
                     let base = currentLogical
-                    let c1 = point(isRelative ? base.x + x1 : x1, isRelative ? base.y + y1 : y1)
+                    let c1Logical = (x: isRelative ? base.x + x1 : x1, y: isRelative ? base.y + y1 : y1)
+                    let c1 = point(c1Logical.x, c1Logical.y)
                     let nx = isRelative ? base.x + x : x
                     let ny = isRelative ? base.y + y : y
                     currentLogical = (nx, ny)
                     current = point(nx, ny)
                     path.addQuadCurve(to: current, control: c1)
+                    lastQuadControl = c1Logical
+                    lastCubicControl = nil
+                    if index >= tokens.count || !tokens[index].isNumber { break }
+                }
+
+            case "T":
+                // Smooth quadratic: control = phản chiếu control của lệnh Q/T trước.
+                while true {
+                    let x = nextNumber(), y = nextNumber()
+                    let base = currentLogical
+                    let reflected = lastQuadControl.map {
+                        (x: 2 * base.x - $0.x, y: 2 * base.y - $0.y)
+                    } ?? base
+                    let c1 = point(reflected.x, reflected.y)
+                    let nx = isRelative ? base.x + x : x
+                    let ny = isRelative ? base.y + y : y
+                    currentLogical = (nx, ny)
+                    current = point(nx, ny)
+                    path.addQuadCurve(to: current, control: c1)
+                    lastQuadControl = reflected
+                    lastCubicControl = nil
                     if index >= tokens.count || !tokens[index].isNumber { break }
                 }
 
@@ -151,11 +210,15 @@ struct SVGPath: Shape {
                     current = point(nx, ny)
                     if index >= tokens.count || !tokens[index].isNumber { break }
                 }
+                lastCubicControl = nil
+                lastQuadControl = nil
 
             case "Z":
                 path.closeSubpath()
                 current = startOfSubpath
                 currentLogical = startLogical
+                lastCubicControl = nil
+                lastQuadControl = nil
 
             default:
                 break
@@ -280,6 +343,9 @@ private enum SVGPathTokenizer {
         /// Số tham số còn lại của lệnh A/a hiện tại cần đọc theo cú pháp đặc biệt
         /// (7 tham số: rx, ry, x-rotation, large-arc-flag, sweep-flag, x, y).
         var argsRemainingForArc = 0
+        /// Lệnh gần nhất có phải A/a không — để biết có mở lại nhóm 7 tham số khi
+        /// nhóm hiện tại vừa đọc xong mà vẫn còn số theo sau.
+        var lastCommandWasArc = false
 
         func isCommandChar(_ c: Character) -> Bool {
             "MmLlHhVvCcSsQqTtAaZz".contains(c)
@@ -293,14 +359,21 @@ private enum SVGPathTokenizer {
             }
             if isCommandChar(c) {
                 tokens.append(.command(String(c)))
-                argsRemainingForArc = (c == "A" || c == "a") ? 7 : 0
+                lastCommandWasArc = (c == "A" || c == "a")
+                argsRemainingForArc = lastCommandWasArc ? 7 : 0
                 i += 1
                 continue
             }
 
-            // Vị trí flag (tham số thứ 4, thứ 5 trong nhóm 7 của lệnh A) — chỉ đọc
-            // đúng 1 ký tự số, không gộp với ký tự theo sau.
-            let isFlagPosition = argsRemainingForArc == 3 || argsRemainingForArc == 2
+            // Vị trí flag (large-arc-flag, sweep-flag = tham số thứ 4 và 5 trong nhóm 7)
+            // — chỉ đọc ĐÚNG 1 ký tự số, không gộp với ký tự theo sau, vì SVG cho phép
+            // viết dính kiểu "0 0 1 1.732 1".
+            //
+            // Bộ đếm được kiểm TRƯỚC khi đọc số, nên tham số thứ 4 ứng với giá trị 4,
+            // thứ 5 ứng với 3. Trước đây dùng 3||2 (lệch 1 nhịp) khiến toạ độ x bị
+            // cắt: "1.732" đọc thành "1" rồi ".732" trôi sang tham số sau -> lệch hết
+            // các lệnh còn lại, icon méo hình.
+            let isFlagPosition = argsRemainingForArc == 4 || argsRemainingForArc == 3
             if isFlagPosition, c == "0" || c == "1" {
                 tokens.append(.number(c == "1" ? 1 : 0))
                 argsRemainingForArc -= 1
@@ -330,7 +403,12 @@ private enum SVGPathTokenizer {
             }
             if !numStr.isEmpty, numStr != "-", numStr != "+" {
                 tokens.append(.number(Double(numStr) ?? 0))
-                if argsRemainingForArc > 0 { argsRemainingForArc -= 1 }
+                if argsRemainingForArc > 0 {
+                    argsRemainingForArc -= 1
+                    // Hết 1 nhóm 7 tham số mà vẫn còn số theo sau: SVG cho phép lặp
+                    // nhóm mà không viết lại chữ lệnh -> mở lại bộ đếm cho nhóm kế.
+                    if argsRemainingForArc == 0, lastCommandWasArc { argsRemainingForArc = 7 }
+                }
             } else {
                 i += 1
             }
