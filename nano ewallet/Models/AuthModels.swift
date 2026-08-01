@@ -14,7 +14,7 @@ import Foundation
 /// `accessToken`/`refreshToken` là **nil** trong 2 trường hợp BE cố tình không cấp token:
 /// - `requireOtp`: tài khoản còn PENDING (chưa verify OTP đăng ký), BE đã gửi lại OTP.
 /// - `requireDeviceOtp`: mật khẩu ĐÚNG nhưng máy khác đang đăng nhập → BE trả `loginTicket`.
-struct AuthData: Decodable {
+nonisolated struct AuthData: Decodable {
     let accessToken: String?
     let refreshToken: String?
     let user: UserAccount?
@@ -23,7 +23,7 @@ struct AuthData: Decodable {
     let loginTicket: String?
 }
 
-struct UserAccount: Decodable {
+nonisolated struct UserAccount: Decodable {
     let id: String?
     let phone: String?
     let fullName: String?
@@ -98,7 +98,7 @@ struct ResetPasswordRequest: Encodable {
     let confirmPassword: String
 }
 
-struct RefreshRequest: Encodable {
+nonisolated struct RefreshRequest: Encodable {
     let deviceId: String
     let refreshToken: String
 }

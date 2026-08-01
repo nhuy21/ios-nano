@@ -67,7 +67,7 @@ enum TransactionStatus: String {
 }
 
 /// Query GET transactions — mirror be/src/modules/transaction/dto/transaction.dto.ts.
-struct TransactionQuery {
+nonisolated struct TransactionQuery {
     var limit: Int = 20
     var type: String = "ALL" // "ALL" | "IN" | "OUT"
     var after: String?

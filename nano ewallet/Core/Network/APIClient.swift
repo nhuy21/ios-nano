@@ -190,7 +190,7 @@ private struct AnyEncodable: Encodable {
 
 extension JSONDecoder {
     /// BE trả ISO-8601 (có/không millisecond) — dùng chung 1 decoder cho toàn app.
-    static let beDecoder: JSONDecoder = {
+    nonisolated static let beDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let raw = try decoder.singleValueContainer().decode(String.self)

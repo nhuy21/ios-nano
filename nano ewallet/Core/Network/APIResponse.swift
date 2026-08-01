@@ -7,7 +7,7 @@ import Foundation
 
 /// Envelope BE bọc quanh mọi response: `{ success, statusCode, message, data }`.
 /// Xem be/src/format-response/.
-struct APIResponse<T: Decodable>: Decodable {
+nonisolated struct APIResponse<T: Decodable>: Decodable {
     let success: Bool?
     let statusCode: Int?
     let message: BEMessage?
@@ -15,7 +15,7 @@ struct APIResponse<T: Decodable>: Decodable {
 }
 
 /// Response không có `data` (register, logout, resend-otp...).
-struct APIEmptyResponse: Decodable {
+nonisolated struct APIEmptyResponse: Decodable {
     let success: Bool?
     let statusCode: Int?
     let message: BEMessage?
@@ -23,7 +23,7 @@ struct APIEmptyResponse: Decodable {
 
 /// `message` của BE có thể là **string** hoặc **array of string** — NestJS ValidationPipe
 /// trả array khi có nhiều lỗi validate. Bọc lại để decode được cả hai dạng.
-enum BEMessage: Decodable {
+nonisolated enum BEMessage: Decodable {
     case single(String)
     case multiple([String])
 

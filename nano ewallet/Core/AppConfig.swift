@@ -11,8 +11,8 @@ import UIKit
 enum AppConfig {
 
     /// Base URL của backend — **đã bao gồm `/api/v1`**.
-    /// Endpoint chỉ truyền path ngắn: `client.get("wallet/me")`, KHÔNG viết `/api/v1/wallet/me`.
-    static let baseURL: URL = {
+    /// Endpoint chỉ truyền path ngắn: `client.get("wallet/me")`, KHÔNG viết `/api/v1/wallet/me`.k
+    nonisolated static let baseURL: URL = {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "BE_BASE_URL") as? String,
               !raw.isEmpty,
               let url = URL(string: raw) else {

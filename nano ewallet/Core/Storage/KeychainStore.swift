@@ -10,7 +10,7 @@ import Security
 ///
 /// Dùng `kSecAttrAccessibleAfterFirstUnlock` để token đọc được sau lần mở máy đầu tiên
 /// (cần cho push/background refresh), nhưng không đọc được khi máy còn khoá lần đầu.
-enum KeychainStore {
+nonisolated enum KeychainStore {
 
     private static let service = "dev.casso.nanowallet.auth"
 

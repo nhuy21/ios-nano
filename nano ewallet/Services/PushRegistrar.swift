@@ -49,7 +49,7 @@ final class PushRegistrar {
 
     /// Gọi khi logout hoặc user tắt push — mirror DeviceTokenApi.unregister. Best-effort.
     func unregister() async {
-        let deviceId = await AuthStore.shared.getOrCreateDeviceId()
+        let deviceId = AuthStore.shared.getOrCreateDeviceId()
         let body = UnregisterDeviceRequest(deviceId: deviceId)
         try? await APIClient.shared.requestVoid(.post, "devices/unregister", body: body, auth: true)
     }
