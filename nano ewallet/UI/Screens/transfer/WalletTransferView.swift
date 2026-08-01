@@ -10,11 +10,45 @@ import SwiftUI
 import Combine
 import UIKit
 
+/// Bảng màu riêng của màn này.
+private enum WtColor {
+    static let pageBg = Color(hex: 0xF4F5F6)
+    static let green = Color(hex: 0x00A85E)
+    static let ink = Color(hex: 0x111C17)
+    static let gray = Color(hex: 0x8A9990)
+    static let fieldFill = Color(hex: 0xF1F3F5)
+    static let circleBg = Color(hex: 0xF1F3F5)
+
+    /// Màu avatar gán ổn định theo tên người nhận.
+    static let avatarColors: [Color] = [
+        Color(hex: 0xB5E48C), Color(hex: 0xA0C4FF), Color(hex: 0xFFB4A2),
+        Color(hex: 0xBDB2FF), Color(hex: 0xFFD6A5), Color(hex: 0x9BF6FF),
+    ]
+
+    static func avatar(for name: String) -> Color {
+        let hash = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        return avatarColors[hash % avatarColors.count]
+    }
+}
+
+/// Thẻ trắng bo 20 có bóng nhẹ — dùng chung cho 2 khối của màn.
+private extension View {
+    func wtCard() -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 2)
+    }
+}
+
 @MainActor
 struct WalletTransferView: View {
     let onBack: () -> Void
     var initialDraft: WalletTransferDraft?
     let onContinue: (WalletTransferDraft) -> Void
+    /// Mở màn Danh bạ — dùng cho cả link "Danh bạ" ở card nhập lẫn "Xem tất cả".
+    var onOpenContacts: () -> Void = {}
 
     @StateObject private var beneficiaryStore = BeneficiaryStore.shared
 
@@ -38,16 +72,14 @@ struct WalletTransferView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         usernameSection
-                        if !recentWalletContacts.isEmpty {
-                            recentSection
-                        }
+                        recentSection
                     }
                     .padding(16)
                 }
                 .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
                 continueBar
             }
-            .background(Color(hex: 0xF7F8FA))
+            .background(WtColor.pageBg)
 
             if showSupport {
                 SupportDialog(onDismiss: { showSupport = false })
@@ -68,151 +100,245 @@ struct WalletTransferView: View {
 
     // MARK: - Header
 
+    /// Header TRẮNG chữ tối, tiêu đề "Chuyển tiền ví" canh giữa — không còn dải
+    /// gradient xanh.
     private var header: some View {
-        HStack {
-            Button(action: onBack) {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
+        ZStack {
+            Text("Chuyển tiền ví")
+                .font(AppFont.beVietnamPro(18, .bold))
+                .foregroundStyle(WtColor.ink)
+
+            HStack {
+                Button(action: onBack) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(WtColor.ink)
+                        .frame(width: 44, height: 44)
+                        .background(WtColor.circleBg)
+                        .clipShape(Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quay lại")
+
+                Spacer()
+
+                Button { showSupport = true } label: {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(WtColor.gray)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            Spacer()
-            Text("CHUYỂN TIỀN")
-                .font(AppFont.beVietnamPro(15, .bold))
-                .foregroundStyle(.white)
-                .tracking(2)
-            Spacer()
-            Button { showSupport = true } label: {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        )
+        .padding(.vertical, 10)
+        .background(Color.white)
     }
 
     // MARK: - Username
 
     private var usernameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "Username ví Bảo Kim")
-            HStack(spacing: 8) {
-                AppTextField(
-                    text: $username, placeholder: "Nhập username người nhận",
-                    keyboardType: .numberPad, submitLabel: .done
-                )
-                .focused($isFocused)
-                .onChange(of: isFocused) { wasFocused, isFocusedNow in
-                    if wasFocused && !isFocusedNow { runVerifyIfNeeded() }
-                }
-
-                Button {
-                    if let clip = UIPasteboard.general.string { username = clip }
-                } label: {
-                    Text("Dán")
-                        .font(AppFont.beVietnamPro(14, .semibold))
-                        .foregroundStyle(AppColor.brand)
-                        .padding(.horizontal, 14)
-                        .frame(height: 56)
-                        .background(AppColor.brandSoft)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Số ví người nhận")
+                    .font(AppFont.beVietnamPro(14, .bold))
+                    .foregroundStyle(WtColor.ink)
+                Spacer()
+                Button { onOpenContacts() } label: {
+                    HStack(spacing: 2) {
+                        Text("Danh bạ")
+                            .font(AppFont.beVietnamPro(13, .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(WtColor.green)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
 
-            if isVerifying {
-                HStack(spacing: 8) {
-                    ProgressView().tint(AppColor.brand)
-                    Text("Đang xác thực...")
-                        .font(AppFont.beVietnamPro(13))
-                        .foregroundStyle(AppColor.payMuted)
+            Spacer().frame(height: 10)
+
+            // Ô nhập + nút "Dán" nằm TRONG ô (không phải nút rời bên cạnh).
+            HStack(spacing: 8) {
+                TextField("", text: $username, prompt: Text("Nhập số ví")
+                    .font(AppFont.beVietnamPro(15))
+                    .foregroundColor(WtColor.gray))
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(WtColor.ink)
+                    .keyboardType(.numberPad)
+                    .tint(WtColor.green)
+                    .focused($isFocused)
+                    .onChange(of: isFocused) { wasFocused, isFocusedNow in
+                        if wasFocused && !isFocusedNow { runVerifyIfNeeded() }
+                    }
+
+                Button {
+                    if let clip = UIPasteboard.general.string { username = clip }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 15))
+                        Text("Dán")
+                            .font(AppFont.beVietnamPro(12.5, .bold))
+                    }
+                    .foregroundStyle(WtColor.green)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(WtColor.green.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-            } else if let errorMessage {
-                FieldError(message: errorMessage, alignment: .leading)
-            } else if let verifiedName {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tên chủ ví")
-                        .font(AppFont.beVietnamPro(12))
-                        .foregroundStyle(AppColor.payMuted)
+                .buttonStyle(.plain)
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .frame(height: 52)
+            .background(WtColor.fieldFill)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            Spacer().frame(height: 16)
+
+            Text("Tên chủ ví")
+                .font(AppFont.beVietnamPro(14, .bold))
+                .foregroundStyle(WtColor.ink)
+
+            Spacer().frame(height: 10)
+
+            // Ô tên chủ ví là ô CHỈ ĐỌC, luôn hiện — hiển thị trạng thái tra cứu.
+            HStack(spacing: 8) {
+                if isVerifying {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(WtColor.green)
+                    Text("Đang tra cứu...")
+                        .font(AppFont.beVietnamPro(13))
+                        .foregroundStyle(WtColor.gray)
+                } else if let errorMessage {
+                    Text(errorMessage)
+                        .font(AppFont.beVietnamPro(13))
+                        .foregroundStyle(AppColor.error)
+                        .lineLimit(2)
+                } else if let verifiedName {
                     Text(verifiedName)
                         .font(AppFont.beVietnamPro(15, .semibold))
-                        .foregroundStyle(AppColor.payInk)
+                        .foregroundStyle(WtColor.ink)
+                        .lineLimit(1)
+                } else {
+                    Text("Nhập username để tra cứu")
+                        .font(AppFont.beVietnamPro(13))
+                        .foregroundStyle(WtColor.gray)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppColor.brandSoft)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+            .background(WtColor.fieldFill)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
+        .wtCard()
     }
 
     // MARK: - Người nhận gần đây
 
     private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            FieldLabel(text: "Người nhận gần đây").padding(.bottom, 0)
-            VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Người nhận gần đây")
+                    .font(AppFont.beVietnamPro(15, .bold))
+                    .foregroundStyle(WtColor.ink)
+                Spacer()
+                Button { onOpenContacts() } label: {
+                    Text("Xem tất cả")
+                        .font(AppFont.beVietnamPro(13, .semibold))
+                        .foregroundStyle(WtColor.green)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if recentWalletContacts.isEmpty {
+                Text("Chưa có người nhận nào")
+                    .font(AppFont.beVietnamPro(12.5))
+                    .foregroundStyle(WtColor.gray)
+                    .padding(.vertical, 8)
+            } else {
                 ForEach(recentWalletContacts.prefix(5)) { contact in
+                    let name = contact.displayName
                     Button {
                         username = contact.benUsername ?? ""
-                        verifiedName = contact.displayName
+                        verifiedName = contact.accName ?? name
                         lastVerified = username
                         errorMessage = nil
+                        beneficiaryStore.touch(id: contact.id)
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             Circle()
-                                .fill(AppColor.brandSoft)
-                                .frame(width: 36, height: 36)
+                                .fill(WtColor.avatar(for: name))
+                                .frame(width: 44, height: 44)
                                 .overlay {
-                                    Text(contact.displayName.nameInitials)
+                                    Text(name.nameInitials)
                                         .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(AppColor.brand)
+                                        .foregroundStyle(.white)
                                 }
+
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(contact.displayName)
-                                    .font(AppFont.beVietnamPro(14, .semibold))
-                                    .foregroundStyle(AppColor.payInk)
-                                Text(contact.benUsername ?? "")
+                                Text(name)
+                                    .font(AppFont.beVietnamPro(14, .bold))
+                                    .foregroundStyle(WtColor.ink)
+                                    .lineLimit(1)
+                                Text("Ví nano · \(contact.benUsername ?? "")")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(AppColor.payMuted)
+                                    .foregroundStyle(WtColor.gray)
+                                    .lineLimit(1)
                             }
-                            Spacer()
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 22, weight: .regular))
+                                .foregroundStyle(WtColor.gray)
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
+        .wtCard()
     }
 
     // MARK: - Continue
 
     private var continueBar: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(AppColor.line).frame(height: 1)
-            PrimaryButton(title: "Tiếp tục", isEnabled: verifiedName != nil && !username.isEmpty) {
+            let enabled = verifiedName != nil && !username.isEmpty
+            Button {
                 guard let verifiedName else { return }
                 onContinue(WalletTransferDraft(username: username, holderName: verifiedName))
+            } label: {
+                Text("Tiếp tục")
+                    .font(AppFont.beVietnamPro(16, .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(enabled ? WtColor.green : WtColor.green.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .disabled(!enabled)
             .padding(16)
         }
-        .background(Color.white)
+        .background(WtColor.pageBg)
     }
 
     // MARK: - Verify

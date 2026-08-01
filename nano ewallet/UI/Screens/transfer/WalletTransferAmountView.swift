@@ -19,6 +19,8 @@ struct WalletTransferAmountView: View {
     private static let suggestions = ["Mình chuyển nhé", "Cảm ơn nha", "Chúc mừng"]
 
     @StateObject private var wallet = WalletStore.shared
+    @StateObject private var authStore = AuthStore.shared
+    @StateObject private var beneficiaryStore = BeneficiaryStore.shared
 
     @State private var amountText = ""
     @State private var message = ""
@@ -42,9 +44,51 @@ struct WalletTransferAmountView: View {
     private var overMaxPerTransfer: Bool { amount > Self.maxAmountPerTransfer }
     private var canContinue: Bool { amount > 0 && !overMaxPerTransfer }
 
+    /// Nội dung mặc định điền sẵn vào ô lời nhắn để user SỬA được, không phải chỉ thay
+    /// thế ngầm lúc gửi. Dùng tên người GỬI vì đây là dòng người nhận sẽ thấy.
+    private var defaultMessage: String {
+        let sender = authStore.userFullName?.trimmingCharacters(in: .whitespaces)
+        guard let sender, !sender.isEmpty else { return "Chuyển tiền qua ví Nano" }
+        return "\(sender) chuyển tiền qua ví Nano"
+    }
+
     private var effectiveMessage: String {
         let trimmed = message.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? "Chuyển tiền" : trimmed
+        return trimmed.isEmpty ? defaultMessage : trimmed
+    }
+
+    /// Người nhận đã nằm trong danh bạ -> ẩn luôn toggle "Lưu vào danh bạ".
+    private var alreadySaved: Bool {
+        beneficiaryStore.beneficiaries.contains {
+            $0.type == .wallet && $0.benUsername == draft.username
+        }
+    }
+
+    /// Gợi ý theo số ĐANG GÕ, đỡ phải gõ hết số 0: gõ "1" -> 1.000 / 10.000 / 100.000,
+    /// gõ "15" -> 15.000 / 150.000 / 1.500.000. Gõ quá 3 chữ số coi như đang nhập số
+    /// tiền đầy đủ nên không gợi ý nữa.
+    private var amountSuggestions: [Int64] {
+        // Chưa gõ gì -> mệnh giá mặc định để chạm 1 phát là xong.
+        guard amount > 0 else { return [10_000, 100_000, 1_000_000] }
+        // Gõ quá 3 chữ số coi như đang nhập số tiền đầy đủ, không gợi ý nữa.
+        guard amount <= 999 else { return [] }
+        return [amount * 1_000, amount * 10_000, amount * 100_000]
+            .filter { $0 <= Self.maxAmountPerTransfer }
+    }
+
+    // MARK: - Nhập số
+
+    private func appendDigits(_ digits: String) {
+        // Chặn số 0 dẫn đầu và giới hạn 9 chữ số như bên Android.
+        let combined = amountText.isEmpty && digits.allSatisfy { $0 == "0" }
+            ? ""
+            : amountText + digits
+        amountText = String(combined.prefix(9))
+    }
+
+    private func backspaceDigit() {
+        guard !amountText.isEmpty else { return }
+        amountText.removeLast()
     }
 
     var body: some View {
@@ -55,17 +99,41 @@ struct WalletTransferAmountView: View {
                     recipientCard
                     amountSection
                     messageSection
-                    saveToggle
+                    if !alreadySaved {
+                        saveToggle
+                    }
                     if let errorMessage {
                         FieldError(message: errorMessage, alignment: .leading)
                     }
                 }
                 .padding(16)
             }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-            continueBar
+
+            // Bàn phím số tự vẽ thay cho nút "Tiếp tục" rời — nút hành động nằm luôn
+            // trong bàn phím, giống màn nhập tiền bên Android.
+            if isMessageFocused {
+                // Đang gõ lời nhắn thì nhường chỗ cho bàn phím chữ của hệ thống.
+                continueBar
+            } else {
+                NumericKeypad(
+                    onDigit: appendDigits,
+                    onBackspace: backspaceDigit,
+                    onNext: { Task { await submitTransfer() } },
+                    nextTitle: "Tiếp",
+                    nextEnabled: canContinue && !isSubmitting
+                )
+            }
         }
         .background(Color(hex: 0xF7F8FA))
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .task {
+            // Cần danh bạ để biết người nhận đã được lưu chưa (quyết định ẩn toggle).
+            _ = await beneficiaryStore.get()
+        }
+        .onAppear {
+            // Điền sẵn nội dung mặc định (user sửa/xoá được), chỉ làm 1 lần lúc vào màn.
+            if message.isEmpty { message = defaultMessage }
+        }
         .sheet(isPresented: pendingTransactionIdBinding) {
             PinEntrySheet(
                 amountText: Int(amount).vndFormatted,
@@ -142,21 +210,59 @@ struct WalletTransferAmountView: View {
 
     // MARK: - Số tiền
 
+    /// Số tiền hiển thị lớn, LUÔN có dấu chấm phân nghìn. Việc nhập/xoá do bàn phím tự
+    /// vẽ ở dưới đảm nhiệm nên không dùng ô nhập của hệ thống nữa.
     private var amountSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "Số tiền")
-            AppTextField(
-                text: amountFieldBinding, placeholder: "0",
-                keyboardType: .numberPad, submitLabel: .next, digitsOnly: true
-            )
-            .focused($isAmountFocused)
+        VStack(spacing: 12) {
+            if let balance = wallet.balance {
+                Text("Số dư khả dụng: \(Int(balance).vndGrouped) VNĐ")
+                    .font(AppFont.beVietnamPro(13, .medium))
+                    .foregroundStyle(AppColor.payMuted)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Text(amountText.isEmpty ? "0đ" : "\(Int(amount).vndGrouped)đ")
+                .font(AppFont.baloo2(34, .bold))
+                .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(maxWidth: .infinity)
+
+            Rectangle()
+                .fill(canContinue ? AppColor.brand : AppColor.line)
+                .frame(height: 2)
 
             if overMaxPerTransfer {
-                FieldError(message: "Số tiền chuyển tối đa 1 lần là 10.000.000đ", alignment: .leading)
+                FieldError(message: "Số tiền chuyển tối đa 1 lần là 10.000.000đ", alignment: .center)
             } else if overLimit {
-                FieldError(message: "Số tiền vượt quá số dư khả dụng", alignment: .leading)
+                FieldError(message: "Số tiền vượt quá số dư khả dụng", alignment: .center)
+            }
+
+            if !amountSuggestions.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(amountSuggestions, id: \.self) { value in
+                        Button {
+                            amountText = String(value)
+                        } label: {
+                            Text("\(Int(value).vndGrouped)đ")
+                                .font(AppFont.beVietnamPro(13, .bold))
+                                .foregroundStyle(AppColor.payInk)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                                .overlay {
+                                    Capsule().strokeBorder(AppColor.line, lineWidth: 1.5)
+                                }
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var amountFieldBinding: Binding<String> {
@@ -266,7 +372,9 @@ struct WalletTransferAmountView: View {
             return
         }
         pendingTransactionId = nil
-        if saveRecipient {
+        // `alreadySaved` phải kiểm lại ở đây: khi người nhận đã có trong danh bạ thì
+        // toggle bị ẩn nhưng saveRecipient vẫn còn true -> tạo trùng bản ghi.
+        if saveRecipient && !alreadySaved {
             _ = try? await BeneficiaryStore.shared.create(
                 CreateBeneficiaryRequest(type: .wallet, accName: draft.holderName, benUsername: draft.username)
             )

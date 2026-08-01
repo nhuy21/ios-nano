@@ -158,7 +158,8 @@ struct HomeView: View {
             WalletTransferView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 initialDraft: draft,
-                onContinue: { draft in path.append(.walletTransferAmount(draft)) }
+                onContinue: { draft in path.append(.walletTransferAmount(draft)) },
+                onOpenContacts: { path.append(.contacts) }
             )
         case .bankTransferAmount(let draft):
             BankTransferAmountView(
