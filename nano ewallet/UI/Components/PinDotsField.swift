@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Ô nhập mật khẩu 6 chữ số dạng 6 dấu tròn — mirror khối password inline ở
 /// LoginScreen / RegisterScreen / WelcomeBackScreen bên Android.
@@ -33,6 +34,11 @@ struct PinDotsField: View {
     @State private var showValue = false
     @FocusState private var isFocused: Bool
     @State private var caretVisible = true
+
+    /// Nhịp nháy chạy độc lập với vòng đời view. Không dùng
+    /// `withAnimation(.repeatForever)` vì animation đó bị huỷ mỗi lần view render
+    /// lại — gõ thêm 1 số là `value` đổi -> render lại -> caret đứng im.
+    private let caretTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     private let maxLength = 6
     private let dotSpacing: CGFloat = 14
@@ -97,20 +103,20 @@ struct PinDotsField: View {
         .inputShadow()
         .contentShape(Rectangle())
         .onTapGesture { isFocused = true }
-        .onChange(of: isFocused, initial: true) { _, focused in
-            if focused {
-                startBlinking()
-            } else {
+        .onReceive(caretTimer) { _ in
+            guard isFocused else {
                 caretVisible = false
+                return
             }
-        }
-    }
-
-    /// Nhấp nháy 1s/chu kỳ — giống caret bàn phím thật, để user biết đang gõ tới đâu.
-    private func startBlinking() {
-        caretVisible = true
-        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
             caretVisible.toggle()
+        }
+        .onChange(of: isFocused, initial: true) { _, focused in
+            // Vừa focus: hiện caret ngay, không phải chờ tới nhịp timer kế tiếp.
+            caretVisible = focused
+        }
+        .onChange(of: value) { _, _ in
+            // Vừa gõ/xoá: caret sáng lại và nhảy sang ô mới ngay, giống caret thật.
+            if isFocused { caretVisible = true }
         }
     }
 
