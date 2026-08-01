@@ -1,0 +1,9 @@
+{
+  "images" : [
+    {
+      "filename" : "logo_napas.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

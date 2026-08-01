@@ -158,12 +158,12 @@ struct DeviceOtpDialog: View {
         return "Mã xác thực đã gửi tới số điện thoại của bạn"
     }
 
-    /// Mirror `maskPhone` riêng của DeviceOtpDialogs.kt: `84387600501` → `"843***0501"`.
+    /// Mirror `maskPhone` riêng của DeviceOtpDialogs.kt: `84387600501` → `"843****0501"`.
     private func maskPhone(_ phone: String) -> String {
         guard phone.count > 6 else { return phone }
         let prefix = phone.prefix(3)
         let suffix = phone.suffix(4)
-        return "\(prefix)***\(suffix)"
+        return "\(prefix)****\(suffix)"
     }
 
     private func submit() {

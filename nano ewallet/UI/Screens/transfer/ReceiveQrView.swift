@@ -63,8 +63,11 @@ struct ReceiveQrView: View {
             )
         )
         .task { await wallet.refresh() }
-        .sheet(isPresented: $showAmountSheet) {
+        // Dialog phủ TOÀN màn (nền tối riêng) thay vì sheet 240pt — sheet thấp vẫn để lộ
+        // màn QR phía sau. Cùng cách Login dựng DeviceConflictDialog/DeviceOtpDialog.
+        .fullScreenCover(isPresented: $showAmountSheet) {
             amountSheet
+                .presentationBackground(.clear)
         }
         .sheet(item: $shareItem) { item in
             ActivityShareSheet(items: [item.image])
@@ -72,8 +75,10 @@ struct ReceiveQrView: View {
         .sheet(item: $shareTextItem) { item in
             ActivityShareSheet(items: [item.text])
         }
-        .sheet(isPresented: $showPayLinkSheet) {
+        // Cùng kiểu dialog phủ toàn màn như "Thêm số tiền".
+        .fullScreenCover(isPresented: $showPayLinkSheet) {
             payLinkSheet
+                .presentationBackground(.clear)
         }
         .overlay(alignment: .bottom) {
             if let toastMessage {
@@ -116,42 +121,81 @@ struct ReceiveQrView: View {
 
     // MARK: - Bill card
 
+    /// Thứ tự theo ReceiveQrScreen.kt: logo VietQR -> khung QR có viền -> hàng logo
+    /// napas 247 | Bảo Kim -> tên -> số ví -> "+ Thêm số tiền".
     private var billCard: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 4) {
-                Text(displayName)
-                    .font(AppFont.beVietnamPro(17, .bold))
-                    .foregroundStyle(AppColor.payInk)
-                Text("Số ví · \(displayNo)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColor.payMuted)
-            }
-            .padding(.top, 20)
+        VStack(spacing: 0) {
+            Image("logo_vietqr")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 30)
+                .accessibilityLabel("VietQR")
 
-            if let qrContent, let image = Self.qrImage(for: qrContent) {
-                Image(uiImage: image)
-                    .interpolation(.none)
-                    .resizable()
-                    .aspectRatio(1, contentMode: .fit)
-                    .frame(width: 220, height: 220)
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(AppColor.bgSoft)
-                    .frame(width: 220, height: 220)
-                    .overlay {
-                        Text("Chưa có số ví để tạo mã")
-                            .font(.system(size: 13))
-                            .foregroundStyle(AppColor.payMuted)
-                            .multilineTextAlignment(.center)
-                            .padding(24)
-                    }
+            Spacer().frame(height: 14)
+
+            // Khung viền vuông bao QR. KHÔNG chèn logo vào giữa mã — che module của mã
+            // tự dựng dễ làm máy quét đọc sai (ghi chú nguyên văn bên Kotlin).
+            Group {
+                if let qrContent, let image = Self.qrImage(for: qrContent) {
+                    Image(uiImage: image)
+                        .interpolation(.none)
+                        .resizable()
+                        .aspectRatio(1, contentMode: .fit)
+                } else {
+                    Text("Chưa có số ví")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColor.payMuted)
+                        .multilineTextAlignment(.center)
+                }
             }
+            .padding(12)
+            .frame(width: 180, height: 180)
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(AppColor.payMuted, lineWidth: 2)
+            }
+
+            Spacer().frame(height: 16)
+
+            HStack(spacing: 8) {
+                Image("logo_napas")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 16)
+                    .accessibilityLabel("NAPAS 247")
+
+                Rectangle()
+                    .fill(AppColor.payMuted)
+                    .frame(width: 2, height: 14)
+
+                Image("logo_baokim_wordmark")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 16)
+                    .accessibilityLabel("Bảo Kim")
+            }
+
+            Spacer().frame(height: 14)
+
+            Text(displayName)
+                .font(AppFont.beVietnamPro(17, .bold))
+                .foregroundStyle(AppColor.payInk)
+                .multilineTextAlignment(.center)
+
+            Spacer().frame(height: 2)
+
+            Text("Số ví · \(displayNo)")
+                .font(.system(size: 13))
+                .foregroundStyle(AppColor.payMuted)
 
             if let fixedAmount {
+                Spacer().frame(height: 8)
                 Text(fixedAmount.vndFormatted)
                     .font(AppFont.baloo2(22, .bold))
                     .foregroundStyle(AppColor.brand)
             }
+
+            Spacer().frame(height: 12)
 
             Button {
                 amountInput = fixedAmount.map { String($0) } ?? ""
@@ -162,10 +206,11 @@ struct ReceiveQrView: View {
                     .foregroundStyle(AppColor.brand)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.bottom, 16)
         }
+        .padding(.vertical, 32)
         .frame(maxWidth: .infinity)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -214,11 +259,6 @@ struct ReceiveQrView: View {
 
     private var amountSheet: some View {
         VStack(spacing: 16) {
-            Capsule()
-                .fill(AppColor.line)
-                .frame(width: 40, height: 4)
-                .padding(.top, 8)
-
             Text("Thêm số tiền vào mã QR")
                 .font(AppFont.beVietnamPro(16, .bold))
                 .foregroundStyle(AppColor.payInk)
@@ -230,15 +270,24 @@ struct ReceiveQrView: View {
             .padding(.horizontal, 20)
 
             HStack(spacing: 12) {
-                Button("Bỏ số tiền") {
+                Button {
                     fixedAmount = nil
                     showAmountSheet = false
+                } label: {
+                    Text("Bỏ số tiền")
+                        .font(AppFont.beVietnamPro(14, .semibold))
+                        .foregroundStyle(AppColor.payMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: 0xF1F3F5))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .font(AppFont.beVietnamPro(14, .semibold))
-                .foregroundStyle(AppColor.payMuted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
 
                 Button {
                     fixedAmount = Int(amountInput)
@@ -258,8 +307,17 @@ struct ReceiveQrView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
-        .presentationDetents([.height(240)])
-        .presentationDragIndicator(.hidden)
+        .padding(.top, 20)
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture { showAmountSheet = false }
+        )
     }
 
     private var amountFieldBinding: Binding<String> {
@@ -275,11 +333,6 @@ struct ReceiveQrView: View {
     /// tiền (để trống = người gửi tự nhập), không có ô nội dung.
     private var payLinkSheet: some View {
         VStack(spacing: 16) {
-            Capsule()
-                .fill(AppColor.line)
-                .frame(width: 40, height: 4)
-                .padding(.top, 8)
-
             Text("Tạo link nhận tiền")
                 .font(AppFont.beVietnamPro(16, .bold))
                 .foregroundStyle(AppColor.payInk)
@@ -301,17 +354,60 @@ struct ReceiveQrView: View {
                     .padding(.horizontal, 20)
             }
 
-            PrimaryButton(
-                title: "Tạo & chia sẻ", loadingTitle: "Đang tạo...",
-                isLoading: isCreatingPayLink
-            ) {
-                Task { await createAndSharePayLink() }
+            HStack(spacing: 12) {
+                Button {
+                    showPayLinkSheet = false
+                } label: {
+                    Text("Huỷ")
+                        .font(AppFont.beVietnamPro(14, .semibold))
+                        .foregroundStyle(AppColor.payMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: 0xF1F3F5))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Task { await createAndSharePayLink() }
+                } label: {
+                    Group {
+                        if isCreatingPayLink {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Tạo & chia sẻ")
+                                .font(AppFont.beVietnamPro(14, .semibold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(AppColor.brand)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isCreatingPayLink)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
-        .presentationDetents([.height(320)])
-        .presentationDragIndicator(.hidden)
+        .padding(.top, 20)
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture { showPayLinkSheet = false }
+        )
     }
 
     private var payLinkAmountFieldBinding: Binding<String> {
