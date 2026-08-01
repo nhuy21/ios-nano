@@ -17,6 +17,7 @@ struct HomeView: View {
     @StateObject private var transactions = TransactionStore.shared
     @StateObject private var authStore = AuthStore.shared
     @StateObject private var deepLinkStore = DeepLinkStore.shared
+    @StateObject private var beneficiaryStore = BeneficiaryStore.shared
 
     @State private var showBalance = false
     @State private var comingSoonFeature: String?
@@ -38,6 +39,7 @@ struct HomeView: View {
                         .hidesSystemNavigationBar()
                 }
         }
+        .showsTabBar(path.isEmpty)
         .onChange(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
             guard let bkUsername = value else { return }
             _ = deepLinkStore.consumeConversation()
@@ -105,6 +107,8 @@ struct HomeView: View {
         switch route {
         case .history:
             HistoryView(onBack: { if !path.isEmpty { path.removeLast() } })
+        case .linkedBanks:
+            LinkedBanksView(onBack: { if !path.isEmpty { path.removeLast() } })
         case .contacts:
             ContactsView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
@@ -177,29 +181,24 @@ struct HomeView: View {
 
                 Spacer().frame(height: 12)
 
+                // Card lề 22, CTA lề 17 -> CTA RỘNG HƠN card mỗi bên 5pt, đúng như
+                // Android (trước đây iOS để ngược: card 16, CTA 24).
                 balanceCard
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 22)
 
                 topUpCta
-                    .padding(.horizontal, 24)
-                    .padding(.top, -18) // đè lên mép dưới balance card, mirror overlap âm bên Android
+                    .padding(.horizontal, 17)
+                    // -30: CTA bo góc 26 nên phải chồng sâu hơn bán kính mới phủ kín
+                    // góc bo đáy card, mirror spacedBy(-30) bên Android.
+                    .padding(.top, -30)
 
-                Spacer().frame(height: 24)
-
-                servicesSection
-                    .padding(.horizontal, 16)
-
-                Spacer().frame(height: 24)
-
-                quickContactsSection
-                    .padding(.horizontal, 16)
-
-                Spacer().frame(height: 24)
-
-                recentTransactionsSection
-                    .padding(.horizontal, 16)
-
-                Spacer().frame(height: 140) // chừa chỗ cho floating tab bar
+                // Dịch vụ + Chuyển tiền nhanh + Giao dịch nằm chung MỘT nền trắng có đỉnh
+                // bo cong lõm, đè lên đáy CTA — mirror WhiteTopShape bên Android, thay vì
+                // ba card trắng rời nhau.
+                whiteSurface
+                    // Chỉ đè nhẹ vào đáy CTA: phần võng giữa của đường cong đã ăn sâu
+                    // sẵn, đè thêm nhiều nữa sẽ cắt mất dòng chữ thứ hai của CTA.
+                    .padding(.top, -10)
             }
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
@@ -213,8 +212,27 @@ struct HomeView: View {
             // được gọi lại mỗi lần vào Home bên Android, không "trúng cache là thôi".
             async let walletTask: Void = wallet.refresh(force: true)
             async let txTask: Void = transactions.refreshRecent()
-            _ = await (walletTask, txTask)
+            // Danh bạ "Chuyển tiền nhanh": vẽ ngay từ cache, refresh nền — mirror
+            // BeneficiaryCache.refresh() chạy song song bên Android.
+            async let contactsTask: [Beneficiary] = beneficiaryStore.get()
+            _ = await (walletTask, txTask, contactsTask)
         }
+    }
+
+    /// Nền trắng liền chứa 3 khối dưới — padding ngang 22, top 40 để chừa chỗ cho
+    /// phần võng giữa của đường cong, mirror Column bọc trong HomeScreen.kt.
+    private var whiteSurface: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            servicesSection
+            quickContactsSection
+            recentTransactionsSection
+
+            Spacer().frame(height: 140) // chừa chỗ cho floating tab bar
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 40)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white, in: WhiteTopShape())
     }
 
     // MARK: - Header
@@ -266,104 +284,147 @@ struct HomeView: View {
     // MARK: - Balance card
 
     private var balanceCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [AppColor.brand, Color(hex: 0x00723A)],
-                            startPoint: .top, endPoint: .bottom
+        // Mirror cấu trúc bên Kotlin: khối nội dung và hàng 2 nút là 2 khối RIÊNG, lề
+        // khác nhau (nội dung 20, nút 16) và hàng nút chừa đáy 44 — chính khoảng 44 này
+        // kéo dài card xuống để CTA đè lên mà không che nút và đáy bản đồ.
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 11) {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [AppColor.brand, Color(hex: 0x00723A)],
+                                startPoint: .top, endPoint: .bottom
+                            )
                         )
-                    )
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Text(initials)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+                        .frame(width: 40, height: 40)
+                        .overlay {
+                            Text(initials)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
 
-                Text(displayName.uppercased())
-                    .font(AppFont.beVietnamPro(15, .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                    Text(displayName.uppercased())
+                        .font(AppFont.beVietnamPro(15, .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
 
-                Spacer()
+                    Spacer()
 
-                Button {
-                    path.append(.receiveQr)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "qrcode")
-                        Text("QR")
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
-
-            balanceRow(label: "Số ví", value: wallet.bkUsername ?? "—", trailing: {
-                if wallet.bkUsername != nil {
                     Button {
-                        UIPasteboard.general.string = wallet.bkUsername
+                        path.append(.receiveQr)
                     } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            Image(systemName: "qrcode")
+                            Text("QR")
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
-            })
 
-            balanceRow(
-                label: "Số dư",
-                value: balanceText,
-                trailing: {
-                    Button {
-                        showBalance.toggle()
-                    } label: {
-                        Image(systemName: showBalance ? "eye.slash" : "eye")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white.opacity(0.85))
+                // Số ví giữ giãn cách CỐ ĐỊNH, không đổi theo bật/tắt số dư.
+                balanceRow(label: "Số ví", value: wallet.bkUsername ?? "—", tracking: 3, trailing: {
+                    if wallet.bkUsername != nil {
+                        Button {
+                            UIPasteboard.general.string = wallet.bkUsername
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
-            )
+                })
 
-            HStack(spacing: 10) {
-                pillButton(systemImage: "clock.arrow.circlepath", title: "Lịch sử") {
-                    path.append(.history)
-                }
-                pillButton(systemImage: "link", title: "Liên kết") {
-                    comingSoonFeature = "Liên kết ngân hàng"
-                }
+                balanceRow(
+                    label: "Số dư",
+                    value: balanceText,
+                    // Chỉ chuỗi chấm che số dư mới cần giãn cách.
+                    tracking: showBalance ? 0 : 3,
+                    trailing: {
+                        Button {
+                            showBalance.toggle()
+                        } label: {
+                            Image(systemName: showBalance ? "eye.slash" : "eye")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                )
+
             }
-            .padding(.top, 4)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Ba nút kiểu gopay, KÉO NGANG được — mirror horizontalScroll bên Kotlin.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 9) {
+                    pillButton(systemImage: "clock.arrow.circlepath", title: "Lịch sử") {
+                        path.append(.history)
+                    }
+                    pillButton(systemImage: "link", title: "Liên kết") {
+                        path.append(.linkedBanks)
+                    }
+                    // "Cấp cứu": mở danh bạ ví ở chế độ xin tiền -> chọn 1 người là vào
+                    // thẳng Cuộc thoại để nhập số tiền cần xin.
+                    pillButton(icon: .requestMoney, title: "Cấp cứu") {
+                        path.append(.contacts)
+                    }
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 16)
+            }
+            .padding(.top, 2)
+            .padding(.bottom, 44)
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x002A18), Color(hex: 0x023A25)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        )
+        .background {
+            ZStack {
+                LinearGradient(
+                    colors: [Color(hex: 0x002A18), Color(hex: 0x023A25)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                // Bản đồ Việt Nam làm watermark — độ mờ đã bake sẵn theo vùng vào ảnh
+                // nên không giảm opacity ở đây. Đẩy lệch sang phải để không đè nút QR.
+                GeometryReader { geo in
+                    Image("vietnam_map")
+                        .resizable()
+                        .aspectRatio(903.0 / 1118.0, contentMode: .fit)
+                        .frame(height: geo.size.height * 0.92)
+                        .offset(x: 70)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                }
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        // Mirror boxShadow(#12813A @22%, offsetY 6, blur 14) bên Android.
+        .shadow(color: Color(hex: 0x12813A).opacity(0.22), radius: 7, x: 0, y: 6)
     }
 
     /// Chưa có dữ liệu (chưa gọi API xong) -> "...". Có rồi mà đang ẩn -> chấm che.
+    /// Đơn vị "VNĐ" luôn hiện — kể cả khi đang che số — để dòng số dư không đổi cấu
+    /// trúc lúc bật/tắt.
     private var balanceText: String {
         guard let balance = wallet.balance else { return "..." }
-        return showBalance ? Int(balance).vndFormatted : "••••••••"
+        let amount = showBalance ? Int(balance).vndGrouped : "••••••••"
+        return "\(amount) VNĐ"
     }
 
     @ViewBuilder
+    /// `tracking` phải truyền theo từng dòng: trước đây dùng chung
+    /// `showBalance ? 0 : 3` nên bật/tắt số dư kéo theo cả dãy SỐ VÍ co giãn — giãn
+    /// cách đó chỉ dành cho chuỗi chấm che số dư.
     private func balanceRow<Trailing: View>(
-        label: String, value: String, @ViewBuilder trailing: () -> Trailing
+        label: String, value: String, tracking: CGFloat, @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 8) {
             Text(label)
@@ -373,23 +434,52 @@ struct HomeView: View {
             Text(value)
                 .font(AppFont.beVietnamPro(15, .semibold))
                 .foregroundStyle(.white)
-                .tracking(showBalance ? 0 : 3)
+                .tracking(tracking)
             trailing()
         }
     }
 
     private func pillButton(systemImage: String, title: String, action: @escaping () -> Void) -> some View {
+        pillButton(title: title, action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17))
+                .foregroundStyle(.white)
+        }
+    }
+
+    /// Biến thể dùng icon vector port từ Android (nút "Cấp cứu").
+    private func pillButton(
+        icon: TransactionIconKind, title: String, action: @escaping () -> Void
+    ) -> some View {
+        pillButton(title: title, action: action) {
+            TransactionIcon(kind: icon, tint: .white)
+                .frame(width: 17, height: 17)
+        }
+    }
+
+    private func pillButton<Icon: View>(
+        title: String,
+        action: @escaping () -> Void,
+        @ViewBuilder icon: () -> Icon
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: systemImage).font(.system(size: 13))
-                Text(title).font(.system(size: 13, weight: .medium))
-                Image(systemName: "chevron.right").font(.system(size: 10))
+                icon()
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            // Lề lệch trái/phải (13/9) đúng như Kotlin — icon cần thoáng hơn mũi tên.
+            .padding(.leading, 13)
+            .padding(.trailing, 9)
+            .padding(.vertical, 9)
             .background(Color.white.opacity(0.18))
             .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -403,32 +493,34 @@ struct HomeView: View {
             // ReceiveQrScreen).
             path.append(.receiveQr)
         } label: {
-            HStack(spacing: 12) {
+            // Cỡ chữ/icon lấy đúng theo Kotlin: tiêu đề 16 bold, phụ đề 13, icon 20,
+            // mũi tên 22 — trước đây iOS để 13/11/16/13 nên cụm này nhỏ và mỏng hơn hẳn.
+            HStack(spacing: 11) {
                 Circle()
                     .fill(Color.white.opacity(0.2))
                     .frame(width: 36, height: 36)
                     .overlay {
                         Image(systemName: "wallet.pass.fill")
-                            .font(.system(size: 16))
+                            .font(.system(size: 20))
                             .foregroundStyle(.white)
                     }
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Nạp tiền nhanh, miễn phí")
-                        .font(AppFont.beVietnamPro(13, .semibold))
+                        .font(AppFont.beVietnamPro(16, .bold))
                         .foregroundStyle(.white)
                     Text("Nạp vào ví chỉ trong vài giây")
-                        .font(AppFont.beVietnamPro(11))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(.white.opacity(0.85))
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13))
+                    .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(.white)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .background(
                 LinearGradient(
@@ -500,9 +592,6 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Chuyển tiền nhanh
@@ -522,19 +611,75 @@ struct HomeView: View {
                 .foregroundStyle(AppColor.brand)
             }
 
-            // TODO (Phase kế tiếp): hiện vài danh bạ dùng gần đây thay vì chỉ ô "Danh bạ"
-            // cố định — cần BeneficiaryStore.beneficiaries đã sort theo lastUsedAt.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    contactItem(title: "Danh bạ", systemImage: "person.2.fill", isPlain: true) {
+                    // Ô đầu LUÔN hiện dù tài khoản chưa có người nhận nào.
+                    // Android dùng Icons.Default.Contacts — thẻ danh bạ có hình người bên
+                    // trong, không phải icon 2 người.
+                    contactItem(title: "Danh bạ", systemImage: "person.crop.rectangle.fill", isPlain: true) {
                         path.append(.contacts)
+                    }
+
+                    // Mirror `quickContacts.take(10)` bên Android.
+                    ForEach(beneficiaryStore.beneficiaries.prefix(10)) { beneficiary in
+                        contactAvatarItem(beneficiary)
                     }
                 }
             }
         }
-        .padding(16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Người nhận đã lưu — avatar chữ cái, màu gán ổn định theo tên.
+    private func contactAvatarItem(_ beneficiary: Beneficiary) -> some View {
+        let name = beneficiary.displayName
+        return Button {
+            beneficiaryStore.touch(id: beneficiary.id)
+            switch beneficiary.type {
+            case .wallet:
+                path.append(.walletTransfer(draft: WalletTransferDraft(
+                    username: beneficiary.benUsername ?? "",
+                    holderName: beneficiary.accName ?? name
+                )))
+            case .bankAccount:
+                path.append(.bankTransfer(draft: BankTransferDraft(
+                    bin: beneficiary.bankNo ?? "",
+                    bankName: BankCache.shared.bank(bin: beneficiary.bankNo)?.shortName ?? "Ngân hàng",
+                    accNo: beneficiary.accNo ?? "", accType: 0,
+                    holderName: beneficiary.accName ?? name
+                )))
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Circle()
+                    .fill(Self.avatarColor(for: name))
+                    .frame(width: 50, height: 50)
+                    .overlay {
+                        Text(name.nameInitials)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                Text(name)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(AppColor.payInk)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(width: 58)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Mirror `HomeAvatarColors` + `homeAvatarColorFor` bên Android.
+    private static let avatarColors: [Color] = [
+        Color(hex: 0xFFB4A2), Color(hex: 0xFFD6A5), Color(hex: 0xB5E48C), Color(hex: 0xA0C4FF),
+        Color(hex: 0xBDB2FF), Color(hex: 0xFFC6FF), Color(hex: 0x9BF6FF), Color(hex: 0xFDFFB6),
+    ]
+
+    private static func avatarColor(for name: String) -> Color {
+        let hash = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        return avatarColors[hash % avatarColors.count]
     }
 
     private func contactItem(
@@ -547,15 +692,16 @@ struct HomeView: View {
                     .frame(width: 50, height: 50)
                     .overlay {
                         Image(systemName: systemImage)
-                            .font(.system(size: 18))
-                            .foregroundStyle(isPlain ? AppColor.payMuted : AppColor.brand)
+                            .font(.system(size: 24))
+                            .foregroundStyle(isPlain ? Color(hex: 0x00A85E) : AppColor.brand)
                     }
                 Text(title)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(AppColor.payInk)
                     .lineLimit(1)
             }
             .frame(width: 58)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -608,9 +754,6 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func transactionRow(_ tx: TransactionEntity) -> some View {

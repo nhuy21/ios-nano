@@ -9,6 +9,18 @@
 import Foundation
 
 extension Int {
+    /// Chỉ nhóm nghìn, KHÔNG kèm đơn vị — để nơi gọi tự ghép đơn vị riêng
+    /// (số dư ở Home dùng "VNĐ" thay vì "đ").
+    var vndGrouped: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        formatter.decimalSeparator = ","
+        let number = NSNumber(value: abs(self))
+        let formatted = formatter.string(from: number) ?? "\(abs(self))"
+        return "\(self < 0 ? "-" : "")\(formatted)"
+    }
+
     var vndFormatted: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
