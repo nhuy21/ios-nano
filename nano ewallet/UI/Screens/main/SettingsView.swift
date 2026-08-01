@@ -53,6 +53,7 @@ struct SettingsView: View {
                         .hidesSystemNavigationBar()
                 }
         }
+        .showsTabBar(path.isEmpty)
     }
 
     /// Tiêu đề "Cá nhân" cố định, không cuộn — mirror header slim riêng bên Android
