@@ -153,8 +153,14 @@ struct WalletOnboardingChoiceView: View {
         }
         .padding(16)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 8, x: 0, y: 3)
+        // Cùng bo góc + cùng viền với thẻ Bảo Kim ở trên: hai thẻ là hai lựa chọn ngang
+        // hàng nhau, lệch bo góc hay thiếu viền làm chúng trông như hai cấp khác nhau.
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(AppColor.payInputBorder, lineWidth: 1.5)
+        }
+        .inputShadow()
         .contentShape(Rectangle())
         .onTapGesture { onCreateNewWallet() }
     }

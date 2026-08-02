@@ -33,24 +33,94 @@ struct RootNavigator: View {
                     .hidesSystemNavigationBar()
                 }
             case .onboarding(let phone):
-                NavigationStack {
-                    WalletOnboardingChoiceView(
-                        onBack: { Task { await appState.logout() } },
-                        onSyncBaoKim: {
-                            // TODO (Phase 3): điều hướng WalletLinkBaoKimView(phone)
-                        },
-                        onCreateNewWallet: {
-                            // TODO (Phase 3): điều hướng CccdScanView(phone)
-                        }
-                    )
-                    .hidesSystemNavigationBar()
-                }
-                .id(phone) // đảm bảo state reset nếu phone đổi (hiếm khi xảy ra)
+                OnboardingFlow()
+                    .id(phone) // đảm bảo state reset nếu phone đổi (hiếm khi xảy ra)
             case .authenticated:
                 MainTabView()
             }
         }
         .animation(.default, value: appState.root)
+    }
+}
+
+/// Cây onboarding sau khi đăng nhập nhưng chưa có ví — mirror nhánh
+/// WALLET_ONBOARDING_CHOICE → WALLET_LINK_BAOKIM → WALLET_RULES trong MainActivity.kt.
+///
+/// Giữ bước bằng state cục bộ thay vì `NavigationStack` path: `embed_link` là URL dài,
+/// nhét vào route argument thì phải encode/decode lằng nhằng (Android cũng giữ state
+/// cục bộ vì lý do này). Các bước ở đây không có back-gesture nên cũng không cần stack.
+private struct OnboardingFlow: View {
+
+    @StateObject private var appState = AppState.shared
+
+    private enum Step {
+        case choice
+        case linkBaoKim
+        /// Đang nhúng trang OTP của Bảo Kim.
+        case linking(embedLink: String)
+        /// Ví đã đồng bộ xong — đọc quy tắc giao dịch một lần rồi vào Home.
+        case rules
+        case pinLimit
+    }
+
+    @State private var step: Step = .choice
+    /// Bảo Kim từ chối ngay lúc gửi yêu cầu liên kết (ví không tồn tại, ví khoá, SĐT đã
+    /// liên kết, tên không khớp).
+    @State private var linkError: String?
+
+    var body: some View {
+        content
+            .alert(
+                "Không liên kết được ví",
+                isPresented: Binding(get: { linkError != nil }, set: { if !$0 { linkError = nil } })
+            ) {
+                Button("Đã hiểu", role: .cancel) { linkError = nil }
+            } message: {
+                Text(linkError ?? "")
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch step {
+        case .choice:
+            NavigationStack {
+                WalletOnboardingChoiceView(
+                    onBack: { Task { await appState.logout() } },
+                    onSyncBaoKim: { step = .linkBaoKim },
+                    onCreateNewWallet: {
+                        // TODO: điều hướng CccdScanView(phone) khi luồng eKYC hoàn thiện.
+                    }
+                )
+                .hidesSystemNavigationBar()
+            }
+
+        case .linkBaoKim:
+            NavigationStack {
+                WalletLinkBaoKimView(
+                    onBack: { step = .choice },
+                    onSubmit: { link in step = .linking(embedLink: link) },
+                    onError: { message in linkError = message }
+                )
+                .hidesSystemNavigationBar()
+            }
+
+        case .linking(let embedLink):
+            WalletLinkingWebView(
+                embedLink: embedLink,
+                onBack: { step = .linkBaoKim },
+                onLinked: { step = .rules }
+            )
+
+        case .rules:
+            WalletRulesView(
+                onStart: { appState.route(status: UserStatus.active.rawValue, phone: nil) },
+                onAdjustLimit: { step = .pinLimit }
+            )
+
+        case .pinLimit:
+            PinLimitView(onBack: { step = .rules })
+        }
     }
 }
 

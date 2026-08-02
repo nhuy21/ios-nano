@@ -95,7 +95,10 @@ struct OtpView: View {
             errorOrSpacer
                 .padding(.top, 12)
 
-            Spacer().frame(height: 60)
+            // Khoảng trống CO GIÃN, không cố định 60: bàn phím đóng/mở làm chiều cao
+            // khả dụng thay đổi, phần dôi ra phải dồn vào đây chứ không được đẩy các ô
+            // nhập đi chỗ khác.
+            Spacer(minLength: 60)
 
             confirmButton
                 .padding(.bottom, 16)
@@ -104,7 +107,9 @@ struct OtpView: View {
                 .padding(.bottom, 24)
         }
         .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // `.top`: neo các ô nhập ngay dưới header. Thiếu tham số này thì mặc định căn
+        // giữa, và mỗi lần bàn phím ẩn là cả khối trôi xuống.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.white)
         .clipShape(.rect(topLeadingRadius: 28, topTrailingRadius: 28))
     }
@@ -269,8 +274,11 @@ private struct OtpStepBar: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0..<3, id: \.self) { index in
+                // `step` đếm từ 1 (bước 1/3) còn `index` đếm từ 0 — phải là `<` chứ không
+                // phải `<=`, nếu không bước 1 sẽ tô sáng 2 vạch. Kotlin lặp `1..3` nên
+                // dùng `<=`; port sang đây đổi gốc lặp mà quên đổi phép so sánh.
                 RoundedRectangle(cornerRadius: 999, style: .continuous)
-                    .fill(index <= step ? AppColor.brand : AppColor.muted.opacity(0.25))
+                    .fill(index < step ? AppColor.brand : AppColor.muted.opacity(0.25))
                     .frame(height: 4)
             }
         }
