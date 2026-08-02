@@ -55,6 +55,8 @@ private struct OnboardingFlow: View {
 
     private enum Step {
         case choice
+        /// Giới thiệu các bước eKYC trước khi mở SDK.
+        case cccdScan
         case linkBaoKim
         /// Đang nhúng trang OTP của Bảo Kim.
         case linking(embedLink: String)
@@ -67,6 +69,8 @@ private struct OnboardingFlow: View {
     /// Bảo Kim từ chối ngay lúc gửi yêu cầu liên kết (ví không tồn tại, ví khoá, SĐT đã
     /// liên kết, tên không khớp).
     @State private var linkError: String?
+    /// Không mở được SDK eKYC (phiên hỏng, không tìm được màn để trình bày).
+    @State private var ekycError: String?
 
     var body: some View {
         content
@@ -78,6 +82,14 @@ private struct OnboardingFlow: View {
             } message: {
                 Text(linkError ?? "")
             }
+            .alert(
+                "Không mở được xác thực định danh",
+                isPresented: Binding(get: { ekycError != nil }, set: { if !$0 { ekycError = nil } })
+            ) {
+                Button("Đã hiểu", role: .cancel) { ekycError = nil }
+            } message: {
+                Text(ekycError ?? "")
+            }
     }
 
     @ViewBuilder
@@ -88,8 +100,25 @@ private struct OnboardingFlow: View {
                 WalletOnboardingChoiceView(
                     onBack: { Task { await appState.logout() } },
                     onSyncBaoKim: { step = .linkBaoKim },
-                    onCreateNewWallet: {
-                        // TODO: điều hướng CccdScanView(phone) khi luồng eKYC hoàn thiện.
+                    onCreateNewWallet: { step = .cccdScan }
+                )
+                .hidesSystemNavigationBar()
+            }
+
+        case .cccdScan:
+            NavigationStack {
+                CccdScanView(
+                    onBack: { step = .choice },
+                    onStartEkyc: {
+                        Task {
+                            await EkycLauncher.start(
+                                onCompleted: { _ in
+                                    // TODO: màn bổ sung thông tin (KycReview) đối soát C06
+                                    // rồi mới gửi hồ sơ. Chưa có nên tạm dừng tại đây.
+                                },
+                                onFailed: { message in ekycError = message }
+                            )
+                        }
                     }
                 )
                 .hidesSystemNavigationBar()

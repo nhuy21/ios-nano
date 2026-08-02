@@ -24,4 +24,9 @@ GoogleService-Info.plist
 .env
 Config.xcconfig
 
+# SDK eKYC (CmcEkycSDK + KalapaSDK + iProov) — ~31MB nhị phân, không đưa vào git để
+# repo khỏi phình mỗi lần SDK lên phiên bản. Xem Frameworks/README.md để lấy về.
+Frameworks/*
+!Frameworks/README.md
+
 PLAN.md
