@@ -62,18 +62,36 @@ enum HomeRoute: Hashable {
     case withdraw
 }
 
-/// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet.
+/// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet (Android tách
+/// làm 2 màn riêng). Gộp được, nhưng phải mang đủ trường riêng của từng luồng chứ
+/// không nhồi vào một chuỗi rồi đoán ngược lại.
 struct TransferSuccessInfo: Hashable {
+    enum Kind: Hashable {
+        case wallet
+        case bank
+    }
+
+    var kind: Kind
     var amount: Int64
     var recipientName: String
-    var recipientDetail: String
+    /// Tên ngân hàng nhận — chỉ luồng `.bank`.
+    var bankName: String?
+    /// Số tài khoản (bank) hoặc username ví.
+    var accountNumber: String
     var noteLabel: String
     var note: String
-    /// Mã giao dịch thật từ Bảo Kim (`bk_trans_id`/`trans_id`). `nil` khi BE chưa
-    /// trả về — biên lai tự sinh mã giả để bố cục không khuyết dòng.
+    /// Mã giao dịch thật từ Bảo Kim (`bk_trans_id`/`trans_id`). `nil` khi BE không trả
+    /// về — biên lai hiện "—". KHÔNG sinh mã giả: biên lai là thứ người dùng lưu lại
+    /// và gửi đi làm bằng chứng, in một mã bịa lên đó còn tệ hơn để trống.
     var transactionCode: String?
-    /// Thời gian xử lý thật (giây) để hiện "hoàn thành trong X giây". `nil` -> mặc định.
+    /// Thời gian xử lý thật (giây), đo quanh lời gọi API. `nil` thì ẩn hẳn dòng
+    /// "hoàn thành trong X giây" thay vì bịa một con số.
     var elapsedSeconds: Double?
+    /// Bảo Kim trả `status == "PENDING"` (code 99) — tiền đã trừ nhưng ngân hàng chưa
+    /// chốt. Phải hiện "đang xử lý", không được báo "thành công".
+    var isProcessing: Bool = false
+    /// Phí giao dịch thật (`fee_amount`). `nil` thì ẩn dòng phí.
+    var feeAmount: Int64?
 }
 
 /// Người nhận ngân hàng đã xác thực sẵn (danh bạ / QR / pay link) truyền vào

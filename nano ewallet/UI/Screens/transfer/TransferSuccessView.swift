@@ -2,13 +2,17 @@
 //  TransferSuccessView.swift
 //  nano ewallet
 //
-//  Mirror WalletTransferSuccessScreen.kt — bố cục "biên lai": nền gradient brand +
-//  confetti, mọi thứ (tích, số tiền, chi tiết, banner hoàn thành) nằm gọn trong tờ
-//  bill trắng có đáy răng cưa. Dùng chung cho cả 2 luồng ví/ngân hàng, chỉ khác
-//  nhãn dòng số tài khoản và nhãn "Nội dung"/"Lời nhắn".
+//  Bố cục "biên lai": nền gradient + confetti, mọi thứ (tích, số tiền, chi tiết,
+//  banner hoàn thành) nằm gọn trong tờ bill trắng có đáy răng cưa.
 //
-//  Mã giao dịch và thời gian xử lý: BE chưa trả về đủ nên thiếu cái nào thì tự sinh
-//  giá trị giả cho cái đó — biên lai không khuyết dòng, bố cục test được ngay.
+//  Android tách 2 màn riêng (WalletTransferSuccessScreen / TransferSuccessScreen);
+//  ở đây gộp 1 màn, phân nhánh theo `info.kind` chứ KHÔNG đoán từ chuỗi hiển thị.
+//  Khác nhau giữa 2 luồng: nhãn "Số ví" / "Số tài khoản" (bank tách nhóm 4), dòng
+//  "Ngân hàng" chỉ có ở bank, nhãn ghi chú "Lời nhắn" / "Nội dung".
+//
+//  Ba trường phụ thuộc dữ liệu THẬT từ Bảo Kim — thiếu thì ẩn dòng, không bịa:
+//  mã giao dịch (`bk_trans_id`), thời gian xử lý (đo quanh lời gọi API), phí
+//  (`fee_amount`). Riêng `status == "PENDING"` đổi hẳn tông màn sang "đang xử lý".
 //
 
 import SwiftUI
@@ -17,25 +21,21 @@ import Photos
 
 @MainActor
 struct TransferSuccessView: View {
-    let amount: Int64
-    let recipientName: String
-    let recipientDetail: String
-    let noteLabel: String
-    let note: String
-    var transactionCode: String?
-    var elapsedSeconds: Double?
+    let info: TransferSuccessInfo
     let onHome: () -> Void
 
     private enum WsColor {
         static let green = Color(hex: 0x00A85E)
+        /// GD đang xử lý — vàng cam, mirror `PendingAmber` bên Android.
+        static let amber = Color(hex: 0xF39C12)
         static let ink = Color(hex: 0x111C17)
         static let gray = Color(hex: 0x8A9990)
         static let line = Color(hex: 0xE4EDE8)
     }
 
-    /// Sinh 1 lần lúc vào màn rồi giữ nguyên — nếu tính lại trong `body` thì mỗi lần
-    /// render mã/giờ sẽ nhảy số.
-    @State private var fallbackCode = String(format: "%06d", Int.random(in: 0...999_999))
+    /// Tông màu toàn màn: xanh khi đã chốt, vàng cam khi ngân hàng còn đang xử lý.
+    private var accent: Color { info.isProcessing ? WsColor.amber : WsColor.green }
+
     @State private var timeText = ""
     @State private var shareImage: ShareableImage?
     @State private var toast: String?
@@ -43,19 +43,26 @@ struct TransferSuccessView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                stops: [
-                    .init(color: Color(hex: 0x2ECB6E), location: 0),
-                    .init(color: Color(hex: 0x0BA94F), location: 0.55),
-                    .init(color: Color(hex: 0x008C3F), location: 1),
-                ],
+                stops: info.isProcessing
+                    ? [
+                        .init(color: Color(hex: 0xF6B93B), location: 0),
+                        .init(color: Color(hex: 0xF39C12), location: 0.55),
+                        .init(color: Color(hex: 0xD4820A), location: 1),
+                    ]
+                    : [
+                        .init(color: Color(hex: 0x2ECB6E), location: 0),
+                        .init(color: Color(hex: 0x0BA94F), location: 0.55),
+                        .init(color: Color(hex: 0x008C3F), location: 1),
+                    ],
                 startPoint: .top, endPoint: .bottom
             )
             .ignoresSafeArea()
 
-            confettiLayer
+            // Đang xử lý thì không bắn hoa giấy — chưa có gì để ăn mừng.
+            if !info.isProcessing { confettiLayer }
 
             VStack(spacing: 0) {
-                Text("BIÊN LAI CHUYỂN TIỀN")
+                Text(info.isProcessing ? "BIÊN LAI GIAO DỊCH" : "BIÊN LAI CHUYỂN TIỀN")
                     .font(AppFont.beVietnamPro(15, .bold))
                     .foregroundStyle(.white)
                     .tracking(2)
@@ -144,59 +151,78 @@ struct TransferSuccessView: View {
         VStack(spacing: 0) {
             checkBadge
 
-            Text("Chuyển tiền thành công!")
+            Text(info.isProcessing ? "Giao dịch đang xử lý" : "Chuyển tiền thành công!")
                 .font(AppFont.beVietnamPro(20, .bold))
-                .foregroundStyle(WsColor.ink)
+                .foregroundStyle(info.isProcessing ? WsColor.amber : WsColor.ink)
                 .multilineTextAlignment(.center)
                 .padding(.top, 14)
 
-            Text("SỐ TIỀN ĐÃ CHUYỂN")
+            if info.isProcessing {
+                Text("Ngân hàng đang xử lý giao dịch. Kết quả cuối cùng sẽ được cập nhật ở lịch sử giao dịch.")
+                    .font(AppFont.beVietnamPro(13))
+                    .foregroundStyle(WsColor.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+            }
+
+            Text(info.isProcessing ? "SỐ TIỀN GIAO DỊCH" : "SỐ TIỀN ĐÃ CHUYỂN")
                 .font(AppFont.beVietnamPro(11, .medium))
                 .foregroundStyle(WsColor.gray)
                 .tracking(1.5)
                 .padding(.top, 18)
 
-            HStack(alignment: .bottom, spacing: 5) {
-                Text(Int(amount).vndGrouped)
+            // Căn theo ĐƯỜNG CHÂN CHỮ, không phải mép dưới khung: Baloo2 chừa nhiều
+            // khoảng cho nét thòng nên căn mép dưới làm chữ "đ" tụt hẳn xuống.
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(Int(info.amount).vndGrouped)
                     .font(AppFont.baloo2(34, .bold))
-                    .foregroundStyle(WsColor.green)
+                    .foregroundStyle(accent)
                     .tracking(-1)
                 Text("đ")
                     .font(AppFont.beVietnamPro(15, .medium))
-                    .foregroundStyle(WsColor.green)
-                    .padding(.bottom, 4)
+                    .foregroundStyle(accent)
             }
             .padding(.top, 8)
 
             VStack(spacing: 0) {
-                detailRow(label: "Người nhận", value: recipientName)
-                thinLine
-                if !isWallet && !channel.isEmpty {
-                    detailRow(label: "Ngân hàng", value: channel)
+                detailRow(label: "Người nhận", value: info.recipientName)
+                if isBank, let bankName = info.bankName, !bankName.isEmpty {
                     thinLine
-                }
-                detailRow(label: isWallet ? "Số ví" : "Số tài khoản", value: accountNumber)
-                if !note.isEmpty {
-                    thinLine
-                    detailRow(label: noteLabel, value: note)
+                    detailRow(label: "Ngân hàng", value: bankName)
                 }
                 thinLine
-                detailRow(label: "Mã giao dịch", value: transactionCode ?? fallbackCode)
+                detailRow(label: isBank ? "Số tài khoản" : "Số ví", value: accountNumberText)
+                if !info.note.isEmpty {
+                    thinLine
+                    detailRow(label: info.noteLabel, value: info.note)
+                }
+                thinLine
+                // Không có mã thật thì để "—". Sinh mã giả là bịa bằng chứng giao dịch.
+                detailRow(label: "Mã giao dịch", value: info.transactionCode ?? "—")
                 thinLine
                 detailRow(label: "Thời gian", value: timeText)
+                if let feeText {
+                    thinLine
+                    detailRow(label: "Phí giao dịch", value: feeText)
+                }
 
-                Text("Giao dịch đã được hoàn thành trong \(completedText) giây")
-                    .font(AppFont.beVietnamPro(12.5, .medium))
-                    .foregroundStyle(WsColor.green)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(
-                        WsColor.green.opacity(0.10),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    )
-                    .padding(.top, 14)
+                // Chỉ hiện khi đo được thời gian thật, và chỉ khi GD đã chốt — đang xử
+                // lý mà khoe "hoàn thành trong X giây" là mâu thuẫn.
+                if !info.isProcessing, let completedText {
+                    Text("Giao dịch đã được hoàn thành trong \(completedText) giây")
+                        .font(AppFont.beVietnamPro(12.5, .medium))
+                        .foregroundStyle(WsColor.green)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(
+                            WsColor.green.opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        )
+                        .padding(.top, 14)
+                }
             }
             .padding(.horizontal, 22)
             .padding(.top, 20)
@@ -210,17 +236,17 @@ struct TransferSuccessView: View {
     private var checkBadge: some View {
         ZStack {
             Circle()
-                .fill(WsColor.green.opacity(0.10))
+                .fill(accent.opacity(0.10))
                 .frame(width: 86, height: 86)
             Circle()
-                .fill(WsColor.green.opacity(0.16))
+                .fill(accent.opacity(0.16))
                 .frame(width: 70, height: 70)
             Circle()
-                .fill(WsColor.green)
+                .fill(accent)
                 .frame(width: 56, height: 56)
-                .shadow(color: WsColor.green.opacity(0.4), radius: 5, x: 0, y: 3)
+                .shadow(color: accent.opacity(0.4), radius: 5, x: 0, y: 3)
                 .overlay {
-                    Image(systemName: "checkmark")
+                    Image(systemName: info.isProcessing ? "clock.fill" : "checkmark")
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(.white)
                 }
@@ -339,23 +365,33 @@ struct TransferSuccessView: View {
 
     // MARK: - Derived
 
-    /// `recipientDetail` do màn trước ghép sẵn dạng "Ví nano • 19957873068" hoặc
-    /// "Vietcombank • 0123456789" — tách lại để biên lai hiện đúng 2 dòng riêng.
-    private var detailParts: (channel: String, number: String) {
-        let parts = recipientDetail
-            .components(separatedBy: "•")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        guard parts.count >= 2 else { return ("", recipientDetail) }
-        return (parts[0], parts[1])
+    private var isBank: Bool { info.kind == .bank }
+
+    /// Số TK ngân hàng tách nhóm 4 cho dễ đối chiếu ("1027 3648 59"), mirror
+    /// `chunked(4)` bên Android. Username ví thì để nguyên.
+    private var accountNumberText: String {
+        guard isBank else { return info.accountNumber }
+        return stride(from: 0, to: info.accountNumber.count, by: 4)
+            .map { offset -> String in
+                let start = info.accountNumber.index(info.accountNumber.startIndex, offsetBy: offset)
+                let end = info.accountNumber.index(start, offsetBy: 4, limitedBy: info.accountNumber.endIndex)
+                    ?? info.accountNumber.endIndex
+                return String(info.accountNumber[start..<end])
+            }
+            .joined(separator: " ")
     }
 
-    private var channel: String { detailParts.channel }
-    private var accountNumber: String { detailParts.number }
-    private var isWallet: Bool { channel.localizedCaseInsensitiveContains("ví") }
+    /// `nil` -> ẩn dòng phí (BE không trả về thì không khẳng định là miễn phí).
+    private var feeText: String? {
+        guard let fee = info.feeAmount else { return nil }
+        return fee == 0 ? "Miễn phí" : "\(Int(fee).vndFormatted)"
+    }
 
     /// Làm tròn 1 chữ số thập phân, dấu phẩy kiểu VN, tối thiểu 0,1 giây.
-    private var completedText: String {
-        let seconds = max((elapsedSeconds ?? 2).rounded(toPlaces: 1), 0.1)
+    /// `nil` khi không đo được — bên gọi ẩn hẳn dòng thay vì hiện số mặc định.
+    private var completedText: String? {
+        guard let elapsed = info.elapsedSeconds else { return nil }
+        let seconds = max(elapsed.rounded(toPlaces: 1), 0.1)
         return String(format: "%.1f", locale: Locale(identifier: "vi_VN"), seconds)
     }
 }
@@ -417,11 +453,26 @@ private extension Double {
     }
 }
 
-#Preview {
+#Preview("Ví") {
     TransferSuccessView(
-        amount: 200_000, recipientName: "DANG NGOC KHIEU",
-        recipientDetail: "Ví nano • 19958413065",
-        noteLabel: "Lời nhắn", note: "Đặng Ngọc Khiêu chuyển tiền qua ví Nano",
+        info: TransferSuccessInfo(
+            kind: .wallet, amount: 200_000, recipientName: "DANG NGOC KHIEU",
+            accountNumber: "19958413065",
+            noteLabel: "Lời nhắn", note: "Đặng Ngọc Khiêu chuyển tiền qua ví Nano",
+            transactionCode: "BK25080212345", elapsedSeconds: 1.4, feeAmount: 0
+        ),
+        onHome: {}
+    )
+}
+
+#Preview("Ngân hàng — đang xử lý") {
+    TransferSuccessView(
+        info: TransferSuccessInfo(
+            kind: .bank, amount: 2_500_000, recipientName: "NGUYEN VAN A",
+            bankName: "Vietcombank", accountNumber: "1027364859",
+            noteLabel: "Nội dung", note: "NGUYEN VAN B chuyen tien",
+            transactionCode: nil, elapsedSeconds: nil, isProcessing: true, feeAmount: 0
+        ),
         onHome: {}
     )
 }

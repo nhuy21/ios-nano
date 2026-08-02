@@ -72,6 +72,8 @@ struct BankTransferView: View {
     @State private var pendingTransactionId: String?
     @State private var pinError: String?
     @State private var isSubmitting = false
+    /// Mốc bắt đầu gọi API chuyển tiền — để biên lai hiện thời gian xử lý thật.
+    @State private var submitStartedAt: Date?
     @State private var transferError: String?
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
@@ -878,6 +880,8 @@ struct BankTransferView: View {
         )
 
         do {
+            // Mốc đo thời gian xử lý THẬT để biên lai không phải bịa "2,0 giây".
+            submitStartedAt = Date()
             let result = try await TransferService.transferToBank(request)
             await handleResult(result)
         } catch let error as APIError {
@@ -890,6 +894,9 @@ struct BankTransferView: View {
     private func submitPin(_ pin: String) async {
         guard let transactionId = pendingTransactionId else { return }
         do {
+            // Đo lại từ lúc gửi PIN — thời gian người dùng gõ PIN không phải thời gian
+            // xử lý giao dịch.
+            submitStartedAt = Date()
             let result = try await TransferService.verifyTransfer(
                 VerifyTransferRequest(password: pin, transactionId: transactionId)
             )
@@ -907,15 +914,21 @@ struct BankTransferView: View {
             return
         }
         pendingTransactionId = nil
+        let elapsed = submitStartedAt.map { Date().timeIntervalSince($0) }
         if let payLinkToken {
             await PayLinkService.consume(reqToken: payLinkToken, txId: result.transId)
         }
         await WalletStore.shared.refresh(force: true)
         onSuccess(
             TransferSuccessInfo(
-                amount: amount, recipientName: holderName,
-                recipientDetail: "\(bankNameForSubmit) • \(accountNumber)",
-                noteLabel: "Nội dung", note: effectiveContent
+                kind: .bank, amount: amount, recipientName: holderName,
+                bankName: bankNameForSubmit, accountNumber: accountNumber,
+                noteLabel: "Nội dung", note: effectiveContent,
+                transactionCode: result.bkTransId ?? result.transId,
+                elapsedSeconds: elapsed,
+                // Bảo Kim code 99: tiền đã trừ nhưng ngân hàng chưa chốt.
+                isProcessing: result.status == "PENDING",
+                feeAmount: result.feeAmount
             )
         )
     }

@@ -41,6 +41,8 @@ struct WithdrawView: View {
     @State private var errorMessage: String?
 
     @State private var pendingTransactionId: String?
+    /// Mốc bắt đầu gọi API rút tiền — để biên lai hiện thời gian xử lý thật.
+    @State private var submitStartedAt: Date?
     @State private var pinError: String?
 
     // Nhánh chưa liên kết ngân hàng — chọn bank + nhập STK, verify trước khi rút.
@@ -473,6 +475,8 @@ struct WithdrawView: View {
         )
 
         do {
+            // Mốc đo thời gian xử lý THẬT để biên lai không phải bịa "2,0 giây".
+            submitStartedAt = Date()
             let result = try await TransferService.withdraw(request)
             await handleResult(result, accNo: accNo, bankNo: bankNo)
         } catch let error as APIError {
@@ -487,6 +491,8 @@ struct WithdrawView: View {
         let accNo = isLinked ? (wallet.accNo ?? "") : accountNumber
         let bankNo = isLinked ? (wallet.bankNo ?? "") : (selectedBin ?? "")
         do {
+            // Đo lại từ lúc gửi PIN — thời gian gõ PIN không phải thời gian xử lý.
+            submitStartedAt = Date()
             let result = try await TransferService.verifyTransfer(
                 VerifyTransferRequest(password: pin, transactionId: transactionId)
             )
@@ -504,13 +510,20 @@ struct WithdrawView: View {
             return
         }
         pendingTransactionId = nil
+        let elapsed = submitStartedAt.map { Date().timeIntervalSince($0) }
         await WalletStore.shared.refresh(force: true)
         let bankName = BankCache.shared.bank(bin: bankNo)?.shortName ?? "Ngân hàng"
         onSuccess(
+            // Rút tiền cũng đổ về TK ngân hàng nên dùng nhánh `.bank` của biên lai.
             TransferSuccessInfo(
-                amount: amount, recipientName: wallet.accName ?? "Tài khoản của bạn",
-                recipientDetail: "\(bankName) • \(accNo)",
-                noteLabel: "Nội dung", note: "Rút tiền về ngân hàng liên kết"
+                kind: .bank, amount: amount,
+                recipientName: wallet.accName ?? "Tài khoản của bạn",
+                bankName: bankName, accountNumber: accNo,
+                noteLabel: "Nội dung", note: "Rút tiền về ngân hàng liên kết",
+                transactionCode: result.bkTransId ?? result.transId,
+                elapsedSeconds: elapsed,
+                isProcessing: result.status == "PENDING",
+                feeAmount: result.feeAmount
             )
         )
     }

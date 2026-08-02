@@ -242,11 +242,7 @@ struct HomeView: View {
                 onSuccess: { info in path.append(.transferSuccess(info)) }
             )
         case .transferSuccess(let info):
-            TransferSuccessView(
-                amount: info.amount, recipientName: info.recipientName,
-                recipientDetail: info.recipientDetail, noteLabel: info.noteLabel, note: info.note,
-                onHome: { path.removeAll() }
-            )
+            TransferSuccessView(info: info, onHome: { path.removeAll() })
         case .conversation(let otherName, let otherBkUsername):
             ConversationView(
                 otherName: otherName, otherBkUsername: otherBkUsername,

@@ -38,6 +38,8 @@ struct WalletTransferAmountView: View {
     @State private var errorMessage: String?
 
     @State private var pendingTransactionId: String?
+    /// Mốc bắt đầu gọi API chuyển tiền — để biên lai hiện thời gian xử lý thật.
+    @State private var submitStartedAt: Date?
     @State private var pinError: String?
 
     /// Bàn phím số tự vẽ đang hiện hay không. Mở sẵn khi vào màn, chạm ra ngoài thì ẩn,
@@ -511,6 +513,8 @@ struct WalletTransferAmountView: View {
         )
 
         do {
+            // Mốc đo thời gian xử lý THẬT để biên lai không phải bịa "2,0 giây".
+            submitStartedAt = Date()
             let result = try await TransferService.transferToWallet(request)
             await handleResult(result)
         } catch let error as APIError {
@@ -523,6 +527,8 @@ struct WalletTransferAmountView: View {
     private func submitPin(_ pin: String) async {
         guard let transactionId = pendingTransactionId else { return }
         do {
+            // Đo lại từ lúc gửi PIN — thời gian gõ PIN không phải thời gian xử lý.
+            submitStartedAt = Date()
             let result = try await TransferService.verifyTransfer(
                 VerifyTransferRequest(password: pin, transactionId: transactionId)
             )
@@ -540,6 +546,7 @@ struct WalletTransferAmountView: View {
             return
         }
         pendingTransactionId = nil
+        let elapsed = submitStartedAt.map { Date().timeIntervalSince($0) }
         // `alreadySaved` phải kiểm lại ở đây: khi người nhận đã có trong danh bạ thì
         // toggle bị ẩn nhưng saveRecipient vẫn còn true -> tạo trùng bản ghi.
         if saveRecipient && !alreadySaved {
@@ -553,9 +560,13 @@ struct WalletTransferAmountView: View {
         await WalletStore.shared.refresh(force: true)
         onSuccess(
             TransferSuccessInfo(
-                amount: amount, recipientName: draft.holderName,
-                recipientDetail: "Ví nano • \(draft.username)",
-                noteLabel: "Lời nhắn", note: effectiveMessage
+                kind: .wallet, amount: amount, recipientName: draft.holderName,
+                accountNumber: draft.username,
+                noteLabel: "Lời nhắn", note: effectiveMessage,
+                transactionCode: result.bkTransId ?? result.transId,
+                elapsedSeconds: elapsed,
+                isProcessing: result.status == "PENDING",
+                feeAmount: result.feeAmount
             )
         )
     }

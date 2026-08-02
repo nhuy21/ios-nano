@@ -60,11 +60,7 @@ struct QrScanNavigationView: View {
                 onSuccess: { info in path.append(.transferSuccess(info)) }
             )
         case .transferSuccess(let info):
-            TransferSuccessView(
-                amount: info.amount, recipientName: info.recipientName,
-                recipientDetail: info.recipientDetail, noteLabel: info.noteLabel, note: info.note,
-                onHome: onDismiss
-            )
+            TransferSuccessView(info: info, onHome: onDismiss)
         case .receiveQr:
             ReceiveQrView(onBack: { if !path.isEmpty { path.removeLast() } })
         }
