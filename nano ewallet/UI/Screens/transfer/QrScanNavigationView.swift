@@ -12,6 +12,7 @@ import SwiftUI
 
 private enum QrFlowRoute: Hashable {
     case bankTransfer(BankTransferDraft)
+    case walletTransferAmount(WalletTransferDraft)
     case transferSuccess(TransferSuccessInfo)
     case receiveQr
 }
@@ -31,7 +32,8 @@ struct QrScanNavigationView: View {
                 onBack: onDismiss,
                 onParsed: { draft in path.append(.bankTransfer(draft)) },
                 onReceiveQr: { path.append(.receiveQr) },
-                onEmergency: onEmergency
+                onEmergency: onEmergency,
+                onWalletRecipient: { draft in path.append(.walletTransferAmount(draft)) }
             )
             .hidesSystemNavigationBar()
             .navigationDestination(for: QrFlowRoute.self) { route in
@@ -49,6 +51,12 @@ struct QrScanNavigationView: View {
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onHome: onDismiss,
                 initialDraft: draft,
+                onSuccess: { info in path.append(.transferSuccess(info)) }
+            )
+        case .walletTransferAmount(let draft):
+            WalletTransferAmountView(
+                draft: draft,
+                onBack: { if !path.isEmpty { path.removeLast() } },
                 onSuccess: { info in path.append(.transferSuccess(info)) }
             )
         case .transferSuccess(let info):

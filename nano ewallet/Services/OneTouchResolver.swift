@@ -1,0 +1,130 @@
+//
+//  OneTouchResolver.swift
+//  nano ewallet
+//
+//  "OneTouch" — nhận một nguồn bất kỳ (bộ nhớ tạm, ảnh trong thư viện) rồi tự nhận
+//  diện là mã QR / tin nhắn chuyển khoản ngân hàng / số ví, trả về người nhận đã sẵn
+//  sàng để điều hướng. Mirror `parseTextAndGo` + `processClipboardImage` trong
+//  QrScanScreen.kt, tách riêng vì cả màn Quét QR lẫn lưới Dịch vụ ngoài Home đều gọi.
+//
+
+import Foundation
+import UIKit
+import CoreImage
+
+enum OneTouchResult {
+    case bank(BankTransferDraft)
+    case wallet(WalletTransferDraft)
+    /// Không nhận diện được — kèm câu báo cho người dùng.
+    case failure(String)
+}
+
+enum OneTouchResolver {
+
+    /// Đọc bộ nhớ tạm: ưu tiên ảnh (người dùng hay chụp/lưu ảnh QR rồi copy), sau đó text.
+    static func resolveClipboard() async -> OneTouchResult {
+        if let image = UIPasteboard.general.image {
+            return await resolve(image: image)
+        }
+        let text = (UIPasteboard.general.string ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            return .failure("Bộ nhớ tạm trống. Hãy copy nội dung chuyển khoản hoặc ảnh mã QR trước.")
+        }
+        return await resolve(text: text)
+    }
+
+    /// Ảnh: thử tìm mã QR trước, không có thì OCR rồi xử như tin nhắn.
+    static func resolve(image: UIImage) async -> OneTouchResult {
+        if let raw = qrPayload(in: image) {
+            return await resolveQr(raw)
+        }
+        let text = await TextRecognizer.recognizeText(in: image)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            return .failure("Ảnh không có mã QR và không đọc được chữ")
+        }
+        return await resolve(text: text)
+    }
+
+    /// Nhận diện text là VÍ nội bộ hay NGÂN HÀNG.
+    static func resolve(text: String) async -> OneTouchResult {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Số trơn -> thử verify là ví. Không phải ví thì báo rõ, KHÔNG thử bóc ngân hàng:
+        // số trơn không kèm ngân hàng nên câu "không nhận ra ngân hàng" gây hiểu nhầm.
+        if AmountParser.isBareNumber(trimmed) {
+            if let name = try? await TransferService.verifyBeneficiary(
+                VerifyBeneficiaryRequest(benUsername: trimmed)
+            ) {
+                return .wallet(walletDraft(username: trimmed, holderName: name, source: text))
+            }
+            return .failure("Không tìm thấy ví với số này (lưu ý không thể tự chuyển cho chính mình).")
+        }
+
+        // Tin nhắn -> để backend bóc ngân hàng + STK + số tiền.
+        if let parsed = try? await BankService.parseMessage(rawMessage: trimmed) {
+            return .bank(
+                BankTransferDraft(
+                    bin: parsed.bankBin, bankName: parsed.bankName ?? "Ngân hàng",
+                    accNo: parsed.accountNumber, accType: 0, holderName: parsed.accountName,
+                    prefillAmount: parsed.amount,
+                    // OneTouch chỉ cần đúng SỐ TIỀN + TÀI KHOẢN. Bỏ nội dung backend bóc
+                    // được để màn sau dùng nội dung mặc định (mirror forceDefaultMemo).
+                    prefillContent: nil,
+                    amountEditable: parsed.isAmountEditable, contentEditable: true
+                )
+            )
+        }
+
+        // Bóc ngân hàng trượt -> dò từng dãy số trong tin nhắn xem có phải số ví không.
+        for candidate in AmountParser.numberCandidates(in: trimmed) {
+            if let name = try? await TransferService.verifyBeneficiary(
+                VerifyBeneficiaryRequest(benUsername: candidate)
+            ) {
+                return .wallet(walletDraft(username: candidate, holderName: name, source: text))
+            }
+        }
+        return .failure("Không nhận diện được ngân hàng hoặc ví từ nội dung dán")
+    }
+
+    /// Mã QR (quét camera hoặc tìm thấy trong ảnh) -> nhờ backend verify CRC + tra chủ TK.
+    static func resolveQr(_ rawValue: String) async -> OneTouchResult {
+        do {
+            let parsed = try await BankService.parseQr(rawQrData: rawValue)
+            return .bank(
+                BankTransferDraft(
+                    bin: parsed.bankBin, bankName: parsed.bankName ?? "Ngân hàng",
+                    accNo: parsed.accountNumber, accType: 0, holderName: parsed.accountName,
+                    prefillAmount: parsed.amount, prefillContent: parsed.content,
+                    amountEditable: parsed.isAmountEditable, contentEditable: parsed.isContentEditable
+                )
+            )
+        } catch let error as APIError {
+            return .failure(error.message)
+        } catch {
+            return .failure("Không đọc được mã QR, vui lòng thử lại")
+        }
+    }
+
+    // MARK: - Private
+
+    private static func walletDraft(
+        username: String, holderName: String, source: String
+    ) -> WalletTransferDraft {
+        WalletTransferDraft(
+            username: username, holderName: holderName,
+            prefillAmount: AmountParser.parseVnd(from: source)
+        )
+    }
+
+    private static func qrPayload(in image: UIImage) -> String? {
+        guard let ciImage = CIImage(image: image),
+              let detector = CIDetector(
+                ofType: CIDetectorTypeQRCode, context: nil,
+                options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+              )
+        else { return nil }
+        return (detector.features(in: ciImage) as? [CIQRCodeFeature])?.first?.messageString
+    }
+}

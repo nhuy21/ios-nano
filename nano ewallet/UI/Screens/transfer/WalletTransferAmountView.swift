@@ -24,7 +24,8 @@ struct WalletTransferAmountView: View {
     @StateObject private var authStore = AuthStore.shared
     @StateObject private var beneficiaryStore = BeneficiaryStore.shared
 
-    @State private var amountText = ""
+    /// OneTouch bóc được số tiền từ nội dung dán -> điền sẵn, vẫn sửa được.
+    @State private var amountText: String
     @State private var message = ""
     @State private var saveRecipient = true
     @State private var isSubmitting = false
@@ -37,6 +38,17 @@ struct WalletTransferAmountView: View {
     @FocusState private var isMessageFocused: Bool
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
+
+    init(
+        draft: WalletTransferDraft,
+        onBack: @escaping () -> Void,
+        onSuccess: @escaping (TransferSuccessInfo) -> Void
+    ) {
+        self.draft = draft
+        self.onBack = onBack
+        self.onSuccess = onSuccess
+        _amountText = State(initialValue: draft.prefillAmount.map(String.init) ?? "")
+    }
 
     private var amount: Int64 { Int64(amountText) ?? 0 }
     private var overLimit: Bool {

@@ -98,6 +98,8 @@ struct WalletTransferDraft: Hashable {
     var username: String
     var holderName: String
     var payLinkToken: String?
+    /// Số tiền bóc được từ nội dung dán (OneTouch) — điền sẵn nhưng vẫn cho sửa.
+    var prefillAmount: Int64?
 }
 
 /// Trạng thái gốc của app — quyết định cây điều hướng nào được hiển thị.

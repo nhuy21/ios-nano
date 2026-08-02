@@ -10,6 +10,7 @@
 import SwiftUI
 import Combine
 import UIKit
+import PhotosUI
 
 @MainActor
 struct HomeView: View {
@@ -29,6 +30,11 @@ struct HomeView: View {
     @State private var comingSoonFeature: String?
     @State private var detailTransaction: TransactionEntity?
     @State private var showTopupWithdrawChooser = false
+    @State private var showOneTouchChooser = false
+    @State private var oneTouchPhoto: PhotosPickerItem?
+    @State private var showOneTouchPhotoPicker = false
+    @State private var isResolvingOneTouch = false
+    @State private var oneTouchError: String?
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -101,6 +107,69 @@ struct HomeView: View {
                 onDismiss: { showTopupWithdrawChooser = false }
             )
             .presentationBackground(.clear)
+        }
+        // OneTouch — chọn nguồn nội dung, mirror dialog PasteSourceRow bên Kotlin.
+        .fullScreenCover(isPresented: $showOneTouchChooser) {
+            ActionChooserSheet(
+                title: "OneTouch",
+                subtitle: "Chọn nguồn nội dung chuyển khoản",
+                actions: [
+                    .init(
+                        systemImage: "doc.on.clipboard",
+                        title: "Dán từ bộ nhớ tạm",
+                        subtitle: "Nội dung hoặc ảnh đã copy",
+                        handler: { Task { await runOneTouch { await OneTouchResolver.resolveClipboard() } } }
+                    ),
+                    .init(
+                        systemImage: "photo.on.rectangle",
+                        title: "Chọn ảnh trong thư viện",
+                        subtitle: "Ảnh QR hoặc ảnh chụp tin nhắn CK",
+                        handler: { showOneTouchPhotoPicker = true }
+                    ),
+                ],
+                onDismiss: { showOneTouchChooser = false }
+            )
+            .presentationBackground(.clear)
+        }
+        .photosPicker(isPresented: $showOneTouchPhotoPicker, selection: $oneTouchPhoto, matching: .images)
+        .onChange(of: oneTouchPhoto) { _, item in
+            guard let item else { return }
+            oneTouchPhoto = nil
+            Task {
+                await runOneTouch {
+                    guard let data = try? await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data) else {
+                        return .failure("Không đọc được ảnh")
+                    }
+                    return await OneTouchResolver.resolve(image: image)
+                }
+            }
+        }
+        .overlay { if isResolvingOneTouch { ProcessingOverlay(message: "Đang nhận diện...") } }
+        .alert("Không nhận diện được", isPresented: oneTouchErrorBinding) {
+            Button("Đóng", role: .cancel) {}
+        } message: {
+            Text(oneTouchError ?? "")
+        }
+    }
+
+    private var oneTouchErrorBinding: Binding<Bool> {
+        Binding(get: { oneTouchError != nil }, set: { if !$0 { oneTouchError = nil } })
+    }
+
+    /// Chạy một lượt OneTouch rồi đưa kết quả tới đúng màn.
+    private func runOneTouch(_ resolve: () async -> OneTouchResult) async {
+        guard !isResolvingOneTouch else { return }
+        isResolvingOneTouch = true
+        defer { isResolvingOneTouch = false }
+
+        switch await resolve() {
+        case .bank(let draft):
+            path.append(.bankTransfer(draft: draft))
+        case .wallet(let draft):
+            path.append(.walletTransferAmount(draft))
+        case .failure(let message):
+            oneTouchError = message
         }
     }
 
@@ -582,6 +651,8 @@ struct HomeView: View {
                             path.append(.walletTransfer(draft: nil))
                         case .walletTopup:
                             showTopupWithdrawChooser = true
+                        case .pasteCk:
+                            showOneTouchChooser = true
                         default:
                             comingSoonFeature = service.title
                         }

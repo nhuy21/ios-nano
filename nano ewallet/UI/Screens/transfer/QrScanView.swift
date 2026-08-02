@@ -23,6 +23,8 @@ struct QrScanView: View {
     let onReceiveQr: () -> Void
     /// "Cấp cứu ví tui" — mở danh bạ ví ở chế độ xin tiền.
     var onEmergency: () -> Void = {}
+    /// OneTouch nhận ra nội dung dán là VÍ nội bộ -> sang màn chuyển ví.
+    var onWalletRecipient: (WalletTransferDraft) -> Void = { _ in }
 
     @StateObject private var scanner = QrScannerController()
 
@@ -31,7 +33,6 @@ struct QrScanView: View {
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var lastHandledValue: String?
     @State private var isDecodingImage = false
-    @State private var showOneTouchSoon = false
 
     // Số đo lấy nguyên từ QrScanScreen.kt.
     private static let frameSize: CGFloat = 310
@@ -87,11 +88,6 @@ struct QrScanView: View {
         .background(Color.black)
         .task {
             await scanner.requestPermissionAndStart()
-        }
-        .alert("Sắp có", isPresented: $showOneTouchSoon) {
-            Button("Đóng", role: .cancel) {}
-        } message: {
-            Text("OneTouch đang được hoàn thiện, sẽ có trong bản cập nhật tới.")
         }
         .onDisappear { scanner.stop() }
         .onChange(of: scanner.lastScannedValue) { _, newValue in
@@ -291,7 +287,7 @@ struct QrScanView: View {
     private var bottomBar: some View {
         HStack(spacing: 0) {
             pillSegment(title: "OneTouch", isNew: true) {
-                showOneTouchSoon = true
+                Task { await handleOneTouch() }
             } icon: {
                 TransactionIcon(kind: .pasteCk, tint: .white)
                     .frame(width: 22, height: 22)
@@ -398,53 +394,57 @@ struct QrScanView: View {
 
     // MARK: - Xử lý QR
 
+    // MARK: - OneTouch
+
+    /// Một chạm: đọc bộ nhớ tạm rồi tự nhận diện QR / tin nhắn CK / số ví.
+    private func handleOneTouch() async {
+        guard !isParsing else { return }
+        errorMessage = nil
+        isParsing = true
+        defer { isParsing = false }
+        route(await OneTouchResolver.resolveClipboard())
+    }
+
+    /// Đưa kết quả nhận diện tới đúng màn.
+    private func route(_ result: OneTouchResult) {
+        switch result {
+        case .bank(let draft):
+            onParsed(draft)
+        case .wallet(let draft):
+            onWalletRecipient(draft)
+        case .failure(let message):
+            errorMessage = message
+            // Cho phép quét lại mã vừa thất bại.
+            lastHandledValue = nil
+        }
+    }
+
     private func handleQrDetected(_ rawValue: String) {
         guard !isParsing else { return }
         errorMessage = nil
         isParsing = true
         Task {
             defer { isParsing = false }
-            do {
-                let parsed = try await BankService.parseQr(rawQrData: rawValue)
-                onParsed(
-                    BankTransferDraft(
-                        bin: parsed.bankBin, bankName: parsed.bankName ?? "Ngân hàng",
-                        accNo: parsed.accountNumber, accType: 0, holderName: parsed.accountName,
-                        prefillAmount: parsed.amount, prefillContent: parsed.content,
-                        amountEditable: parsed.isAmountEditable, contentEditable: parsed.isContentEditable
-                    )
-                )
-            } catch let error as APIError {
-                errorMessage = error.message
-                lastHandledValue = nil
-            } catch {
-                errorMessage = "Không đọc được mã QR, vui lòng thử lại"
-                lastHandledValue = nil
-            }
+            route(await OneTouchResolver.resolveQr(rawValue))
         }
     }
 
+    /// "Tải từ ảnh": ảnh chọn từ thư viện. Đi qua cùng resolver với OneTouch nên ảnh
+    /// KHÔNG có mã QR vẫn dùng được — OCR rồi bóc như tin nhắn, thay vì báo lỗi.
     private func handlePickedPhoto(_ item: PhotosPickerItem) async {
         photoPickerItem = nil
         isDecodingImage = true
-        defer { isDecodingImage = false }
         errorMessage = nil
+        defer { isDecodingImage = false }
+
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data),
-              let ciImage = CIImage(image: image) else {
+              let image = UIImage(data: data) else {
             errorMessage = "Không đọc được ảnh"
             return
         }
-        let detector = CIDetector(
-            ofType: CIDetectorTypeQRCode, context: nil,
-            options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
-        )
-        guard let features = detector?.features(in: ciImage) as? [CIQRCodeFeature],
-              let rawValue = features.first?.messageString else {
-            errorMessage = "Không tìm thấy mã QR trong ảnh"
-            return
-        }
-        handleQrDetected(rawValue)
+        isParsing = true
+        defer { isParsing = false }
+        route(await OneTouchResolver.resolve(image: image))
     }
 }
 

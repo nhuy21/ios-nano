@@ -19,6 +19,10 @@ struct ParseQrRequest: Encodable {
     let rawQrData: String
 }
 
+struct ParseMessageRequest: Encodable {
+    let rawMessage: String
+}
+
 /// Response `POST banks/parse-qr` — mirror bank.service.ts parseAndEnrich(). `amount`/`content`
 /// null nghĩa là QR "động" (không cố định số tiền/nội dung) -> user được sửa (isXxxEditable).
 struct ParsedQr: Decodable {
@@ -53,6 +57,16 @@ enum BankService {
     static func parseQr(rawQrData: String) async throws -> ParsedQr {
         try await APIClient.shared.request(
             .post, "banks/parse-qr", body: ParseQrRequest(rawQrData: rawQrData), auth: true, as: ParsedQr.self
+        )
+    }
+
+    /// `POST banks/parse-message` — bóc ngân hàng/STK/số tiền/nội dung từ tin nhắn
+    /// chuyển khoản dán vào (OneTouch). Trả cùng shape `ParsedQr` để dùng chung màn
+    /// chuyển khoản với luồng quét QR.
+    static func parseMessage(rawMessage: String) async throws -> ParsedQr {
+        try await APIClient.shared.request(
+            .post, "banks/parse-message",
+            body: ParseMessageRequest(rawMessage: rawMessage), auth: true, slow: true, as: ParsedQr.self
         )
     }
 }
