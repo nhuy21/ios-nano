@@ -4,8 +4,8 @@
 //
 //  Mirror QrScanScreen.kt — camera quét mã QR VietQR (EMVCo). Chỉ target ngân hàng:
 //  quét xong gửi rawValue lên BE `banks/parse-qr` (verify CRC + tra tên chủ TK),
-//  rồi vào thẳng BankTransferAmountView với draft đã điền sẵn — dùng chung màn
-//  chuyển khoản ngân hàng nhập tay, không có màn "QR_PAYMENT" riêng.
+//  rồi vào thẳng BankTransferView với draft đã điền sẵn (thẻ người nhận khoá) —
+//  dùng chung màn chuyển khoản ngân hàng nhập tay, không có màn "QR_PAYMENT" riêng.
 //
 //  Dùng AVFoundation (AVCaptureMetadataOutput) thay ML Kit bên Android — cùng
 //  hiệu quả cho QR code, là API chuẩn của iOS nên không cần thư viện ngoài.

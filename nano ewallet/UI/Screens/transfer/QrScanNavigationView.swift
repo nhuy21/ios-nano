@@ -3,14 +3,15 @@
 //  nano ewallet
 //
 //  Wrapper NavigationStack riêng cho luồng quét QR (mở như modal trượt dọc lên từ
-//  FAB, độc lập với NavigationStack của Home) — quét xong đi tiếp BankTransferAmountView
-//  -> TransferSuccessView, hoặc mở "QR của tôi", tất cả nằm trong cùng 1 stack modal.
+//  FAB, độc lập với NavigationStack của Home) — quét xong đi tiếp BankTransferView
+//  (thẻ người nhận đã khoá) -> TransferSuccessView, hoặc mở "QR của tôi", tất cả
+//  nằm trong cùng 1 stack modal.
 //
 
 import SwiftUI
 
 private enum QrFlowRoute: Hashable {
-    case bankTransferAmount(BankTransferDraft)
+    case bankTransfer(BankTransferDraft)
     case transferSuccess(TransferSuccessInfo)
     case receiveQr
 }
@@ -25,7 +26,7 @@ struct QrScanNavigationView: View {
         NavigationStack(path: $path) {
             QrScanView(
                 onBack: onDismiss,
-                onParsed: { draft in path.append(.bankTransferAmount(draft)) },
+                onParsed: { draft in path.append(.bankTransfer(draft)) },
                 onReceiveQr: { path.append(.receiveQr) }
             )
             .hidesSystemNavigationBar()
@@ -39,10 +40,11 @@ struct QrScanNavigationView: View {
     @ViewBuilder
     private func qrDestination(for route: QrFlowRoute) -> some View {
         switch route {
-        case .bankTransferAmount(let draft):
-            BankTransferAmountView(
-                draft: draft,
+        case .bankTransfer(let draft):
+            BankTransferView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
+                onHome: onDismiss,
+                initialDraft: draft,
                 onSuccess: { info in path.append(.transferSuccess(info)) }
             )
         case .transferSuccess(let info):

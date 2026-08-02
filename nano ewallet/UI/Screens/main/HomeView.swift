@@ -97,7 +97,7 @@ struct HomeView: View {
                     return
                 }
                 let bankName = BankCache.shared.bank(bin: bankNo)?.shortName ?? info.bankShortName ?? "Ngân hàng"
-                path.append(.bankTransferAmount(BankTransferDraft(
+                path.append(.bankTransfer(draft: BankTransferDraft(
                     bin: bankNo, bankName: bankName, accNo: accNo, accType: 0,
                     holderName: info.accName ?? "Người nhận",
                     prefillAmount: info.amountValue, prefillContent: info.note,
@@ -133,7 +133,7 @@ struct HomeView: View {
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 // Chọn từ danh bạ = người nhận đã xác thực -> vào THẲNG màn nhập số tiền.
                 onPickForTransfer: { beneficiary in
-                    path.append(.bankTransferAmount(BankTransferDraft(
+                    path.append(.bankTransfer(draft: BankTransferDraft(
                         bin: beneficiary.bankNo ?? "",
                         bankName: BankCache.shared.bank(bin: beneficiary.bankNo)?.shortName ?? "Ngân hàng",
                         accNo: beneficiary.accNo ?? "", accType: 0,
@@ -151,8 +151,9 @@ struct HomeView: View {
         case .bankTransfer(let draft):
             BankTransferView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
+                onHome: { path.removeAll() },
                 initialDraft: draft,
-                onContinue: { draft in path.append(.bankTransferAmount(draft)) },
+                onSuccess: { info in path.append(.transferSuccess(info)) },
                 onOpenContacts: { path.append(.contacts) }
             )
         case .walletTransfer(let draft):
@@ -161,12 +162,6 @@ struct HomeView: View {
                 initialDraft: draft,
                 onContinue: { draft in path.append(.walletTransferAmount(draft)) },
                 onOpenContacts: { path.append(.contacts) }
-            )
-        case .bankTransferAmount(let draft):
-            BankTransferAmountView(
-                draft: draft,
-                onBack: { if !path.isEmpty { path.removeLast() } },
-                onSuccess: { info in path.append(.transferSuccess(info)) }
             )
         case .walletTransferAmount(let draft):
             WalletTransferAmountView(
@@ -664,7 +659,7 @@ struct HomeView: View {
                     holderName: beneficiary.accName ?? name
                 )))
             case .bankAccount:
-                path.append(.bankTransferAmount(BankTransferDraft(
+                path.append(.bankTransfer(draft: BankTransferDraft(
                     bin: beneficiary.bankNo ?? "",
                     bankName: BankCache.shared.bank(bin: beneficiary.bankNo)?.shortName ?? "Ngân hàng",
                     accNo: beneficiary.accNo ?? "", accType: 0,

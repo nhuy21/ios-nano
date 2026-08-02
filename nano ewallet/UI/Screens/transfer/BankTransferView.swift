@@ -2,40 +2,101 @@
 //  BankTransferView.swift
 //  nano ewallet
 //
-//  Mirror BankTransferScreen.kt — chọn ngân hàng + nhập STK, lookup tên chủ tài
-//  khoản khi rời focus, rồi chuyển sang màn nhập số tiền (BankTransferAmountView).
+//  Mirror TransferScreen.kt (nhánh chuyển khoản ngân hàng) — MỘT màn gộp người
+//  nhận + số tiền + nội dung, thay cho 2 màn tách rời trước đây (chọn bank/STK rồi
+//  mới sang màn nhập tiền). Khác Kotlin ở chỗ: số tài khoản dùng bàn phím HỆ THỐNG
+//  (không phải bàn phím số tự vẽ) — chỉ ô số tiền mới dùng NumericKeypad tự vẽ.
+//
+//  2 chế độ trên cùng màn (mirror `recipientLocked` bên Kotlin):
+//   - `initialDraft == nil`: nhập tay — chọn bank (mở sheet), gõ STK, tự tra tên.
+//   - `initialDraft != nil`: người nhận đã có sẵn (QR / danh bạ / pay link) — thẻ
+//     khoá, có thể kèm số tiền/nội dung cố định nếu QR "động".
 //
 
 import SwiftUI
+import UIKit
 import Combine
 
 @MainActor
 struct BankTransferView: View {
     let onBack: () -> Void
-    /// Người nhận đã có sẵn (từ danh bạ) — bỏ qua bước chọn bank/nhập STK, đi thẳng
-    /// tới màn số tiền. `nil` = nhập tay từ đầu.
+    let onHome: () -> Void
     var initialDraft: BankTransferDraft?
-    let onContinue: (BankTransferDraft) -> Void
+    let onSuccess: (TransferSuccessInfo) -> Void
     var onOpenContacts: () -> Void = {}
 
+    private static let maxAmount: Int64 = 999_999_999
+    private static let maxAmountPerTransfer: Int64 = 10_000_000
+    private static let quickAmounts: [(label: String, value: Int64)] = [
+        ("50k", 50_000), ("100k", 100_000), ("200k", 200_000), ("500k", 500_000),
+    ]
+    private static let contentSuggestions = ["Chuyển tiền", "Trả tiền ăn", "Gửi tặng"]
     private static let bankPriority = [
         "Vietcombank", "BIDV", "VietinBank", "Agribank", "Techcombank",
         "MBBank", "ACB", "VPBank", "TPBank", "Sacombank",
     ]
 
     @StateObject private var bankCache = BankCache.shared
-    @StateObject private var beneficiaryStore = BeneficiaryStore.shared
+    @StateObject private var wallet = WalletStore.shared
+    @StateObject private var authStore = AuthStore.shared
+
+    private let recipientLocked: Bool
+    private let amountEditable: Bool
+    private let contentEditable: Bool
+    private let payLinkToken: String?
 
     @State private var selectedBin: String?
-    @State private var accountNumber = ""
-    @State private var accType = 0 // 0: STK, 1: Thẻ
-    @State private var holderName = ""
+    @State private var accountNumber: String
+    @State private var accType: Int
+    @State private var holderName: String
     @State private var isLookingUp = false
     @State private var lookupError: String?
     @State private var lastLookedUp: (bin: String, account: String, accType: Int)?
-    @State private var showAllBanks = false
-
+    @State private var showBankSheet = false
     @FocusState private var isAccountFocused: Bool
+
+    /// Chỉ điều khiển bàn phím số tự vẽ của Ô SỐ TIỀN — số tài khoản dùng bàn
+    /// phím hệ thống qua `isAccountFocused` riêng, không dùng chung bàn phím này.
+    @State private var isAmountFocused = false
+
+    @State private var amount: Int64
+    @State private var content: String
+    @FocusState private var isContentFocused: Bool
+
+    @State private var pendingTransactionId: String?
+    @State private var pinError: String?
+    @State private var isSubmitting = false
+    @State private var transferError: String?
+
+    private let idempotencyKey = TransferService.newIdempotencyKey()
+
+    init(
+        onBack: @escaping () -> Void,
+        onHome: @escaping () -> Void,
+        initialDraft: BankTransferDraft? = nil,
+        onSuccess: @escaping (TransferSuccessInfo) -> Void,
+        onOpenContacts: @escaping () -> Void = {}
+    ) {
+        self.onBack = onBack
+        self.onHome = onHome
+        self.initialDraft = initialDraft
+        self.onSuccess = onSuccess
+        self.onOpenContacts = onOpenContacts
+
+        recipientLocked = initialDraft != nil
+        amountEditable = initialDraft?.amountEditable ?? true
+        contentEditable = initialDraft?.contentEditable ?? true
+        payLinkToken = initialDraft?.payLinkToken
+
+        _selectedBin = State(initialValue: initialDraft?.bin)
+        _accountNumber = State(initialValue: initialDraft?.accNo ?? "")
+        _accType = State(initialValue: initialDraft?.accType ?? 0)
+        _holderName = State(initialValue: initialDraft?.holderName ?? "")
+        _amount = State(initialValue: initialDraft?.prefillAmount.map(Int64.init) ?? 0)
+        _content = State(initialValue: initialDraft?.prefillContent ?? "")
+    }
+
+    // MARK: - Derived
 
     private var sortedBanks: [Bank] {
         bankCache.banks.sorted { a, b in
@@ -45,90 +106,120 @@ struct BankTransferView: View {
         }
     }
 
-    private var selectedBank: Bank? {
-        bankCache.banks.first { $0.bin == selectedBin }
+    private var selectedBank: Bank? { bankCache.banks.first { $0.bin == selectedBin } }
+
+    private var bankNameForSubmit: String { selectedBank?.shortName ?? initialDraft?.bankName ?? "Ngân hàng" }
+
+    private var recipientReady: Bool {
+        recipientLocked || (selectedBin != nil && !accountNumber.isEmpty && !holderName.isEmpty)
+    }
+    private var canContinue: Bool { amount > 0 && recipientReady }
+
+    private var overLimit: Bool {
+        guard amount > 0, let balance = wallet.balance else { return false }
+        return amount > balance
     }
 
-    private var recentBankContacts: [Beneficiary] {
-        beneficiaryStore.beneficiaries.filter { $0.type == .bankAccount }
+    private var defaultContent: String {
+        let sender = authStore.userFullName?.trimmingCharacters(in: .whitespaces)
+        guard let sender, !sender.isEmpty else { return "Chuyển tiền qua ví Nano" }
+        return "\(sender) chuyển tiền qua ví Nano"
     }
 
-    private var canContinue: Bool {
-        selectedBin != nil && !accountNumber.isEmpty && !holderName.isEmpty
+    private var effectiveContent: String {
+        let trimmed = content.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? "Chuyen tien" : trimmed
+    }
+
+    private var amountText: String { amount == 0 ? "" : Int(amount).vndGrouped }
+
+    private var amountFontSize: CGFloat {
+        switch amount == 0 ? 1 : String(amount).count {
+        case ...3: return 44
+        case 4...5: return 40
+        case 6...7: return 34
+        case 8: return 30
+        default: return 26
+        }
+    }
+
+    /// Gõ số ngắn (1-3 chữ số) -> gợi ý thêm số 0 thay vì phải gõ hết, mirror Kotlin.
+    private var amountSuggestions: [Int64] {
+        guard (1...999).contains(amount) else { return [] }
+        return [amount * 1_000, amount * 10_000, amount * 100_000].filter { $0 <= Self.maxAmount }
+    }
+
+    private var bankSheetBinding: Binding<String?> {
+        Binding(
+            get: { selectedBin },
+            set: { newBin in
+                if newBin != selectedBin {
+                    holderName = ""; lookupError = nil; lastLookedUp = nil
+                }
+                selectedBin = newBin
+            }
+        )
+    }
+
+    private var pendingTransactionIdBinding: Binding<Bool> {
+        Binding(get: { pendingTransactionId != nil }, set: { if !$0 { pendingTransactionId = nil } })
     }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    bankPickerSection
-                    accountSection
-                    if !recentBankContacts.isEmpty {
-                        recentSection
-                    }
+                VStack(alignment: .leading, spacing: 24) {
+                    sourceAccountCard
+                    recipientCard
+                    amountSection
+                    contentSection
                 }
                 .padding(16)
             }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-            continueBar
+            footer
         }
-        .background(Color(hex: 0xF7F8FA))
-        .task {
-            _ = await bankCache.get()
-            await beneficiaryStore.refresh()
-        }
-        .sheet(isPresented: $showAllBanks) {
-            BankPickerSheet(banks: sortedBanks, selectedBin: $selectedBin, onDismiss: { showAllBanks = false })
-        }
+        .background(Color.white)
+        .task { _ = await bankCache.get() }
         .onAppear {
-            if let initialDraft {
-                selectedBin = initialDraft.bin
-                accountNumber = initialDraft.accNo
-                accType = initialDraft.accType
-                holderName = initialDraft.holderName
-            }
+            if initialDraft?.prefillContent == nil { content = defaultContent }
         }
-        .onChange(of: selectedBin) { _, _ in runLookupIfNeeded() }
+        .onChange(of: selectedBin) { _, _ in
+            if holderName.isEmpty { runLookupIfNeeded() }
+        }
+        .onChange(of: isAccountFocused) { wasFocused, isFocused in
+            if wasFocused && !isFocused { runLookupIfNeeded() }
+        }
+        .sheet(isPresented: $showBankSheet) {
+            BankPickerSheet(banks: sortedBanks, selectedBin: bankSheetBinding, onDismiss: { showBankSheet = false })
+        }
+        .sheet(isPresented: pendingTransactionIdBinding) {
+            PinEntrySheet(
+                amountText: Int(amount).vndFormatted,
+                recipientName: holderName,
+                onSubmit: submitPin,
+                onCancel: { pendingTransactionId = nil },
+                externalError: $pinError
+            )
+        }
+        .overlay { if isSubmitting { submittingOverlay } }
+        .overlay { if let transferError { errorOverlay(transferError) } }
     }
 
     // MARK: - Header
 
     private var header: some View {
         HStack {
-            Button(action: onBack) {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-
+            headerCircleButton(systemImage: "arrow.left", action: onBack, accessibilityLabel: "Quay lại")
             Spacer()
-
-            Text("CHUYỂN KHOẢN NGÂN HÀNG")
-                .font(AppFont.beVietnamPro(15, .bold))
+            Text("Chuyển tiền")
+                .font(AppFont.beVietnamPro(18, .bold))
                 .foregroundStyle(.white)
-                .tracking(1)
-
             Spacer()
-
-            Button(action: onOpenContacts) {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Danh bạ")
+            headerCircleButton(systemImage: "house.fill", action: onHome, accessibilityLabel: "Trang chủ")
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
+        .padding(.vertical, 12)
         .background(
             LinearGradient(
                 colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
@@ -137,228 +228,683 @@ struct BankTransferView: View {
         )
     }
 
-    // MARK: - Chọn ngân hàng
-
-    private var bankPickerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                FieldLabel(text: "Ngân hàng")
-                    .padding(.bottom, 0)
-                Spacer()
-                Button("Xem tất cả") { showAllBanks = true }
-                    .buttonStyle(.plain)
-                    .font(AppFont.beVietnamPro(13, .semibold))
-                    .foregroundStyle(AppColor.brand)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(sortedBanks.prefix(10)) { bank in
-                        bankChip(bank)
-                    }
-                }
-            }
-        }
-    }
-
-    private func bankChip(_ bank: Bank) -> some View {
-        let isSelected = bank.bin == selectedBin
-        return Button {
-            selectedBin = bank.bin
-        } label: {
-            VStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? AppColor.brand : Color.white)
-                    .frame(width: 56, height: 56)
-                    .overlay {
-                        Text(bank.shortName.prefix(4))
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(isSelected ? .white : AppColor.payInk)
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(isSelected ? Color.clear : AppColor.payInputBorder, lineWidth: 1)
-                    }
-                Text(bank.shortName)
-                    .font(.system(size: 11))
-                    .foregroundStyle(AppColor.payInk)
-                    .lineLimit(1)
-            }
-            .frame(width: 64)
+    private func headerCircleButton(systemImage: String, action: @escaping () -> Void, accessibilityLabel: String) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(AppColor.payInk)
+                .frame(width: 38, height: 38)
+                .background(Color.white)
+                .clipShape(Circle())
+                .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 
-    // MARK: - Số tài khoản
+    // MARK: - TK nguồn (ví của người gửi + số dư)
 
-    private var accountSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 0) {
-                accTypeToggle(title: "Số tài khoản", index: 0)
-                accTypeToggle(title: "Số thẻ", index: 1)
-            }
-            .padding(3)
-            .background(Color(hex: 0xF1F3F5))
-            .clipShape(Capsule())
+    private var sourceAccountCard: some View {
+        SourceAccountCard(username: wallet.bkUsername, balance: wallet.balance)
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                FieldLabel(text: accType == 0 ? "Số tài khoản" : "Số thẻ")
-                AppTextField(
-                    text: $accountNumber,
-                    placeholder: "Nhập số tài khoản",
-                    keyboardType: .numberPad,
-                    submitLabel: .done,
-                    digitsOnly: true
-                )
-                .focused($isAccountFocused)
-                .onChange(of: isAccountFocused) { wasFocused, isFocused in
-                    if wasFocused && !isFocused { runLookupIfNeeded() }
+    // MARK: - Người nhận
+
+    private var recipientCard: some View {
+        VStack(spacing: 0) {
+            bankHeaderRow
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer().frame(height: 14)
+                if recipientLocked {
+                    lockedAccountBlock
+                } else {
+                    manualAccountBlock
                 }
+                Spacer().frame(height: 14)
             }
+            .padding(.horizontal, 16)
+        }
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(cardBorderColor, lineWidth: 1)
+        }
+        .shadow(color: Color(hex: 0x111C17).opacity(0.08), radius: 3, x: 0, y: 1)
+    }
 
-            if isLookingUp {
-                HStack(spacing: 8) {
-                    ProgressView().tint(AppColor.brand)
-                    Text("Đang tra cứu tên chủ tài khoản...")
-                        .font(AppFont.beVietnamPro(13))
-                        .foregroundStyle(AppColor.payMuted)
+    private var cardBorderColor: Color {
+        selectedBank?.brandColor.flatMap(Color.init(hexString:)) ?? AppColor.line
+    }
+
+    private var bankHeaderRow: some View {
+        let bank = selectedBank
+        let brand = bank?.brandColor.flatMap(Color.init(hexString:)) ?? Color(hex: 0xF1F3F5)
+        let onBrand: Color = bank == nil ? AppColor.payInk : (brand.isLight ? AppColor.payInk : .white)
+        return HStack(spacing: 12) {
+            Circle()
+                .fill(Color.white)
+                .frame(width: 42, height: 42)
+                .overlay { BankLogoView(bank: bank) }
+            if let bank {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bank.shortName)
+                        .font(AppFont.beVietnamPro(16, .bold))
+                        .foregroundStyle(onBrand)
+                        .lineLimit(1)
+                    Text(bank.name)
+                        .font(.system(size: 12))
+                        .foregroundStyle(onBrand.opacity(0.85))
+                        .lineLimit(2)
                 }
-            } else if let lookupError {
-                FieldError(message: lookupError, alignment: .leading)
-            } else if !holderName.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tên chủ tài khoản")
-                        .font(AppFont.beVietnamPro(12))
+            } else {
+                Text("Chọn ngân hàng")
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(AppColor.payInk)
+            }
+            Spacer()
+            if recipientLocked {
+                Circle()
+                    .fill(Color(hex: 0x12A67E))
+                    .frame(width: 20, height: 20)
+                    .overlay {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(onBrand)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .background(brand)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !recipientLocked else { return }
+            isContentFocused = false
+            isAccountFocused = false
+            isAmountFocused = false
+            showBankSheet = true
+        }
+    }
+
+    private var lockedAccountBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(accType == 1 ? "Số thẻ" : "Số tài khoản")
+                .font(AppFont.beVietnamPro(12.5, .medium))
+                .foregroundStyle(AppColor.payMuted)
+            Spacer().frame(height: 8)
+            Text(accountNumber.isEmpty ? "—" : accountNumber)
+                .font(AppFont.beVietnamPro(17, .bold))
+                .foregroundStyle(AppColor.payInk)
+                .lineLimit(1)
+            Spacer().frame(height: 14)
+            Rectangle().fill(AppColor.line).frame(height: 1)
+            Spacer().frame(height: 14)
+            Text("Tên người nhận")
+                .font(AppFont.beVietnamPro(12.5, .medium))
+                .foregroundStyle(AppColor.payMuted)
+            Spacer().frame(height: 6)
+            Text(holderName.isEmpty ? "—" : holderName.uppercased())
+                .font(AppFont.beVietnamPro(16, .bold))
+                .foregroundStyle(AppColor.payInk)
+                .lineLimit(1)
+        }
+    }
+
+    private var manualAccountBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                HStack(spacing: 0) {
+                    Text(accType == 1 ? "Số thẻ" : "Số tài khoản")
+                        .font(AppFont.beVietnamPro(12.5, .medium))
                         .foregroundStyle(AppColor.payMuted)
-                    Text(holderName)
-                        .font(AppFont.beVietnamPro(15, .semibold))
+                    Text(" *")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(AppColor.error)
+                }
+                Spacer()
+                accTypeToggle
+            }
+            Spacer().frame(height: 8)
+            accountRow
+
+            if isLookingUp || !holderName.isEmpty || lookupError != nil {
+                Spacer().frame(height: 14)
+                Rectangle().fill(AppColor.line).frame(height: 1)
+                Spacer().frame(height: 14)
+                Text("Tên người nhận")
+                    .font(AppFont.beVietnamPro(12.5, .medium))
+                    .foregroundStyle(AppColor.payMuted)
+                Spacer().frame(height: 6)
+                if isLookingUp {
+                    Text("Đang tra cứu...")
+                        .font(AppFont.beVietnamPro(14))
+                        .foregroundStyle(AppColor.payMuted)
+                } else if !holderName.isEmpty {
+                    Text(holderName.uppercased())
+                        .font(AppFont.beVietnamPro(16, .bold))
                         .foregroundStyle(AppColor.payInk)
+                        .lineLimit(1)
+                } else {
+                    Text(lookupError ?? "")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColor.error)
+                        .lineLimit(2)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppColor.brandSoft)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
     }
 
-    private func accTypeToggle(title: String, index: Int) -> some View {
-        let isSelected = accType == index
+    private var accTypeToggle: some View {
+        HStack(spacing: 2) {
+            accTypeButton(title: "Số TK", index: 0)
+            accTypeButton(title: "Số thẻ", index: 1)
+        }
+        .padding(3)
+        .background(Color(hex: 0xF1F3F5))
+        .clipShape(Capsule())
+    }
+
+    private func accTypeButton(title: String, index: Int) -> some View {
+        let selected = accType == index
         return Button {
-            accType = index
-            holderName = ""
-            lastLookedUp = nil
-            runLookupIfNeeded()
+            setAccType(index)
         } label: {
             Text(title)
-                .font(AppFont.beVietnamPro(13, .semibold))
-                .foregroundStyle(isSelected ? .white : AppColor.payMuted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(isSelected ? AppColor.brand : Color.clear)
+                .font(.system(size: 12, weight: selected ? .bold : .medium))
+                .foregroundStyle(selected ? Color(hex: 0x00542F) : AppColor.payMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(selected ? Color.white : Color.clear)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Người nhận gần đây
+    /// Số tài khoản/thẻ dùng bàn phím SỐ HỆ THỐNG (không phải NumericKeypad tự vẽ) —
+    /// tra cứu tên chủ TK chạy khi rời focus (`onChange(isAccountFocused)`) hoặc bấm Done.
+    private var accountRow: some View {
+        HStack(spacing: 8) {
+            TextField(
+                accType == 1 ? "Nhập số thẻ" : "Nhập số tài khoản",
+                text: $accountNumber
+            )
+            .font(AppFont.beVietnamPro(17, .bold))
+            .foregroundStyle(AppColor.payInk)
+            .tint(AppColor.brand)
+            .keyboardType(.numberPad)
+            .submitLabel(.done)
+            .focused($isAccountFocused)
+            .onSubmit { runLookupIfNeeded() }
+            .onChange(of: accountNumber) { _, newValue in
+                let filtered = String(newValue.filter(\.isNumber).prefix(19))
+                if filtered != newValue {
+                    accountNumber = filtered
+                } else if !filtered.isEmpty {
+                    holderName = ""; lookupError = nil
+                }
+            }
 
-    private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            FieldLabel(text: "Người nhận gần đây").padding(.bottom, 0)
-            VStack(spacing: 0) {
-                ForEach(recentBankContacts.prefix(5)) { contact in
-                    Button {
-                        pick(contact)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(AppColor.brandSoft)
-                                .frame(width: 36, height: 36)
-                                .overlay {
-                                    Text(contact.displayName.nameInitials)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(AppColor.brand)
-                                }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(contact.displayName)
-                                    .font(AppFont.beVietnamPro(14, .semibold))
-                                    .foregroundStyle(AppColor.payInk)
-                                Text(contact.accNo ?? "")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(AppColor.payMuted)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 8)
+            if !accountNumber.isEmpty {
+                Button {
+                    accountNumber = ""; holderName = ""; lookupError = nil; lastLookedUp = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color(hex: 0xBFC4CC))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                isAccountFocused = false
+                onOpenContacts()
+            } label: {
+                Image(systemName: "person.crop.rectangle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color(hex: 0x00542F))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Chọn từ danh bạ")
+        }
+    }
+
+    // MARK: - Số tiền
+
+    private var amountSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Số tiền chuyển")
+                    .font(AppFont.beVietnamPro(13, .semibold))
+                    .foregroundStyle(AppColor.payMuted)
+                Spacer()
+                if overLimit {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                        Text("Vượt số dư")
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .buttonStyle(.plain)
+                    .foregroundStyle(AppColor.error)
+                }
+            }
+
+            ZStack(alignment: .bottomTrailing) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(AppColor.line, lineWidth: 1)
+                    .frame(height: 130)
+                    .overlay {
+                        ZStack {
+                            HStack(spacing: 4) {
+                                Text(amountText.isEmpty ? "0" : amountText)
+                                    .font(AppFont.baloo2(amountFontSize, .bold))
+                                    .foregroundStyle(amountText.isEmpty ? AppColor.line : AppColor.payInk)
+                                    .lineLimit(1)
+                                if amountEditable && isAmountFocused {
+                                    BlinkingCaret(color: AppColor.payInk, height: amountFontSize * 0.85)
+                                }
+                            }
+                            HStack {
+                                Spacer()
+                                Text("VND")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(AppColor.payMuted)
+                                    .tracking(0.6)
+                            }
+                        }
+                        .padding(.horizontal, 36)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isContentFocused = false
+                            isAccountFocused = false
+                            isAmountFocused = true
+                        }
+                    }
+
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(AppColor.payMuted)
+                    .frame(width: 36, height: 36)
+                    .padding(10)
+            }
+
+            if amountEditable {
+                if !amountSuggestions.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(amountSuggestions, id: \.self) { value in
+                            quickChip(Int(value).vndGrouped) { amount = value }
+                        }
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        ForEach(Self.quickAmounts, id: \.label) { q in
+                            quickChip(q.label) { amount = min(Self.maxAmount, amount + q.value) }
+                        }
+                    }
                 }
             }
         }
     }
 
-    /// Người nhận đã lưu trong danh bạ nên STK/tên đã xác thực — vào THẲNG màn nhập
-    /// số tiền thay vì chỉ điền vào form rồi bắt bấm "Tiếp tục".
-    private func pick(_ contact: Beneficiary) {
-        selectedBin = contact.bankNo
-        accountNumber = contact.accNo ?? ""
-        holderName = contact.accName ?? contact.displayName
-        lastLookedUp = (contact.bankNo ?? "", contact.accNo ?? "", accType)
-
-        onContinue(BankTransferDraft(
-            bin: contact.bankNo ?? "",
-            bankName: BankCache.shared.bank(bin: contact.bankNo)?.shortName ?? "Ngân hàng",
-            accNo: contact.accNo ?? "", accType: accType,
-            holderName: contact.accName ?? contact.displayName
-        ))
-    }
-
-    // MARK: - Continue
-
-    private var continueBar: some View {
-        VStack(spacing: 0) {
-            Rectangle().fill(AppColor.line).frame(height: 1)
-            PrimaryButton(title: "Tiếp tục", isEnabled: canContinue) {
-                guard let bank = selectedBank else { return }
-                onContinue(
-                    BankTransferDraft(
-                        bin: bank.bin, bankName: bank.shortName,
-                        accNo: accountNumber, accType: accType, holderName: holderName
-                    )
-                )
-            }
-            .padding(16)
+    private func quickChip(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(AppColor.payInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .overlay { Capsule().strokeBorder(AppColor.line, lineWidth: 1) }
+                .contentShape(Capsule())
         }
-        .background(Color.white)
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Lookup
+    // MARK: - Nội dung
+
+    private var contentSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .bottom) {
+                Text("Nội dung chuyển tiền")
+                    .font(AppFont.beVietnamPro(13, .medium))
+                    .foregroundStyle(AppColor.payMuted)
+                Spacer()
+                Text("\(content.count)/250")
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColor.payMuted)
+            }
+
+            if contentEditable {
+                TextField("Nhập nội dung chuyển tiền", text: $content, axis: .vertical)
+                    .font(AppFont.beVietnamPro(16, .medium))
+                    .foregroundStyle(AppColor.payInk)
+                    .tint(AppColor.brand)
+                    .lineLimit(1...4)
+                    .focused($isContentFocused)
+                    .onChange(of: isContentFocused) { _, focused in
+                        if focused { isAmountFocused = false }
+                    }
+                    .onChange(of: content) { _, newValue in
+                        if newValue.count > 250 { content = String(newValue.prefix(250)) }
+                    }
+            } else {
+                Text(content)
+                    .font(AppFont.beVietnamPro(16, .medium))
+                    .foregroundStyle(AppColor.payInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Rectangle()
+                .fill(isContentFocused ? AppColor.payInk : AppColor.line)
+                .frame(height: 1)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+
+            HStack(spacing: 8) {
+                ForEach(Self.contentSuggestions, id: \.self) { suggestion in
+                    Button {
+                        content = suggestion
+                    } label: {
+                        Text(suggestion)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(AppColor.payMuted)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .overlay { Capsule().strokeBorder(AppColor.line, lineWidth: 1) }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!contentEditable)
+                }
+            }
+        }
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        Group {
+            if amountEditable && isAmountFocused {
+                NumericKeypad(
+                    onDigit: pushDigit,
+                    onBackspace: backspaceDigit,
+                    onNext: { isAmountFocused = false },
+                    nextTitle: "Xong"
+                )
+            } else {
+                continueButton
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+            }
+        }
+    }
+
+    private var continueButton: some View {
+        Button {
+            startTransfer()
+        } label: {
+            HStack(spacing: 10) {
+                Text("TIẾP TỤC")
+                    .font(.system(size: 14, weight: .bold))
+                    .tracking(1.2)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(canContinue ? .white : AppColor.payMuted)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(canContinue ? AppColor.brand : AppColor.bgSoft)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!canContinue || isSubmitting)
+    }
+
+    // MARK: - Nhập số tiền (bàn phím tự vẽ)
+
+    private func pushDigit(_ s: String) {
+        guard amountEditable else { return }
+        let current = amount == 0 ? "" : String(amount)
+        let next = String((current + s).filter(\.isNumber).drop(while: { $0 == "0" }).prefix(9))
+        amount = min(Int64(next) ?? 0, Self.maxAmount)
+    }
+
+    private func backspaceDigit() {
+        guard amountEditable else { return }
+        let current = amount == 0 ? "" : String(amount)
+        amount = Int64(String(current.dropLast())) ?? 0
+    }
+
+    private func setAccType(_ type: Int) {
+        guard accType != type else { return }
+        accType = type
+        holderName = ""; lookupError = nil; lastLookedUp = nil
+        if accountNumber.count >= 4, selectedBin != nil { runLookupIfNeeded() }
+    }
+
+    // MARK: - Tra cứu tên chủ tài khoản
 
     private func runLookupIfNeeded() {
-        guard let bin = selectedBin, accountNumber.count >= 4 else { return }
+        guard !recipientLocked, let bin = selectedBin, accountNumber.count >= 4 else { return }
+        guard let bankNo = Int(bin) else {
+            lookupError = "Mã ngân hàng không hợp lệ"
+            return
+        }
         let key = (bin, accountNumber, accType)
         if let lastLookedUp, lastLookedUp == key { return }
         lastLookedUp = key
-        lookupError = nil
+        holderName = ""; lookupError = nil
         Task {
             isLookingUp = true
             defer { isLookingUp = false }
             do {
-                holderName = try await BankService.lookupAccount(bin: bin, accountNumber: accountNumber)
+                holderName = try await TransferService.verifyBeneficiary(
+                    VerifyBeneficiaryRequest(accNo: accountNumber, bankNo: bankNo, accType: accType)
+                )
             } catch let error as APIError {
-                holderName = ""
                 lookupError = error.message
             } catch {
-                holderName = ""
-                lookupError = "Không tra cứu được tên chủ tài khoản"
+                lookupError = "Không tra cứu được tài khoản"
             }
+        }
+    }
+
+    // MARK: - Submit
+
+    private func startTransfer() {
+        guard amount <= Self.maxAmountPerTransfer else {
+            transferError = "Số tiền chuyển tối đa 1 lần là 10.000.000đ"
+            return
+        }
+        Task { await submitTransfer() }
+    }
+
+    private func submitTransfer() async {
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        let request = TransferToBankRequest(
+            idempotencyKey: idempotencyKey,
+            accNo: accountNumber, accType: accType, bankNo: selectedBin ?? "",
+            accName: holderName, transAmount: Int(amount), memo: effectiveContent
+        )
+
+        do {
+            let result = try await TransferService.transferToBank(request)
+            await handleResult(result)
+        } catch let error as APIError {
+            transferError = error.message
+        } catch {
+            transferError = "Đã có lỗi xảy ra, vui lòng thử lại"
+        }
+    }
+
+    private func submitPin(_ pin: String) async {
+        guard let transactionId = pendingTransactionId else { return }
+        do {
+            let result = try await TransferService.verifyTransfer(
+                VerifyTransferRequest(password: pin, transactionId: transactionId)
+            )
+            await handleResult(result)
+        } catch let error as APIError {
+            pinError = error.message
+        } catch {
+            pinError = "Đã có lỗi xảy ra, vui lòng thử lại"
+        }
+    }
+
+    private func handleResult(_ result: TransferResult) async {
+        if result.isPending, let transactionId = result.transactionId {
+            pendingTransactionId = transactionId
+            return
+        }
+        pendingTransactionId = nil
+        if let payLinkToken {
+            await PayLinkService.consume(reqToken: payLinkToken, txId: result.transId)
+        }
+        await WalletStore.shared.refresh(force: true)
+        onSuccess(
+            TransferSuccessInfo(
+                amount: amount, recipientName: holderName,
+                recipientDetail: "\(bankNameForSubmit) • \(accountNumber)",
+                noteLabel: "Nội dung", note: effectiveContent
+            )
+        )
+    }
+
+    // MARK: - Overlays (đang xử lý / lỗi)
+
+    private var submittingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.35).ignoresSafeArea()
+            VStack(spacing: 14) {
+                ProgressView().tint(AppColor.brand).scaleEffect(1.3)
+                Text("Đang xử lý giao dịch...")
+                    .font(AppFont.beVietnamPro(13.5, .medium))
+                    .foregroundStyle(AppColor.payInk)
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    private func errorOverlay(_ message: String) -> some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { transferError = nil }
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(AppColor.error)
+                Text("Giao dịch không thành công")
+                    .font(AppFont.beVietnamPro(15, .bold))
+                    .foregroundStyle(AppColor.payInk)
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundStyle(AppColor.payMuted)
+                    .multilineTextAlignment(.center)
+                Button {
+                    transferError = nil
+                } label: {
+                    Text("ĐÓNG")
+                        .font(.system(size: 14, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(AppColor.brand)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 22)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 40)
         }
     }
 }
 
-/// Sheet "Xem tất cả" — danh sách đầy đủ, tìm kiếm không dấu (mirror BankTransferScreen.kt).
-/// Không `private` — tái dùng ở WithdrawView (chọn bank khi chưa liên kết).
+/// Con trỏ nhấp nháy tự vẽ cho ô STK/số tiền (không còn `TextField` hệ thống nên
+/// không có con trỏ thật). Timer chạy độc lập với vòng đời view — không dùng
+/// `withAnimation(.repeatForever)` vì bị huỷ mỗi lần view render lại khi gõ số.
+private struct BlinkingCaret: View {
+    let color: Color
+    var height: CGFloat = 20
+
+    @State private var visible = true
+    private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Rectangle()
+            .fill(color)
+            .frame(width: 2, height: height)
+            .opacity(visible ? 1 : 0)
+            .onReceive(timer) { _ in visible.toggle() }
+    }
+}
+
+/// Logo ngân hàng thật (ảnh mạng) kèm fallback khối màu brand + tên viết tắt.
+private struct BankLogoView: View {
+    let bank: Bank?
+    var size: CGFloat = 34
+
+    var body: some View {
+        Group {
+            if let bank {
+                if let urlString = bank.logoUrl, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let image) = phase {
+                            image.resizable().scaledToFit()
+                        } else {
+                            fallback(bank)
+                        }
+                    }
+                } else {
+                    fallback(bank)
+                }
+            } else {
+                Image(systemName: "building.columns")
+                    .font(.system(size: size * 0.5))
+                    .foregroundStyle(AppColor.payMuted)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+
+    private func fallback(_ bank: Bank) -> some View {
+        Circle()
+            .fill(bank.brandColor.flatMap(Color.init(hexString:)) ?? AppColor.brand)
+            .overlay {
+                Text(bank.shortName.prefix(4))
+                    .font(.system(size: size * 0.28, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+    }
+}
+
+private extension Color {
+    /// Mirror `Color.luminance() > 0.6f` bên Kotlin — quyết định chữ trắng/đen trên
+    /// nền brand-color của từng ngân hàng.
+    var isLight: Bool {
+        guard let components = UIColor(self).cgColor.components, components.count >= 3 else { return false }
+        let luminance = 0.2126 * components[0] + 0.7152 * components[1] + 0.0722 * components[2]
+        return luminance > 0.6
+    }
+}
+
+/// Sheet "Chọn ngân hàng" — danh sách đầy đủ, tìm kiếm không dấu (mirror
+/// ModalBottomSheet trong TransferScreen.kt). Không `private` — tái dùng ở WithdrawView.
 struct BankPickerSheet: View {
     let banks: [Bank]
     @Binding var selectedBin: String?
@@ -408,6 +954,7 @@ struct BankPickerSheet: View {
                             onDismiss()
                         } label: {
                             HStack(spacing: 12) {
+                                BankLogoView(bank: bank, size: 32)
                                 Text(bank.shortName)
                                     .font(AppFont.beVietnamPro(14, .semibold))
                                     .foregroundStyle(AppColor.payInk)
@@ -442,5 +989,5 @@ private extension String {
 }
 
 #Preview {
-    BankTransferView(onBack: {}, onContinue: { _ in })
+    BankTransferView(onBack: {}, onHome: {}, onSuccess: { _ in })
 }

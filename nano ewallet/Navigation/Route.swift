@@ -39,12 +39,13 @@ enum HomeRoute: Hashable {
     /// (Routes.LINKED_BANKS), không phải dialog "sắp có".
     case linkedBanks
 
-    /// Chuyển khoản ngân hàng — nhập tay (chọn bank + STK) hoặc đã có sẵn từ danh bạ.
+    /// Chuyển khoản ngân hàng — MỘT màn gộp người nhận + số tiền + nội dung.
+    /// `draft == nil`: nhập tay (chọn bank + gõ STK). `draft != nil`: người nhận đã
+    /// có sẵn (danh bạ / QR / pay link) — thẻ khoá, có thể kèm số tiền/nội dung cố định.
     case bankTransfer(draft: BankTransferDraft?)
     /// Chuyển ví-ví — nhập tay (username) hoặc đã có sẵn từ danh bạ.
     case walletTransfer(draft: WalletTransferDraft?)
-    /// Màn nhập số tiền/nội dung — người nhận đã xác thực xong ở màn trước.
-    case bankTransferAmount(BankTransferDraft)
+    /// Màn nhập số tiền/nội dung (luồng ví) — người nhận đã xác thực xong ở màn trước.
     case walletTransferAmount(WalletTransferDraft)
     /// Màn kết quả — giao dịch đã thực thi xong (SUCCESS hoặc PENDING đối soát).
     case transferSuccess(TransferSuccessInfo)
@@ -68,8 +69,8 @@ struct TransferSuccessInfo: Hashable {
     var note: String
 }
 
-/// Người nhận ngân hàng đã xác thực (hoặc đang chờ xác thực) — cầu nối giữa
-/// BankTransferView -> TransferAmountView, mirror `TransferDraft` bên Android.
+/// Người nhận ngân hàng đã xác thực sẵn (danh bạ / QR / pay link) truyền vào
+/// BankTransferView để khoá thẻ người nhận, mirror `TransferDraft` bên Android.
 struct BankTransferDraft: Hashable {
     var bin: String
     var bankName: String
