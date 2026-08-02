@@ -202,8 +202,12 @@ struct BankTransferView: View {
                 externalError: $pinError
             )
         }
-        .overlay { if isSubmitting { submittingOverlay } }
-        .overlay { if let transferError { errorOverlay(transferError) } }
+        .overlay { if isSubmitting { ProcessingOverlay() } }
+        .overlay {
+            if let transferError {
+                TransferErrorOverlay(message: transferError) { self.transferError = nil }
+            }
+        }
     }
 
     // MARK: - Header
@@ -776,62 +780,6 @@ struct BankTransferView: View {
         )
     }
 
-    // MARK: - Overlays (đang xử lý / lỗi)
-
-    private var submittingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.35).ignoresSafeArea()
-            VStack(spacing: 14) {
-                ProgressView().tint(AppColor.brand).scaleEffect(1.3)
-                Text("Đang xử lý giao dịch...")
-                    .font(AppFont.beVietnamPro(13.5, .medium))
-                    .foregroundStyle(AppColor.payInk)
-            }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-
-    private func errorOverlay(_ message: String) -> some View {
-        ZStack {
-            Color.black.opacity(0.35)
-                .ignoresSafeArea()
-                .onTapGesture { transferError = nil }
-            VStack(spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(AppColor.error)
-                Text("Giao dịch không thành công")
-                    .font(AppFont.beVietnamPro(15, .bold))
-                    .foregroundStyle(AppColor.payInk)
-                Text(message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColor.payMuted)
-                    .multilineTextAlignment(.center)
-                Button {
-                    transferError = nil
-                } label: {
-                    Text("ĐÓNG")
-                        .font(.system(size: 14, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(AppColor.brand)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 22)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .padding(.horizontal, 40)
-        }
-    }
 }
 
 /// Con trỏ nhấp nháy tự vẽ cho ô STK/số tiền (không còn `TextField` hệ thống nên

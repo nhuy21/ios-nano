@@ -67,6 +67,11 @@ struct TransferSuccessInfo: Hashable {
     var recipientDetail: String
     var noteLabel: String
     var note: String
+    /// Mã giao dịch thật từ Bảo Kim (`bk_trans_id`/`trans_id`). `nil` khi BE chưa
+    /// trả về — biên lai tự sinh mã giả để bố cục không khuyết dòng.
+    var transactionCode: String?
+    /// Thời gian xử lý thật (giây) để hiện "hoàn thành trong X giây". `nil` -> mặc định.
+    var elapsedSeconds: Double?
 }
 
 /// Người nhận ngân hàng đã xác thực sẵn (danh bạ / QR / pay link) truyền vào

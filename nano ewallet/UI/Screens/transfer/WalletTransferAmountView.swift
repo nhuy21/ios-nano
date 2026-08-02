@@ -105,9 +105,6 @@ struct WalletTransferAmountView: View {
                     if !alreadySaved {
                         saveToggle
                     }
-                    if let errorMessage {
-                        FieldError(message: errorMessage, alignment: .leading)
-                    }
                 }
                 .padding(16)
             }
@@ -145,6 +142,15 @@ struct WalletTransferAmountView: View {
                 onCancel: { pendingTransactionId = nil },
                 externalError: $pinError
             )
+        }
+        .overlay { if isSubmitting { ProcessingOverlay() } }
+        .overlay {
+            if let errorMessage {
+                // Bản Kotlin của luồng ví không có icon cảnh báo.
+                TransferErrorOverlay(message: errorMessage, showIcon: false) {
+                    self.errorMessage = nil
+                }
+            }
         }
     }
 

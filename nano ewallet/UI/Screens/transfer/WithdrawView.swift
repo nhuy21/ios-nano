@@ -99,9 +99,6 @@ struct WithdrawView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     destinationSection
                     amountSection
-                    if let errorMessage {
-                        FieldError(message: errorMessage, alignment: .leading)
-                    }
                 }
                 .padding(16)
             }
@@ -127,6 +124,14 @@ struct WithdrawView: View {
             )
         }
         .onChange(of: selectedBin) { _, _ in runLookupIfNeeded() }
+        .overlay { if isSubmitting { ProcessingOverlay() } }
+        .overlay {
+            if let errorMessage {
+                TransferErrorOverlay(message: errorMessage, showIcon: false) {
+                    self.errorMessage = nil
+                }
+            }
+        }
     }
 
     private var pendingTransactionIdBinding: Binding<Bool> {

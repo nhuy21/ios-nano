@@ -12,6 +12,7 @@ import SwiftUI
 import Combine
 import CoreImage.CIFilterBuiltins
 import UIKit
+import Photos
 
 @MainActor
 struct ReceiveQrView: View {
@@ -125,6 +126,34 @@ struct ReceiveQrView: View {
     /// napas 247 | Bảo Kim -> tên -> số ví -> "+ Thêm số tiền".
     private var billCard: some View {
         VStack(spacing: 0) {
+            billContent
+
+            Spacer().frame(height: 12)
+
+            Button {
+                amountInput = fixedAmount.map { $0.vndGrouped } ?? ""
+                showAmountSheet = true
+            } label: {
+                Text(fixedAmount != nil ? "+ Đổi số tiền" : "+ Thêm số tiền")
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(AppColor.brand)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 32)
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
+    }
+
+    /// Phần thẻ dùng chung cho cả màn hình lẫn ảnh lưu/chia sẻ — KHÔNG gồm nút
+    /// "Thêm số tiền" vì nút đó vô nghĩa trong ảnh gửi cho người khác.
+    private var billContent: some View {
+        VStack(spacing: 0) {
             Image("logo_vietqr")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -190,31 +219,30 @@ struct ReceiveQrView: View {
 
             if let fixedAmount {
                 Spacer().frame(height: 8)
-                Text(fixedAmount.vndFormatted)
+                Text("Số tiền: \(fixedAmount.vndFormatted)")
                     .font(AppFont.baloo2(22, .bold))
                     .foregroundStyle(AppColor.brand)
             }
-
-            Spacer().frame(height: 12)
-
-            Button {
-                amountInput = fixedAmount.map { $0.vndGrouped } ?? ""
-                showAmountSheet = true
-            } label: {
-                Text(fixedAmount != nil ? "+ Đổi số tiền" : "+ Thêm số tiền")
-                    .font(AppFont.beVietnamPro(15, .semibold))
-                    .foregroundStyle(AppColor.brand)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.vertical, 32)
-        .frame(maxWidth: .infinity)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
+    }
+
+    /// Ảnh xuất ra khi lưu/chia sẻ — mirror `buildQrBillBitmap` bên Kotlin: card trắng
+    /// đủ logo VietQR, khung QR, dải napas|Bảo Kim, tên và số ví. Trước đây xuất mã QR
+    /// TRẦN nên người nhận ảnh chỉ thấy ô vuông đen trắng, không biết ví của ai.
+    private var exportBill: some View {
+        billContent
+            .padding(.vertical, 32)
+            .padding(.horizontal, 24)
+            .frame(width: 340)
+            .background(Color.white)
+    }
+
+    /// `nil` khi chưa có số ví (chưa dựng được mã) — cùng điều kiện với `qrContent`.
+    private func renderQrBill() -> UIImage? {
+        guard qrContent != nil else { return nil }
+        let renderer = ImageRenderer(content: exportBill)
+        renderer.scale = 3
+        return renderer.uiImage
     }
 
     // MARK: - Action row
@@ -428,29 +456,43 @@ struct ReceiveQrView: View {
     // MARK: - Share / Save
 
     private func shareQr() {
-        guard let qrContent, let image = Self.qrImage(for: qrContent) else {
-            toastMessage = "Chưa có số ví để tạo mã"
-            hideToastLater()
+        guard let image = renderQrBill() else {
+            showToast("Chưa có số ví để tạo mã")
             return
         }
         shareItem = ShareableImage(image: image)
     }
 
+    /// Dùng `PHPhotoLibrary` thay `UIImageWriteToSavedPhotosAlbum(_, nil, nil, nil)`:
+    /// bản kia không có completion nên nuốt mọi lỗi — user từ chối quyền ảnh thì không
+    /// có gì được lưu nhưng vẫn hiện "Đã lưu mã QR vào thư viện".
     private func saveQr() {
-        guard let qrContent, let image = Self.qrImage(for: qrContent) else {
-            toastMessage = "Chưa có số ví để tạo mã"
-            hideToastLater()
+        guard let image = renderQrBill() else {
+            showToast("Chưa có số ví để tạo mã")
             return
         }
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        toastMessage = "Đã lưu mã QR vào thư viện"
-        hideToastLater()
+        Task {
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            guard status == .authorized || status == .limited else {
+                showToast("Cần quyền truy cập thư viện ảnh để lưu mã QR")
+                return
+            }
+            do {
+                try await PHPhotoLibrary.shared().performChanges {
+                    PHAssetChangeRequest.creationRequestForAsset(from: image)
+                }
+                showToast("Đã lưu mã QR vào thư viện")
+            } catch {
+                showToast("Lưu ảnh thất bại, vui lòng thử lại")
+            }
+        }
     }
 
-    private func hideToastLater() {
+    private func showToast(_ message: String) {
+        toastMessage = message
         Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            toastMessage = nil
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            if toastMessage == message { toastMessage = nil }
         }
     }
 
