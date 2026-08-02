@@ -98,6 +98,7 @@ struct WalletTransferAmountView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    sourceAccountCard
                     recipientCard
                     amountSection
                     messageSection
@@ -183,6 +184,12 @@ struct WalletTransferAmountView: View {
         )
     }
 
+    // MARK: - TK nguồn (ví của người gửi + số dư)
+
+    private var sourceAccountCard: some View {
+        SourceAccountCard(username: wallet.bkUsername, balance: wallet.balance)
+    }
+
     // MARK: - Người nhận (read-only)
 
     private var recipientCard: some View {
@@ -216,13 +223,6 @@ struct WalletTransferAmountView: View {
     /// vẽ ở dưới đảm nhiệm nên không dùng ô nhập của hệ thống nữa.
     private var amountSection: some View {
         VStack(spacing: 12) {
-            if let balance = wallet.balance {
-                Text("Số dư khả dụng: \(Int(balance).vndGrouped) VNĐ")
-                    .font(AppFont.beVietnamPro(13, .medium))
-                    .foregroundStyle(AppColor.payMuted)
-                    .frame(maxWidth: .infinity)
-            }
-
             Text(amountText.isEmpty ? "0đ" : "\(Int(amount).vndGrouped)đ")
                 .font(AppFont.baloo2(34, .bold))
                 .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)

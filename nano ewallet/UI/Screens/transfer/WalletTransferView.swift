@@ -273,11 +273,13 @@ struct WalletTransferView: View {
                 ForEach(recentWalletContacts.prefix(5)) { contact in
                     let name = contact.displayName
                     Button {
-                        username = contact.benUsername ?? ""
-                        verifiedName = contact.accName ?? name
-                        lastVerified = username
-                        errorMessage = nil
+                        // Người nhận đã lưu -> vào THẲNG màn nhập số tiền, không dừng
+                        // lại ở bước điền username rồi phải bấm "Tiếp tục".
                         beneficiaryStore.touch(id: contact.id)
+                        onContinue(WalletTransferDraft(
+                            username: contact.benUsername ?? "",
+                            holderName: contact.accName ?? name
+                        ))
                     } label: {
                         HStack(spacing: 12) {
                             Circle()
@@ -353,9 +355,24 @@ struct WalletTransferView: View {
             isVerifying = true
             defer { isVerifying = false }
             do {
-                verifiedName = try await TransferService.verifyBeneficiary(
+                let name = try await TransferService.verifyBeneficiary(
                     VerifyBeneficiaryRequest(benUsername: trimmed)
                 )
+                verifiedName = name
+                // Tắt cờ NGAY, trước khi chờ: `defer` chỉ chạy lúc kết thúc Task nên ô
+                // "Tên chủ ví" sẽ kẹt ở "Đang tra cứu..." suốt 700ms và người dùng
+                // không kịp thấy tên trước khi màn tự chuyển.
+                isVerifying = false
+
+                // Tra ra tên -> tự sang màn nhập số tiền sau ~700ms (đủ để nhìn xác
+                // nhận đúng người), không phải bấm "Tiếp tục". Chỉ chạy cho lượt tra
+                // cứu do người dùng nhập, không áp cho trường hợp mở màn với người
+                // nhận có sẵn.
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                guard username.trimmingCharacters(in: .whitespaces) == trimmed,
+                      verifiedName == name else { return }
+                isFocused = false
+                onContinue(WalletTransferDraft(username: trimmed, holderName: name))
             } catch let error as APIError {
                 errorMessage = error.message
             } catch {

@@ -15,6 +15,16 @@ struct VerifyBeneficiaryRequest: Encodable {
     var accNo: String?
     var bankNo: Int?
     var accType: Int?
+
+    /// BẮT BUỘC map snake_case: BE bật `forbidNonWhitelisted` nên field sai tên không
+    /// bị bỏ qua mà trả lỗi "property <tên> should not exist". Thiếu phần này thì tra
+    /// cứu tên chủ ví luôn thất bại dù username đúng.
+    enum CodingKeys: String, CodingKey {
+        case benUsername = "ben_username"
+        case accNo = "acc_no"
+        case bankNo = "bank_no"
+        case accType = "acc_type"
+    }
 }
 
 struct TransferToWalletRequest: Encodable {

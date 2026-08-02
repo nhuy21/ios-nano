@@ -131,8 +131,9 @@ struct HomeView: View {
         case .contacts:
             ContactsView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
+                // Chọn từ danh bạ = người nhận đã xác thực -> vào THẲNG màn nhập số tiền.
                 onPickForTransfer: { beneficiary in
-                    path.append(.bankTransfer(draft: BankTransferDraft(
+                    path.append(.bankTransferAmount(BankTransferDraft(
                         bin: beneficiary.bankNo ?? "",
                         bankName: BankCache.shared.bank(bin: beneficiary.bankNo)?.shortName ?? "Ngân hàng",
                         accNo: beneficiary.accNo ?? "", accType: 0,
@@ -141,7 +142,7 @@ struct HomeView: View {
                 },
                 onPickForWalletTransfer: { name, sub in
                     let username = sub.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
-                    path.append(.walletTransfer(draft: WalletTransferDraft(username: username, holderName: name)))
+                    path.append(.walletTransferAmount(WalletTransferDraft(username: username, holderName: name)))
                 },
                 onPickForRequest: { name, bkUsername in
                     path.append(.conversation(otherName: name, otherBkUsername: bkUsername))
@@ -654,14 +655,16 @@ struct HomeView: View {
         let name = beneficiary.displayName
         return Button {
             beneficiaryStore.touch(id: beneficiary.id)
+            // Người nhận đã lưu trong danh bạ nên thông tin đã đủ và đã xác thực —
+            // vào THẲNG màn nhập số tiền, bỏ qua bước chọn/nhập người nhận.
             switch beneficiary.type {
             case .wallet:
-                path.append(.walletTransfer(draft: WalletTransferDraft(
+                path.append(.walletTransferAmount(WalletTransferDraft(
                     username: beneficiary.benUsername ?? "",
                     holderName: beneficiary.accName ?? name
                 )))
             case .bankAccount:
-                path.append(.bankTransfer(draft: BankTransferDraft(
+                path.append(.bankTransferAmount(BankTransferDraft(
                     bin: beneficiary.bankNo ?? "",
                     bankName: BankCache.shared.bank(bin: beneficiary.bankNo)?.shortName ?? "Ngân hàng",
                     accNo: beneficiary.accNo ?? "", accType: 0,

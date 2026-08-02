@@ -298,11 +298,20 @@ struct BankTransferView: View {
         }
     }
 
+    /// Người nhận đã lưu trong danh bạ nên STK/tên đã xác thực — vào THẲNG màn nhập
+    /// số tiền thay vì chỉ điền vào form rồi bắt bấm "Tiếp tục".
     private func pick(_ contact: Beneficiary) {
         selectedBin = contact.bankNo
         accountNumber = contact.accNo ?? ""
         holderName = contact.accName ?? contact.displayName
         lastLookedUp = (contact.bankNo ?? "", contact.accNo ?? "", accType)
+
+        onContinue(BankTransferDraft(
+            bin: contact.bankNo ?? "",
+            bankName: BankCache.shared.bank(bin: contact.bankNo)?.shortName ?? "Ngân hàng",
+            accNo: contact.accNo ?? "", accType: accType,
+            holderName: contact.accName ?? contact.displayName
+        ))
     }
 
     // MARK: - Continue
