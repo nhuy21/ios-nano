@@ -13,18 +13,28 @@ import UIKit
 
 @MainActor
 struct HomeView: View {
+    /// Ngăn xếp điều hướng do `MainTabView` SỞ HỮU, không phải `@State` của màn này.
+    /// Lý do: chuyển sang tab Cá nhân là `HomeView` bị huỷ khỏi cây view (MainTabView
+    /// dùng `switch` chứ không phải `TabView`), state riêng sẽ mất theo. Deep link tới
+    /// lúc đó cần một ngăn xếp còn sống để đẩy màn vào.
+    @Binding var path: [HomeRoute]
+
     @StateObject private var wallet = WalletStore.shared
     @StateObject private var transactions = TransactionStore.shared
     @StateObject private var authStore = AuthStore.shared
-    @StateObject private var deepLinkStore = DeepLinkStore.shared
     @StateObject private var beneficiaryStore = BeneficiaryStore.shared
+    @StateObject private var notifications = NotificationStore.shared
 
     @State private var showBalance = false
     @State private var comingSoonFeature: String?
     @State private var detailTransaction: TransactionEntity?
-    @State private var path: [HomeRoute] = []
-    @State private var payLinkError: String?
     @State private var showTopupWithdrawChooser = false
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Home đang thật sự trước mắt người dùng: app ở foreground VÀ chưa push màn con nào.
+    /// Rời Home thì ngừng poll cho đỡ tốn pin/mạng — mirror `homeVisible` bên Kotlin.
+    private var isHomeVisible: Bool { scenePhase == .active && path.isEmpty }
 
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
@@ -40,21 +50,34 @@ struct HomeView: View {
                 }
         }
         .showsTabBar(path.isEmpty)
-        .onChange(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
-            guard let bkUsername = value else { return }
-            _ = deepLinkStore.consumeConversation()
-            path.append(.conversation(otherName: "", otherBkUsername: bkUsername))
+        // Poll gần realtime khi Home đang hiển thị — dự phòng cho lúc push FCM bị tắt
+        // hoặc tới chậm. Không có vòng này thì tiền vào ví lúc đang ngồi ở Home chỉ làm
+        // badge chuông nhảy, còn SỐ DƯ trên màn đứng yên cho tới khi mở lại app.
+        // `.task(id:)` tự huỷ khi `isHomeVisible` đổi -> rời Home là ngừng poll.
+        .task(id: isHomeVisible) {
+            guard isHomeVisible else { return }
+            while !Task.isCancelled {
+                // Chờ TRƯỚC rồi mới gọi: `.task` phía dưới vừa nạp lần đầu xong,
+                // gọi ngay ở đây là bắn trùng 2 request.
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                async let walletTask: Void = wallet.refresh(force: true)
+                async let txTask: Void = transactions.refreshRecent()
+                _ = await (walletTask, txTask)
+            }
         }
-        .onChange(of: deepLinkStore.pendingPayToken, initial: true) { _, value in
-            guard let token = value else { return }
-            _ = deepLinkStore.consumePayToken()
-            Task { await resolvePayLink(token: token) }
+        // Từ nền quay ra: làm mới NGAY cả 3, không chờ hết nhịp 8s — mirror nhánh
+        // ON_RESUME bên Kotlin.
+        .onChange(of: scenePhase) { previous, phase in
+            guard phase == .active, previous != .active else { return }
+            Task {
+                async let walletTask: Void = wallet.refresh(force: true)
+                async let txTask: Void = transactions.refreshRecent()
+                async let notifTask: Bool = notifications.refresh()
+                _ = await (walletTask, txTask, notifTask)
+            }
         }
-        .alert(
-            "Không mở được link nhận tiền", isPresented: payLinkErrorBinding,
-            actions: { Button("Đóng", role: .cancel) {} },
-            message: { Text(payLinkError ?? "") }
-        )
+        // Deep link (pay link / push xin tiền) KHÔNG quan sát ở đây — xem MainTabView.
         // Dialog tuỳ biến (không dùng confirmationDialog) để giữ icon + dòng mô tả
         // như Android — menu hệ thống chỉ hiện được mỗi tiêu đề nút.
         .fullScreenCover(isPresented: $showTopupWithdrawChooser) {
@@ -81,51 +104,18 @@ struct HomeView: View {
         }
     }
 
-    private var payLinkErrorBinding: Binding<Bool> {
-        Binding(get: { payLinkError != nil }, set: { if !$0 { payLinkError = nil } })
-    }
-
-    /// App tự động điền (prefill) trực tiếp vào màn chuyển khoản có sẵn sau khi resolve
-    /// — mirror MainActivity.kt: KHÔNG có màn "xác nhận thanh toán qua link" riêng.
-    private func resolvePayLink(token: String) async {
-        do {
-            let info = try await PayLinkService.resolve(reqToken: token)
-            switch info.payKind {
-            case .bank:
-                guard let accNo = info.accNo, let bankNo = info.bankNo else {
-                    payLinkError = "Link nhận tiền không hợp lệ"
-                    return
-                }
-                let bankName = BankCache.shared.bank(bin: bankNo)?.shortName ?? info.bankShortName ?? "Ngân hàng"
-                path.append(.bankTransfer(draft: BankTransferDraft(
-                    bin: bankNo, bankName: bankName, accNo: accNo, accType: 0,
-                    holderName: info.accName ?? "Người nhận",
-                    prefillAmount: info.amountValue, prefillContent: info.note,
-                    amountEditable: info.amountValue == nil,
-                    contentEditable: (info.note?.isEmpty ?? true),
-                    payLinkToken: token
-                )))
-            case .wallet:
-                guard let benUsername = info.benUsername else {
-                    payLinkError = "Link nhận tiền không hợp lệ"
-                    return
-                }
-                path.append(.walletTransferAmount(WalletTransferDraft(
-                    username: benUsername, holderName: info.accName ?? benUsername, payLinkToken: token
-                )))
-            }
-        } catch let error as APIError {
-            payLinkError = error.message
-        } catch {
-            payLinkError = "Không mở được link nhận tiền"
-        }
-    }
-
     @ViewBuilder
     private func destination(for route: HomeRoute) -> some View {
         switch route {
         case .history:
             HistoryView(onBack: { if !path.isEmpty { path.removeLast() } })
+        case .notifications:
+            NotificationsView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onOpenConversation: { bkUsername in
+                    path.append(.conversation(otherName: "", otherBkUsername: bkUsername))
+                }
+            )
         case .linkedBanks:
             LinkedBanksView(onBack: { if !path.isEmpty { path.removeLast() } })
         case .contacts:
@@ -231,7 +221,9 @@ struct HomeView: View {
             // Danh bạ "Chuyển tiền nhanh": vẽ ngay từ cache, refresh nền — mirror
             // BeneficiaryCache.refresh() chạy song song bên Android.
             async let contactsTask: [Beneficiary] = beneficiaryStore.get()
-            _ = await (walletTask, txTask, contactsTask)
+            // Badge chuông phải đúng ngay khi mở Home, không đợi nhịp poll kế tiếp.
+            async let notifTask: Bool = notifications.refresh()
+            _ = await (walletTask, txTask, contactsTask, notifTask)
         }
     }
 
@@ -266,7 +258,7 @@ struct HomeView: View {
 
             ZStack(alignment: .topTrailing) {
                 Button {
-                    comingSoonFeature = "Thông báo"
+                    path.append(.notifications)
                 } label: {
                     TransactionIcon(kind: .notificationBell, tint: AppColor.payInk)
                         .frame(width: 18, height: 18)
@@ -275,10 +267,17 @@ struct HomeView: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                Circle()
-                    .fill(AppColor.error)
-                    .frame(width: 8, height: 8)
-                    .offset(x: -2, y: 2)
+                // Chấm đỏ chỉ hiện khi CÓ thông báo chưa đọc thật — trước đây vẽ cứng
+                // nên lúc nào cũng đỏ, người dùng không phân biệt được có gì mới hay không.
+                if notifications.unreadCount > 0 {
+                    Text(notifications.unreadCount > 9 ? "9+" : "\(notifications.unreadCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 4)
+                        .frame(minWidth: 16, minHeight: 16)
+                        .background(AppColor.error, in: Capsule())
+                        .offset(x: 2, y: -2)
+                }
             }
         }
         .padding(.horizontal, 22)
@@ -831,17 +830,13 @@ struct HomeView: View {
             ?? ISO8601DateFormatter.standard.date(from: iso) else {
             return iso
         }
-        if Calendar.current.isDateInToday(date) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: date)
+        if Calendar.app.isDateInToday(date) {
+            return DateFormatter.app("HH:mm").string(from: date)
         }
-        if Calendar.current.isDateInYesterday(date) {
+        if Calendar.app.isDateInYesterday(date) {
             return "Hôm qua"
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM"
-        return formatter.string(from: date)
+        return DateFormatter.app("dd/MM").string(from: date)
     }
 
     // MARK: - Derived
@@ -854,5 +849,5 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(path: .constant([]))
 }

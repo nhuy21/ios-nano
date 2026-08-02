@@ -20,6 +20,15 @@ final class AppState: ObservableObject {
 
     /// Gọi 1 lần lúc Splash hiện lên.
     func bootstrap() async {
+        // Mở app hàng ngày (đã có phiên) thì mặc định vào màn quét QR — mirror
+        // `DeepLinkStore.requestDefaultQr()` trong callback Splash bên Android.
+        // Chỉ ĐẶT CỜ, không mở thẳng: deep link có thể tới sau vài nhịp, mở ngay sẽ đua
+        // và đè lên link nhận tiền. MainTabView quyết định sau khi chắc chắn không còn
+        // deep link nào chờ. `defer` để nhánh nào kết thúc ở `.authenticated` cũng chạy.
+        defer {
+            if root == .authenticated { DeepLinkStore.shared.requestDefaultQr() }
+        }
+
         let store = AuthStore.shared
         let lastPhone = store.lastPhone
 
@@ -92,6 +101,9 @@ final class AppState: ObservableObject {
 
     func logout() async {
         await AuthService.logout()
+        // Xoá hộp thư trong bộ nhớ — không xoá thì tài khoản đăng nhập sau sẽ thấy
+        // thông báo của tài khoản trước cho tới lần refresh kế tiếp.
+        NotificationStore.shared.clear()
         root = .unauthenticated(lastPhone: nil)
     }
 

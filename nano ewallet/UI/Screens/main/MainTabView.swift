@@ -23,6 +23,18 @@ struct MainTabView: View {
     /// Chỉ hiện thanh tab ở màn gốc Home/Settings — các màn con push lên thì ẩn.
     @State private var showTabBar = true
 
+    @StateObject private var deepLinkStore = DeepLinkStore.shared
+
+    /// Ngăn xếp của tab Home sống ở ĐÂY chứ không phải trong `HomeView`: view đó bị huỷ
+    /// mỗi khi sang tab Cá nhân (dùng `switch`, không phải `TabView`), nên deep link tới
+    /// lúc đó sẽ không có chỗ nào để đẩy màn vào.
+    @State private var homePath: [HomeRoute] = []
+    @State private var payLinkError: String?
+
+    private var payLinkErrorBinding: Binding<Bool> {
+        Binding(get: { payLinkError != nil }, set: { if !$0 { payLinkError = nil } })
+    }
+
     // Mirror hằng số navbar trong MainScreen.kt.
     private static let barHeight: CGFloat = 66
     private static let pillRadius: CGFloat = 32
@@ -48,7 +60,7 @@ struct MainTabView: View {
                 switch selectedTab {
                 case .home:
                     // HomeView tự sở hữu NavigationStack riêng (push History/Contacts).
-                    HomeView()
+                    HomeView(path: $homePath)
                 case .settings:
                     // SettingsView tự sở hữu NavigationStack riêng (cần push nhiều
                     // route con: Security -> ChangePassword/Devices...).
@@ -61,7 +73,39 @@ struct MainTabView: View {
                 floatingTabBar
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
         }
+        // Theo dõi thông báo khi app foreground (poll + làm mới badge/hộp thư).
+        // KHÔNG hiện banner trong app: `willPresent` đã trả `.banner` nên iOS tự hiện
+        // banner hệ thống ngay cả lúc app đang mở — thêm banner tự vẽ nữa là hiện TRÙNG
+        // hai cái. Bản Android từng mắc đúng lỗi này rồi gỡ bỏ (xem MainActivity.kt).
+        .notificationWatcher()
+        // Mở app hàng ngày -> vào thẳng màn quét QR. CHỈ mở khi không còn deep link nào
+        // chờ, nếu không sẽ đè lên link nhận tiền mà người dùng vừa bấm.
+        // `initial: true` vì cờ có thể được bật TRƯỚC khi view này xuất hiện (bootstrap
+        // chạy ở Splash) — thiếu nó thì onChange không bao giờ khớp và QR không mở.
+        .onChange(of: deepLinkStore.pendingDefaultQr, initial: true) { _, pending in
+            guard pending, !deepLinkStore.hasPendingDeepLink else { return }
+            deepLinkStore.consumeDefaultQr()
+            showQrScan = true
+        }
+        // Push "xin tiền" -> mở thẳng màn Cuộc thoại. Quan sát ở đây (gốc, luôn sống)
+        // thay vì trong HomeView, để bấm push lúc đang ở tab Cá nhân vẫn mở được.
+        .onChange(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
+            guard let bkUsername = value else { return }
+            _ = deepLinkStore.consumeConversation()
+            openOnHome(.conversation(otherName: "", otherBkUsername: bkUsername))
+        }
+        .onChange(of: deepLinkStore.pendingPayToken, initial: true) { _, value in
+            guard let token = value else { return }
+            _ = deepLinkStore.consumePayToken()
+            Task { await resolvePayLink(token: token) }
+        }
+        .alert(
+            "Không mở được link nhận tiền", isPresented: payLinkErrorBinding,
+            actions: { Button("Đóng", role: .cancel) {} },
+            message: { Text(payLinkError ?? "") }
+        )
         .onPreferenceChange(TabBarVisibilityKey.self) { visible in
             showTabBar = visible
         }
@@ -69,6 +113,56 @@ struct MainTabView: View {
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showQrScan) {
             QrScanNavigationView(onDismiss: { showQrScan = false })
+        }
+    }
+
+    // MARK: - Deep link
+
+    /// Đẩy màn vào ngăn xếp Home. PHẢI chuyển tab trước: `HomeView` chỉ được dựng khi
+    /// `selectedTab == .home`, đẩy route lúc đang ở tab Cá nhân thì không ai hiển thị nó.
+    /// Đóng luôn màn quét QR nếu đang mở, tránh nó che mất màn vừa đẩy.
+    private func openOnHome(_ route: HomeRoute) {
+        showQrScan = false
+        selectedTab = .home
+        homePath.append(route)
+    }
+
+    /// App tự điền sẵn vào màn chuyển tiền sau khi resolve — mirror MainActivity.kt:
+    /// KHÔNG có màn "xác nhận thanh toán qua link" riêng.
+    private func resolvePayLink(token: String) async {
+        do {
+            let info = try await PayLinkService.resolve(reqToken: token)
+            switch info.payKind {
+            case .bank:
+                guard let accNo = info.accNo, let bankNo = info.bankNo else {
+                    payLinkError = "Link nhận tiền không hợp lệ"
+                    return
+                }
+                let bankName = BankCache.shared.bank(bin: bankNo)?.shortName
+                    ?? info.bankShortName ?? "Ngân hàng"
+                openOnHome(.bankTransfer(draft: BankTransferDraft(
+                    bin: bankNo, bankName: bankName, accNo: accNo, accType: 0,
+                    holderName: info.accName ?? "Người nhận",
+                    prefillAmount: info.amountValue, prefillContent: info.note,
+                    amountEditable: info.amountValue == nil,
+                    contentEditable: (info.note?.isEmpty ?? true),
+                    payLinkToken: token
+                )))
+            case .wallet:
+                guard let benUsername = info.benUsername else {
+                    payLinkError = "Link nhận tiền không hợp lệ"
+                    return
+                }
+                openOnHome(.walletTransferAmount(WalletTransferDraft(
+                    username: benUsername,
+                    holderName: info.accName ?? benUsername,
+                    payLinkToken: token
+                )))
+            }
+        } catch let error as APIError {
+            payLinkError = error.message
+        } catch {
+            payLinkError = "Không mở được link nhận tiền"
         }
     }
 

@@ -21,6 +21,18 @@ final class DeepLinkStore: ObservableObject {
     /// Mở màn hội thoại xin tiền với 1 người (từ push MONEY_REQUEST).
     @Published private(set) var pendingConversationBkUsername: String?
 
+    /// Mở app hàng ngày (không có deep link) -> mặc định vào màn quét QR.
+    ///
+    /// Đặt CỜ thay vì điều hướng thẳng lúc bootstrap xong: deep link có thể tới sau vài
+    /// nhịp, điều hướng ngay sẽ đua nhau và ra kết quả khác nhau tuỳ máy nhanh/chậm.
+    /// Nơi quan sát chỉ mở QR khi chắc chắn không còn deep link nào chờ.
+    @Published private(set) var pendingDefaultQr = false
+
+    /// Còn deep link nào đang chờ xử lý không — dùng để QR không đè lên link nhận tiền.
+    var hasPendingDeepLink: Bool {
+        pendingPayToken != nil || pendingConversationBkUsername != nil
+    }
+
     // MARK: - Phát
 
     /// Nhận URL từ Universal Link / custom scheme. Trả false nếu không phải link của app.
@@ -39,6 +51,10 @@ final class DeepLinkStore: ObservableObject {
         pendingConversationBkUsername = bkUsername
     }
 
+    func requestDefaultQr() {
+        pendingDefaultQr = true
+    }
+
     // MARK: - Tiêu thụ (lấy 1 lần)
 
     func consumePayToken() -> String? {
@@ -49,6 +65,12 @@ final class DeepLinkStore: ObservableObject {
     func consumeConversation() -> String? {
         defer { pendingConversationBkUsername = nil }
         return pendingConversationBkUsername
+    }
+
+    @discardableResult
+    func consumeDefaultQr() -> Bool {
+        defer { pendingDefaultQr = false }
+        return pendingDefaultQr
     }
 
     // MARK: - Private
