@@ -38,6 +38,7 @@ struct SettingsView: View {
 
     @State private var pushEnabled = NotificationPrefs.isEnabled
     @State private var speakOnReceiveEnabled = NotificationPrefs.speakOnReceiveEnabled
+    @State private var showPushDeniedAlert = false
     @State private var path: [SettingsRoute] = []
 
     private var showingComingSoon: Binding<Bool> {
@@ -82,6 +83,16 @@ struct SettingsView: View {
             SupportSheet(onDismiss: { showSupportDialog = false })
                 .presentationDetents([.height(320)])
         }
+        .alert("Thông báo đang bị chặn", isPresented: $showPushDeniedAlert) {
+            Button("Để sau", role: .cancel) {}
+            Button("Mở Cài đặt") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+        } message: {
+            Text("Bạn đã tắt quyền thông báo cho ứng dụng ở Cài đặt iOS. Hãy bật lại để nhận thông báo biến động số dư.")
+        }
     }
 
     private var settingsScrollContent: some View {
@@ -107,11 +118,20 @@ struct SettingsView: View {
                         systemImage: "bell.fill",
                         isOn: $pushEnabled
                     ) { enabled in
-                        NotificationPrefs.isEnabled = enabled
-                        if enabled {
-                            PushRegistrar.shared.syncCurrentToken()
-                        } else {
+                        guard enabled else {
+                            NotificationPrefs.isEnabled = false
                             Task { await PushRegistrar.shared.unregister() }
+                            return
+                        }
+                        Task {
+                            // `enablePush` tự set NotificationPrefs khi thành công.
+                            if await PushRegistrar.shared.enablePush() == .deniedInSystemSettings {
+                                // Trả toggle về TẮT — để nó xanh là nói dối, iOS đang
+                                // chặn hiển thị nên sẽ không có thông báo nào tới.
+                                pushEnabled = false
+                                NotificationPrefs.isEnabled = false
+                                showPushDeniedAlert = true
+                            }
                         }
                     }
                     divider
@@ -121,6 +141,9 @@ struct SettingsView: View {
                         isOn: $speakOnReceiveEnabled
                     ) { enabled in
                         NotificationPrefs.speakOnReceiveEnabled = enabled
+                        // Đọc thử ngay khi bật — người dùng biết loa có kêu thật không,
+                        // thay vì phải chờ tới lúc có tiền vào mới phát hiện hỏng.
+                        if enabled { TtsAnnouncer.shared.announceEnabled() }
                     }
                 }
 

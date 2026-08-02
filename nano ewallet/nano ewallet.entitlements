@@ -9,9 +9,12 @@
         <string>applinks:nano.casso.dev</string>
     </array>
 
-    <!-- Push Notifications (APNs) — tương ứng POST_NOTIFICATIONS -->
+    <!-- Push Notifications (APNs) — tương ứng POST_NOTIFICATIONS.
+         Lấy theo build setting APS_ENVIRONMENT: Debug = development (APNs sandbox),
+         Release = production. KHÔNG ghi cứng "production" ở đây — profile Development
+         chỉ cho phép "development", ghi cứng sẽ làm bản Debug ký lỗi. -->
     <key>aps-environment</key>
-    <string>development</string>
+    <string>$(APS_ENVIRONMENT)</string>
 
     <!-- NFC Tag Reading — tương ứng android.hardware.nfc -->
     <key>com.apple.developer.nfc.readersession.formats</key>

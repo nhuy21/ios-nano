@@ -35,6 +35,8 @@ enum SettingsRoute: Hashable {
 enum HomeRoute: Hashable {
     case history
     case contacts
+    /// Hộp thư thông báo — mirror NotificationScreen.kt.
+    case notifications
     /// Nút "Liên kết" trên balance card — Android mở thẳng màn ngân hàng liên kết
     /// (Routes.LINKED_BANKS), không phải dialog "sắp có".
     case linkedBanks

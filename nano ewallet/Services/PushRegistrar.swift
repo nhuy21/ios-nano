@@ -36,7 +36,15 @@ final class PushRegistrar {
     /// Fire-and-forget giống Android (lỗi chỉ log, không chặn UI, best-effort).
     func onFcmTokenRefresh(_ token: String?) {
         guard let token, !token.isEmpty else { return }
+        // User đã tắt thông báo -> KHÔNG đăng ký lại. Thiếu guard này thì mỗi lần
+        // Firebase refresh token (hoặc chỉ cần mở lại app) là device tự đăng ký lại lên
+        // BE, push quay về dù công tắc vẫn đang tắt. Mirror `onNewToken` bên Android.
+        guard NotificationPrefs.isEnabled else { return }
         Task { @MainActor in
+            // Chưa đăng nhập thì chưa có ví để gắn token — gọi lên sẽ nhận 401 và chỉ
+            // tổ làm nhiễu log. Token sẽ được đăng ký lại sau khi login qua
+            // `syncCurrentToken()`. Mirror guard `getAccessToken() == null` bên Android.
+            guard AuthStore.shared.accessToken != nil else { return }
             let deviceId = AuthStore.shared.getOrCreateDeviceId()
             let body = RegisterDeviceRequest(token: token, deviceId: deviceId)
             do {
@@ -52,6 +60,38 @@ final class PushRegistrar {
         let deviceId = AuthStore.shared.getOrCreateDeviceId()
         let body = UnregisterDeviceRequest(deviceId: deviceId)
         try? await APIClient.shared.requestVoid(.post, "devices/unregister", body: body, auth: true)
+    }
+
+    /// Kết quả bật push từ màn Cài đặt.
+    enum EnableResult {
+        case enabled
+        /// User đã từ chối quyền ở cấp hệ thống — app không tự xin lại được, phải vào
+        /// Cài đặt iOS. Đăng ký token lúc này vô nghĩa vì iOS chặn hiển thị.
+        case deniedInSystemSettings
+    }
+
+    /// Bật push từ toggle trong Cài đặt. Kiểm tra quyền TRƯỚC khi đăng ký token — nếu
+    /// chỉ gọi `syncCurrentToken()` như trước thì token vẫn lên BE, toggle vẫn xanh,
+    /// nhưng iOS chặn hiển thị nên người dùng không nhận được thông báo nào.
+    @MainActor
+    func enablePush() async -> EnableResult {
+        let center = UNUserNotificationCenter.current()
+        let status = await center.notificationSettings().authorizationStatus
+
+        switch status {
+        case .notDetermined:
+            let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            guard granted else { return .deniedInSystemSettings }
+        case .denied:
+            return .deniedInSystemSettings
+        default:
+            break
+        }
+
+        NotificationPrefs.isEnabled = true
+        UIApplication.shared.registerForRemoteNotifications()
+        syncCurrentToken()
+        return .enabled
     }
 
     /// Lấy FCM token hiện tại (dùng khi bật lại push trong Settings).
