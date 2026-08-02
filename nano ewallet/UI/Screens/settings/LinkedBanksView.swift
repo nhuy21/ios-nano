@@ -203,9 +203,7 @@ struct LinkedBanksView: View {
     /// Không parse được / chưa có `bankLinkedAt` thì lấy ngày hôm nay —
     /// mirror `fmtLinkedDate()` bên Android (fallback `LocalDate.now()`).
     private var formattedLinkedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM/yyyy"
-        formatter.locale = Locale(identifier: "vi_VN")
+        let formatter = DateFormatter.app("dd/MM/yyyy")
 
         guard let iso = wallet.bankLinkedAt else {
             return formatter.string(from: Date())
@@ -215,8 +213,7 @@ struct LinkedBanksView: View {
             return formatter.string(from: date)
         }
         // Chuỗi không đúng ISO-8601: thử lấy 10 ký tự đầu dạng "yyyy-MM-dd".
-        let dayOnly = DateFormatter()
-        dayOnly.dateFormat = "yyyy-MM-dd"
+        let dayOnly = DateFormatter.app("yyyy-MM-dd")
         if let date = dayOnly.date(from: String(iso.prefix(10))) {
             return formatter.string(from: date)
         }

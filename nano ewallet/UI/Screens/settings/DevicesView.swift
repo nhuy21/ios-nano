@@ -133,18 +133,16 @@ struct DevicesView: View {
             ?? ISO8601DateFormatter.standard.date(from: iso) else {
             return iso
         }
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm"
+        let timeFormatter = DateFormatter.app("HH:mm")
         let time = timeFormatter.string(from: date)
 
-        if Calendar.current.isDateInToday(date) {
+        if Calendar.app.isDateInToday(date) {
             return "Hôm nay lúc \(time)"
         }
-        if Calendar.current.isDateInYesterday(date) {
+        if Calendar.app.isDateInYesterday(date) {
             return "Hôm qua lúc \(time)"
         }
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "dd-MM-yyyy"
+        let dateFormatter = DateFormatter.app("dd-MM-yyyy")
         return "\(dateFormatter.string(from: date)) lúc \(time)"
     }
 }

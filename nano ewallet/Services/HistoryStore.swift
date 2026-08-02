@@ -111,16 +111,16 @@ final class HistoryStore: ObservableObject {
     }
 
     private static func startOfDayISO(_ date: Date) -> String {
-        let start = Calendar.current.startOfDay(for: date)
+        let start = Calendar.app.startOfDay(for: date)
         return ISO8601DateFormatter.withFractionalSeconds.string(from: start)
     }
 
     private static func endOfDayISO(_ date: Date) -> String {
-        var components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        var components = Calendar.app.dateComponents([.year, .month, .day], from: date)
         components.hour = 23
         components.minute = 59
         components.second = 59
-        let end = Calendar.current.date(from: components) ?? date
+        let end = Calendar.app.date(from: components) ?? date
         return ISO8601DateFormatter.withFractionalSeconds.string(from: end)
     }
 }

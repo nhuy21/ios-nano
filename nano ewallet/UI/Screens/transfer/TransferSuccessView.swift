@@ -77,9 +77,7 @@ struct TransferSuccessView: View {
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "vi_VN")
-            formatter.dateFormat = "dd/MM/yyyy - HH:mm"
+            let formatter = DateFormatter.app("dd/MM/yyyy - HH:mm")
             timeText = formatter.string(from: Date())
         }
         .sheet(item: $shareImage) { item in

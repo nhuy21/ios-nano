@@ -135,9 +135,7 @@ struct TransactionDetailSheet: View {
             ?? ISO8601DateFormatter.standard.date(from: tx.createdAt) else {
             return tx.createdAt
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm • dd/MM/yyyy"
-        return formatter.string(from: date)
+        return DateFormatter.app("HH:mm • dd/MM/yyyy").string(from: date)
     }
 }
 

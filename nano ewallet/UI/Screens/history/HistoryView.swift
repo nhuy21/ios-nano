@@ -164,15 +164,13 @@ struct HistoryView: View {
     }
 
     private var rangeLabel: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM/yyyy"
-        let shortFormatter = DateFormatter()
-        shortFormatter.dateFormat = "dd/MM"
+        let formatter = DateFormatter.app("dd/MM/yyyy")
+        let shortFormatter = DateFormatter.app("dd/MM")
 
         switch (dateStart, dateEnd) {
         case (nil, nil):
             return "Mọi ngày"
-        case let (start?, end?) where Calendar.current.isDate(start, inSameDayAs: end):
+        case let (start?, end?) where Calendar.app.isDate(start, inSameDayAs: end):
             return formatter.string(from: start)
         case let (start?, end?):
             return "\(shortFormatter.string(from: start)) – \(formatter.string(from: end))"
@@ -424,19 +422,15 @@ struct HistoryView: View {
     }
 
     private func dayLabel(for date: Date) -> String {
-        if Calendar.current.isDateInToday(date) { return "Hôm nay" }
-        if Calendar.current.isDateInYesterday(date) { return "Hôm qua" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM/yyyy"
-        return formatter.string(from: date)
+        if Calendar.app.isDateInToday(date) { return "Hôm nay" }
+        if Calendar.app.isDateInYesterday(date) { return "Hôm qua" }
+        return DateFormatter.app("dd/MM/yyyy").string(from: date)
     }
 
     private func timeLabel(_ iso: String) -> String {
         guard let date = ISO8601DateFormatter.withFractionalSeconds.date(from: iso)
             ?? ISO8601DateFormatter.standard.date(from: iso) else { return iso }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return DateFormatter.app("HH:mm").string(from: date)
     }
 
     private func signedAmount(_ tx: TransactionEntity) -> String {

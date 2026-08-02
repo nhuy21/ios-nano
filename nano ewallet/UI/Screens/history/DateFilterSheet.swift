@@ -18,13 +18,13 @@ struct DateFilterSheet: View {
     @State private var customEnd: Date = Date()
 
     private var presets: [(label: String, start: Date?, end: Date?)] {
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = Calendar.app.startOfDay(for: Date())
         return [
             ("Tất cả", nil, nil),
             ("Hôm nay", today, today),
-            ("Hôm qua", Calendar.current.date(byAdding: .day, value: -1, to: today), Calendar.current.date(byAdding: .day, value: -1, to: today)),
-            ("7 ngày qua", Calendar.current.date(byAdding: .day, value: -6, to: today), today),
-            ("30 ngày qua", Calendar.current.date(byAdding: .day, value: -29, to: today), today),
+            ("Hôm qua", Calendar.app.date(byAdding: .day, value: -1, to: today), Calendar.app.date(byAdding: .day, value: -1, to: today)),
+            ("7 ngày qua", Calendar.app.date(byAdding: .day, value: -6, to: today), today),
+            ("30 ngày qua", Calendar.app.date(byAdding: .day, value: -29, to: today), today),
         ]
     }
 
@@ -59,24 +59,24 @@ struct DateFilterSheet: View {
             }
             .datePickerStyle(.compact)
             .onChange(of: customStart) { _, value in
-                if dateStart == nil || !Calendar.current.isDate(value, inSameDayAs: dateStart!) {
+                if dateStart == nil || !Calendar.app.isDate(value, inSameDayAs: dateStart!) {
                     dateStart = value
                 }
             }
             .onChange(of: customEnd) { _, value in
-                if dateEnd == nil || !Calendar.current.isDate(value, inSameDayAs: dateEnd!) {
+                if dateEnd == nil || !Calendar.app.isDate(value, inSameDayAs: dateEnd!) {
                     dateEnd = value
                 }
             }
             // Bấm preset -> đổ ngược vào 2 ô cho khớp. "Tất cả" (nil) giữ nguyên ngày
             // đang hiện, không ghi đè ngược lại bộ lọc.
             .onChange(of: dateStart) { _, value in
-                if let value, !Calendar.current.isDate(value, inSameDayAs: customStart) {
+                if let value, !Calendar.app.isDate(value, inSameDayAs: customStart) {
                     customStart = value
                 }
             }
             .onChange(of: dateEnd) { _, value in
-                if let value, !Calendar.current.isDate(value, inSameDayAs: customEnd) {
+                if let value, !Calendar.app.isDate(value, inSameDayAs: customEnd) {
                     customEnd = value
                 }
             }
@@ -91,7 +91,7 @@ struct DateFilterSheet: View {
         .onAppear {
             // Mở sheet: 2 ô hiện đúng khoảng đang lọc; chưa lọc thì mặc định 7 ngày qua.
             let today = Date()
-            customStart = dateStart ?? Calendar.current.date(byAdding: .day, value: -6, to: today) ?? today
+            customStart = dateStart ?? Calendar.app.date(byAdding: .day, value: -6, to: today) ?? today
             customEnd = dateEnd ?? today
         }
     }
@@ -129,8 +129,8 @@ private struct FlowChips: View {
     }
 
     private func isSelected(_ preset: (label: String, start: Date?, end: Date?)) -> Bool {
-        Calendar.current.isDate(dateStart, equalToDateOrNil: preset.start)
-            && Calendar.current.isDate(dateEnd, equalToDateOrNil: preset.end)
+        Calendar.app.isDate(dateStart, equalToDateOrNil: preset.start)
+            && Calendar.app.isDate(dateEnd, equalToDateOrNil: preset.end)
     }
 }
 
