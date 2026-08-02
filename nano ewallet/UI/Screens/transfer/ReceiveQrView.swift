@@ -198,7 +198,7 @@ struct ReceiveQrView: View {
             Spacer().frame(height: 12)
 
             Button {
-                amountInput = fixedAmount.map { String($0) } ?? ""
+                amountInput = fixedAmount.map { $0.vndGrouped } ?? ""
                 showAmountSheet = true
             } label: {
                 Text(fixedAmount != nil ? "+ Đổi số tiền" : "+ Thêm số tiền")
@@ -264,9 +264,10 @@ struct ReceiveQrView: View {
                 .foregroundStyle(AppColor.payInk)
 
             AppTextField(
-                text: amountFieldBinding, placeholder: "0",
-                keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
+                text: $amountInput, placeholder: "0",
+                keyboardType: .numberPad, submitLabel: .done
             )
+            .thousandsSeparated($amountInput)
             .padding(.horizontal, 20)
 
             HStack(spacing: 12) {
@@ -290,7 +291,7 @@ struct ReceiveQrView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    fixedAmount = Int(amountInput)
+                    fixedAmount = Int(amountInput.amountDigits)
                     showAmountSheet = false
                 } label: {
                     Text("Xong")
@@ -320,12 +321,6 @@ struct ReceiveQrView: View {
         )
     }
 
-    private var amountFieldBinding: Binding<String> {
-        Binding(
-            get: { amountInput },
-            set: { amountInput = String($0.filter(\.isNumber).prefix(9)) }
-        )
-    }
 
     // MARK: - Pay link sheet
 
@@ -344,9 +339,10 @@ struct ReceiveQrView: View {
                 .padding(.horizontal, 20)
 
             AppTextField(
-                text: payLinkAmountFieldBinding, placeholder: "0",
-                keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
+                text: $payLinkAmountInput, placeholder: "0",
+                keyboardType: .numberPad, submitLabel: .done
             )
+            .thousandsSeparated($payLinkAmountInput)
             .padding(.horizontal, 20)
 
             if let payLinkError {
@@ -410,12 +406,6 @@ struct ReceiveQrView: View {
         )
     }
 
-    private var payLinkAmountFieldBinding: Binding<String> {
-        Binding(
-            get: { payLinkAmountInput },
-            set: { payLinkAmountInput = String($0.filter(\.isNumber).prefix(9)) }
-        )
-    }
 
     private func createAndSharePayLink() async {
         guard !isCreatingPayLink else { return }
@@ -424,7 +414,7 @@ struct ReceiveQrView: View {
         defer { isCreatingPayLink = false }
         do {
             let result = try await PayLinkService.create(
-                CreatePayLinkRequest(amount: Int(payLinkAmountInput), note: nil)
+                CreatePayLinkRequest(amount: Int(payLinkAmountInput.amountDigits), note: nil)
             )
             showPayLinkSheet = false
             shareTextItem = ShareableText(text: "Chuyển tiền cho tôi qua Nano Wallet: \(result.url)")
@@ -475,7 +465,41 @@ struct ReceiveQrView: View {
         let scale = 640 / outputImage.extent.width
         let scaled = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
-        return UIImage(cgImage: cgImage)
+        return overlayVietQrMark(on: UIImage(cgImage: cgImage))
+    }
+
+    /// Vẽ logo "V" của VietQR vào chính giữa mã, trên một nền trắng bo tròn để tách khỏi
+    /// các ô đen xung quanh. An toàn vì mã đã dựng ở mức sửa lỗi H (~30%).
+    private static func overlayVietQrMark(on qr: UIImage) -> UIImage {
+        guard let mark = UIImage(named: "logo_vietqr_v") else { return qr }
+
+        let size = qr.size.width
+        let logoSize = size * 0.1
+        let pad = logoSize * 0.14
+        let center = CGPoint(x: size / 2, y: size / 2)
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { _ in
+            qr.draw(in: CGRect(x: 0, y: 0, width: size, height: size))
+
+            let half = logoSize / 2
+            let backdrop = CGRect(
+                x: center.x - half - pad, y: center.y - half - pad,
+                width: logoSize + pad * 2, height: logoSize + pad * 2
+            )
+            UIColor.white.setFill()
+            UIBezierPath(roundedRect: backdrop, cornerRadius: logoSize * 0.22).fill()
+
+            // Giữ tỉ lệ gốc của logo, canh giữa trong ô logoSize.
+            let ratio = mark.size.width / mark.size.height
+            let markSize = ratio >= 1
+                ? CGSize(width: logoSize, height: logoSize / ratio)
+                : CGSize(width: logoSize * ratio, height: logoSize)
+            mark.draw(in: CGRect(
+                x: center.x - markSize.width / 2, y: center.y - markSize.height / 2,
+                width: markSize.width, height: markSize.height
+            ))
+        }
     }
 }
 

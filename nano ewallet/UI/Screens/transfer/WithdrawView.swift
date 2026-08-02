@@ -58,7 +58,8 @@ struct WithdrawView: View {
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
 
-    private var amount: Int64 { Int64(amountText) ?? 0 }
+    /// `amountText` chứa chuỗi ĐÃ format ("1.000.000") nên phải lọc chữ số.
+    private var amount: Int64 { amountText.amountValue }
 
     private var isLinked: Bool {
         !(wallet.accNo ?? "").isEmpty && !(wallet.bankNo ?? "").isEmpty
@@ -358,7 +359,7 @@ struct WithdrawView: View {
             }
 
             HStack(spacing: 8) {
-                TextField("", text: amountFieldBinding, prompt: Text("Nhập số tiền")
+                TextField("", text: $amountText, prompt: Text("Nhập số tiền")
                     .font(AppFont.beVietnamPro(18))
                     .foregroundColor(WdColor.muted))
                     .font(AppFont.beVietnamPro(22, .bold))
@@ -366,6 +367,7 @@ struct WithdrawView: View {
                     .keyboardType(.numberPad)
                     .tint(WdColor.green)
                     .focused($isAmountFocused)
+                    .thousandsSeparated($amountText)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("VNĐ")
@@ -393,15 +395,6 @@ struct WithdrawView: View {
         }
     }
 
-    private var amountFieldBinding: Binding<String> {
-        Binding(
-            get: { amount > 0 ? Int(amount).vndFormatted.replacingOccurrences(of: " đ", with: "") : "" },
-            set: { newValue in
-                let digits = newValue.filter(\.isNumber)
-                amountText = String(digits.prefix(9))
-            }
-        )
-    }
 
     // MARK: - Continue
 

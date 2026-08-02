@@ -16,7 +16,7 @@ struct BankTransferAmountView: View {
     let onSuccess: (TransferSuccessInfo) -> Void
 
     /// Hạn mức 1 lần chuyển — mirror TransferScreen.kt. Nhập tối đa 9 chữ số
-    /// (chặn ở `amountFieldBinding.set`), số này chặn thêm ở mức hạn mức thật.
+    /// (chặn ở `thousandsSeparated`), số này chặn thêm ở mức hạn mức thật.
     private static let maxAmountPerTransfer: Int64 = 10_000_000
     private static let suggestions = ["Chuyển tiền", "Trả tiền ăn", "Gửi tặng"]
 
@@ -40,11 +40,12 @@ struct BankTransferAmountView: View {
         self.draft = draft
         self.onBack = onBack
         self.onSuccess = onSuccess
-        _amountText = State(initialValue: draft.prefillAmount.map { String($0) } ?? "")
+        _amountText = State(initialValue: draft.prefillAmount.map { Int($0).vndGrouped } ?? "")
         _memo = State(initialValue: draft.prefillContent ?? "")
     }
 
-    private var amount: Int64 { Int64(amountText) ?? 0 }
+    /// `amountText` chứa chuỗi ĐÃ format nên phải lọc chữ số.
+    private var amount: Int64 { amountText.amountValue }
 
     private var overLimit: Bool {
         if let balance = wallet.balance { return amount > balance }
@@ -160,14 +161,14 @@ struct BankTransferAmountView: View {
             FieldLabel(text: "Số tiền")
             if draft.amountEditable {
                 AppTextField(
-                    text: amountFieldBinding,
+                    text: $amountText,
                     placeholder: "0",
                     keyboardType: .numberPad,
                     submitLabel: .next,
-                    textAlignment: .leading,
-                    digitsOnly: true
+                    textAlignment: .leading
                 )
                 .focused($isAmountFocused)
+                .thousandsSeparated($amountText)
             } else {
                 lockedField(text: amount > 0 ? Int(amount).vndFormatted : "0")
             }
@@ -180,16 +181,6 @@ struct BankTransferAmountView: View {
         }
     }
 
-    /// Format hiển thị "1.234.567" trong lúc gõ — lưu raw digits ở `amountText`.
-    private var amountFieldBinding: Binding<String> {
-        Binding(
-            get: { amount > 0 ? Int(amount).vndFormatted.replacingOccurrences(of: " đ", with: "") : "" },
-            set: { newValue in
-                let digits = newValue.filter(\.isNumber)
-                amountText = String(digits.prefix(9))
-            }
-        )
-    }
 
     // MARK: - Nội dung
 

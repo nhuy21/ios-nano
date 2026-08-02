@@ -42,7 +42,8 @@ struct ConversationView: View {
         _displayName = State(initialValue: otherName)
     }
 
-    private var amount: Int64 { Int64(amountText) ?? 0 }
+    /// `amountText` chứa chuỗi ĐÃ format nên phải lọc chữ số.
+    private var amount: Int64 { amountText.amountValue }
 
     /// Gợi ý số tiền nhặt từ lời nhắn (regex đơn giản: "100k", "1tr", "100.000"...).
     private var suggestedAmount: Int64? {
@@ -223,7 +224,7 @@ struct ConversationView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let suggestedAmount, suggestedAmount > 0, suggestedAmount <= Self.maxRequestAmount, amountText.isEmpty {
                 Button {
-                    amountText = String(suggestedAmount)
+                    amountText = Int(suggestedAmount).vndGrouped
                 } label: {
                     Text("Dùng \(Int(suggestedAmount).vndFormatted)")
                         .font(.system(size: 13, weight: .semibold))
@@ -246,10 +247,11 @@ struct ConversationView: View {
 
             HStack(spacing: 10) {
                 AppTextField(
-                    text: amountFieldBinding, placeholder: "Số tiền",
-                    keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
+                    text: $amountText, placeholder: "Số tiền",
+                    keyboardType: .numberPad, submitLabel: .done
                 )
                 .focused($isAmountFocused)
+                .thousandsSeparated($amountText)
 
                 Button {
                     send()
@@ -274,12 +276,6 @@ struct ConversationView: View {
         .shadow(color: .black.opacity(0.06), radius: 8, y: -2)
     }
 
-    private var amountFieldBinding: Binding<String> {
-        Binding(
-            get: { amountText },
-            set: { newValue in amountText = String(newValue.filter(\.isNumber).prefix(9)) }
-        )
-    }
 
     // MARK: - Actions
 

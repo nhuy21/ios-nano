@@ -16,6 +16,8 @@ struct WalletTransferAmountView: View {
     let onSuccess: (TransferSuccessInfo) -> Void
 
     private static let maxAmountPerTransfer: Int64 = 10_000_000
+    /// 140 ký tự cho luồng ví (bank transfer dùng 250).
+    private static let maxMessageLength = 140
     private static let suggestions = ["Mình chuyển nhé", "Cảm ơn nha", "Chúc mừng"]
 
     @StateObject private var wallet = WalletStore.shared
@@ -265,26 +267,38 @@ struct WalletTransferAmountView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var amountFieldBinding: Binding<String> {
-        Binding(
-            get: { amount > 0 ? Int(amount).vndFormatted.replacingOccurrences(of: " đ", with: "") : "" },
-            set: { newValue in
-                let digits = newValue.filter(\.isNumber)
-                amountText = String(digits.prefix(9))
-            }
-        )
-    }
 
     // MARK: - Lời nhắn
 
+    /// Không bọc trong ô có viền: chỉ nhãn + bộ đếm ký tự ở trên, chữ trải rộng và
+    /// XUỐNG DÒNG được, gạch chân mảnh ở dưới.
     private var messageSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "Lời nhắn")
-            AppTextField(
-                text: $message, placeholder: "Nhập lời nhắn",
-                submitLabel: .done, maxLength: 140
-            )
-            .focused($isMessageFocused)
+            HStack {
+                Text("Nội dung chuyển tiền")
+                    .font(AppFont.beVietnamPro(14))
+                    .foregroundStyle(AppColor.payMuted)
+                Spacer()
+                Text("\(message.count)/\(Self.maxMessageLength)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(AppColor.payMuted)
+            }
+
+            TextField("Nhập nội dung chuyển tiền", text: $message, axis: .vertical)
+                .font(AppFont.beVietnamPro(17, .semibold))
+                .foregroundStyle(AppColor.payInk)
+                .tint(AppColor.brand)
+                .lineLimit(1...4)
+                .focused($isMessageFocused)
+                .onChange(of: message) { _, newValue in
+                    if newValue.count > Self.maxMessageLength {
+                        message = String(newValue.prefix(Self.maxMessageLength))
+                    }
+                }
+
+            Rectangle()
+                .fill(AppColor.line)
+                .frame(height: 1)
 
             HStack(spacing: 8) {
                 ForEach(Self.suggestions, id: \.self) { suggestion in
