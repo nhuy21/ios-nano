@@ -35,6 +35,7 @@ struct HomeView: View {
     @State private var showOneTouchPhotoPicker = false
     @State private var isResolvingOneTouch = false
     @State private var oneTouchError: String?
+    @State private var showVoiceCommand = false
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -146,6 +147,18 @@ struct HomeView: View {
             }
         }
         .overlay { if isResolvingOneTouch { ProcessingOverlay(message: "Đang nhận diện...") } }
+        .fullScreenCover(isPresented: $showVoiceCommand) {
+            VoiceCommandOverlay(
+                onDismiss: { showVoiceCommand = false },
+                onResolved: { draft in
+                    showVoiceCommand = false
+                    // Nghe ra người nhận -> vào THẲNG màn nhập tiền, số tiền điền sẵn
+                    // nếu bóc được. Vẫn phải xác nhận + PIN nên không tự chuyển tiền.
+                    path.append(.walletTransferAmount(draft))
+                }
+            )
+            .presentationBackground(.clear)
+        }
         .alert("Không nhận diện được", isPresented: oneTouchErrorBinding) {
             Button("Đóng", role: .cancel) {}
         } message: {
@@ -323,7 +336,7 @@ struct HomeView: View {
 
             Spacer()
 
-            iconButton(systemImage: "mic.fill") { comingSoonFeature = "Trợ lý giọng nói" }
+            iconButton(systemImage: "mic.fill") { showVoiceCommand = true }
 
             ZStack(alignment: .topTrailing) {
                 Button {
