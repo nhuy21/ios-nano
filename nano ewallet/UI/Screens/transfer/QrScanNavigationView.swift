@@ -19,6 +19,9 @@ private enum QrFlowRoute: Hashable {
 @MainActor
 struct QrScanNavigationView: View {
     let onDismiss: () -> Void
+    /// "Cấp cứu ví tui" — đóng modal QR rồi mở danh bạ trên tab Home, thay vì dựng
+    /// lại cả luồng chọn người nhận + cuộc thoại bên trong ngăn xếp QR.
+    var onEmergency: () -> Void = {}
 
     @State private var path: [QrFlowRoute] = []
 
@@ -27,7 +30,8 @@ struct QrScanNavigationView: View {
             QrScanView(
                 onBack: onDismiss,
                 onParsed: { draft in path.append(.bankTransfer(draft)) },
-                onReceiveQr: { path.append(.receiveQr) }
+                onReceiveQr: { path.append(.receiveQr) },
+                onEmergency: onEmergency
             )
             .hidesSystemNavigationBar()
             .navigationDestination(for: QrFlowRoute.self) { route in

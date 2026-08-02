@@ -112,7 +112,10 @@ struct MainTabView: View {
         .animation(.easeInOut(duration: 0.2), value: showTabBar)
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showQrScan) {
-            QrScanNavigationView(onDismiss: { showQrScan = false })
+            QrScanNavigationView(
+                onDismiss: { showQrScan = false },
+                onEmergency: { openOnHome(.contacts) }
+            )
         }
     }
 

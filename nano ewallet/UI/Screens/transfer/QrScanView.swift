@@ -21,6 +21,8 @@ struct QrScanView: View {
     let onBack: () -> Void
     let onParsed: (BankTransferDraft) -> Void
     let onReceiveQr: () -> Void
+    /// "Cấp cứu ví tui" — mở danh bạ ví ở chế độ xin tiền.
+    var onEmergency: () -> Void = {}
 
     @StateObject private var scanner = QrScannerController()
 
@@ -28,13 +30,26 @@ struct QrScanView: View {
     @State private var errorMessage: String?
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var lastHandledValue: String?
+    @State private var isDecodingImage = false
+    @State private var showOneTouchSoon = false
+
+    // Số đo lấy nguyên từ QrScanScreen.kt.
+    private static let frameSize: CGFloat = 310
+    private static let frameShiftUp: CGFloat = 25
+    private static let cornerLength: CGFloat = 34
+    private static let cornerThickness: CGFloat = 4
 
     var body: some View {
         ZStack {
-            CameraPreviewView(session: scanner.session)
-                .ignoresSafeArea()
+            if scanner.isPermissionDenied {
+                permissionPrompt
+            } else {
+                CameraPreviewView(session: scanner.session)
+                    .ignoresSafeArea()
+            }
 
             scrimOverlay
+            viewfinder
 
             VStack {
                 header
@@ -43,28 +58,40 @@ struct QrScanView: View {
                     Text(errorMessage)
                         .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(Color.black.opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .padding(.horizontal, 20)
                         .padding(.bottom, 12)
                 }
                 bottomBar
             }
 
+            // Chặn mọi thao tác tới khi backend trả kết quả — bấm tiếp lúc này chỉ tạo
+            // thêm lượt parse trùng.
             if isParsing {
-                Color.black.opacity(0.4).ignoresSafeArea()
-                VStack(spacing: 12) {
-                    ProgressView().tint(.white)
-                    Text("Đang xử lý...")
-                        .font(AppFont.beVietnamPro(14))
-                        .foregroundStyle(.white)
+                ZStack {
+                    Color.black.opacity(0.65).ignoresSafeArea()
+                    VStack(spacing: 14) {
+                        ProgressView().tint(AppColor.brand).scaleEffect(1.2)
+                        Text("Đang xử lý...")
+                            .font(AppFont.beVietnamPro(14, .medium))
+                            .foregroundStyle(.white)
+                    }
                 }
+                .transition(.opacity)
             }
         }
         .background(Color.black)
         .task {
             await scanner.requestPermissionAndStart()
+        }
+        .alert("Sắp có", isPresented: $showOneTouchSoon) {
+            Button("Đóng", role: .cancel) {}
+        } message: {
+            Text("OneTouch đang được hoàn thiện, sẽ có trong bản cập nhật tới.")
         }
         .onDisappear { scanner.stop() }
         .onChange(of: scanner.lastScannedValue) { _, newValue in
@@ -80,109 +107,293 @@ struct QrScanView: View {
 
     // MARK: - Header
 
+    /// Nút tròn trong header — nền trong suốt, chỉ icon (mirror `HeaderCircleButton`).
     private var header: some View {
-        HStack {
-            Button(action: onBack) {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            Text("QUÉT MÃ QR")
-                .font(AppFont.beVietnamPro(15, .bold))
+        ZStack {
+            Text("Quét mã QR")
+                .font(AppFont.beVietnamPro(18, .bold))
                 .foregroundStyle(.white)
-                .tracking(2)
 
-            Spacer()
+            HStack {
+                Button(action: onBack) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
-            Button {
-                scanner.toggleTorch()
-            } label: {
-                Image(systemName: scanner.isTorchOn ? "bolt.fill" : "bolt.slash")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
+                Spacer()
+
+                Button {
+                    scanner.toggleTorch()
+                } label: {
+                    Image(systemName: scanner.isTorchOn ? "bolt.fill" : "bolt.slash.fill")
+                        .font(.system(size: 20))
+                        // Đèn bật -> đổi màu brand để thấy rõ trạng thái.
+                        .foregroundStyle(scanner.isTorchOn ? AppColor.brand : .white)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+
+    private var permissionPrompt: some View {
+        Button {
+            scanner.openSystemSettings()
+        } label: {
+            VStack(spacing: 10) {
+                Image(systemName: "camera")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.white)
+                Text("Chạm để bật camera")
+                    .font(AppFont.beVietnamPro(14, .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .ignoresSafeArea()
     }
 
     // MARK: - Khung quét
 
-    private static let frameSize: CGFloat = 260
+    /// Tâm khung: giữa màn hình, đẩy lên `frameShiftUp`.
+    private func frameCenter(in size: CGSize) -> CGPoint {
+        CGPoint(x: size.width / 2, y: size.height / 2 - Self.frameShiftUp)
+    }
 
+    /// Lớp tối phủ ngoài khung, KHOÉT LỖ VUÔNG ở giữa để vùng quét sáng rõ.
     private var scrimOverlay: some View {
         GeometryReader { geo in
-            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2 - 40)
-            let frame = Self.frameSize
+            let center = frameCenter(in: geo.size)
+            Rectangle()
+                .fill(Color.black.opacity(0.6))
+                .mask {
+                    Rectangle()
+                        .overlay {
+                            // Vuông, KHÔNG bo góc — phải trùng khít với 4 góc chữ L.
+                            Rectangle()
+                                .frame(width: Self.frameSize, height: Self.frameSize)
+                                .position(center)
+                                .blendMode(.destinationOut)
+                        }
+                }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Khung 4 góc chữ L + logo + hướng dẫn + hàng logo cổng thanh toán.
+    private var viewfinder: some View {
+        GeometryReader { geo in
+            let center = frameCenter(in: geo.size)
+            let half = Self.frameSize / 2
 
             ZStack {
-                Rectangle().fill(Color.black.opacity(0.55))
-                    .mask {
-                        Rectangle()
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .frame(width: frame, height: frame)
-                                    .position(center)
-                                    .blendMode(.destinationOut)
-                            }
-                    }
+                ForEach(FrameCorner.allCases, id: \.self) { corner in
+                    cornerMark(corner)
+                }
+                .frame(width: Self.frameSize, height: Self.frameSize)
+                .position(center)
 
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.9), lineWidth: 2)
-                    .frame(width: frame, height: frame)
-                    .position(center)
-
-                Text("Đưa mã QR vào khung để quét")
-                    .font(AppFont.beVietnamPro(13, .medium))
+                Image("logo_white")
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
                     .foregroundStyle(.white)
-                    .position(x: center.x, y: center.y - frame / 2 - 24)
+                    .frame(height: 44)
+                    .position(x: center.x, y: center.y - half - 70)
+
+                Text("Hướng camera vào mã QR cần quét")
+                    .font(AppFont.beVietnamPro(13))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                    .position(x: center.x, y: center.y - half - 28)
+
+                gatewayLogos
+                    .position(x: center.x, y: center.y + half + 44)
             }
         }
         .allowsHitTesting(false)
     }
 
-    // MARK: - Thanh dưới
-
-    private var bottomBar: some View {
-        HStack(spacing: 0) {
-            PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                bottomItem(icon: "photo.on.rectangle", title: "Tải từ ảnh")
-            }
-
-            Button(action: onReceiveQr) {
-                bottomItem(icon: "qrcode", title: "Mã nhận tiền")
-            }
-            .buttonStyle(.plain)
+    /// Cổng thanh toán hỗ trợ — logo tô trắng, ngăn nhau bằng vạch dọc mờ.
+    private var gatewayLogos: some View {
+        HStack(spacing: 12) {
+            gatewayLogo("ic_pay_vietqr")
+            gatewayDivider
+            gatewayLogo("ic_pay_vnpay")
+            gatewayDivider
+            gatewayLogo("ic_pay_payos")
         }
-        .padding(.vertical, 14)
-        .background(.ultraThinMaterial)
-        .environment(\.colorScheme, .dark)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .padding(.horizontal, 24)
-        .padding(.bottom, 24)
     }
 
-    private nonisolated func bottomItem(icon: String, title: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(.white)
-            Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white)
+    private func gatewayLogo(_ name: String) -> some View {
+        Image(name)
+            .resizable()
+            .renderingMode(.template)
+            .aspectRatio(contentMode: .fit)
+            .foregroundStyle(.white)
+            .frame(height: 14)
+    }
+
+    private var gatewayDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.25))
+            .frame(width: 1, height: 14)
+    }
+
+    private enum FrameCorner: CaseIterable {
+        case topLeading, topTrailing, bottomLeading, bottomTrailing
+
+        var isTop: Bool { self == .topLeading || self == .topTrailing }
+        var isLeading: Bool { self == .topLeading || self == .bottomLeading }
+
+        var alignment: Alignment {
+            switch self {
+            case .topLeading: return .topLeading
+            case .topTrailing: return .topTrailing
+            case .bottomLeading: return .bottomLeading
+            case .bottomTrailing: return .bottomTrailing
+            }
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    /// Một góc chữ L: nhánh ngang + nhánh dọc, màu brand.
+    private func cornerMark(_ corner: FrameCorner) -> some View {
+        ZStack(alignment: corner.isTop ? .top : .bottom) {
+            Rectangle()
+                .fill(AppColor.brand)
+                .frame(width: Self.cornerLength, height: Self.cornerThickness)
+
+            HStack(spacing: 0) {
+                if !corner.isLeading { Spacer(minLength: 0) }
+                Rectangle()
+                    .fill(AppColor.brand)
+                    .frame(width: Self.cornerThickness, height: Self.cornerLength)
+                if corner.isLeading { Spacer(minLength: 0) }
+            }
+        }
+        .frame(width: Self.cornerLength, height: Self.cornerLength)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: corner.alignment)
+    }
+
+    // MARK: - Thanh dưới
+
+    /// Pill 4 phân đoạn dùng CHUNG một khối kính mờ, ngăn nhau bằng vạch dọc —
+    /// mirror khối cuối QrScanScreen.kt.
+    private var bottomBar: some View {
+        HStack(spacing: 0) {
+            pillSegment(title: "OneTouch", isNew: true) {
+                showOneTouchSoon = true
+            } icon: {
+                TransactionIcon(kind: .pasteCk, tint: .white)
+                    .frame(width: 22, height: 22)
+            }
+
+            pillDivider
+
+            pillSegment(title: "Cấp cứu ví tui", isNew: true, action: onEmergency) {
+                TransactionIcon(kind: .requestMoney, tint: .white)
+                    .frame(width: 22, height: 22)
+            }
+
+            pillDivider
+
+            // PhotosPicker tự là nút nên không bọc thêm Button.
+            PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                pillLabel(title: "Tải từ ảnh", isNew: false) {
+                    if isDecodingImage {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(width: 22, height: 22)
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                    }
+                }
+            }
+            .disabled(isDecodingImage)
+
+            pillDivider
+
+            pillSegment(title: "Mã nhận tiền", isNew: false, action: onReceiveQr) {
+                Image(systemName: "qrcode")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+            }
+        }
+        .frame(height: 74)
+        .background(Color.white.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.45), lineWidth: 1)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 26)
+    }
+
+    private func pillSegment<Icon: View>(
+        title: String,
+        isNew: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder icon: () -> Icon
+    ) -> some View {
+        Button(action: action) {
+            pillLabel(title: title, isNew: isNew, icon: icon)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pillLabel<Icon: View>(
+        title: String,
+        isNew: Bool,
+        @ViewBuilder icon: () -> Icon
+    ) -> some View {
+        VStack(spacing: 6) {
+            ZStack {
+                icon()
+                if isNew {
+                    Text("MỚI")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        // fixedSize: badge nằm trong ZStack rộng 22pt nên bị ép xuống
+                        // dòng thành "MỚ / I" nếu không cho nó giữ bề rộng tự nhiên.
+                        .fixedSize()
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color(hex: 0xFF3B30), in: RoundedRectangle(cornerRadius: 6))
+                        .offset(x: 13, y: -9)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+            }
+            .frame(width: 22, height: 22)
+
+            Text(title)
+                .font(AppFont.beVietnamPro(11, .semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+    }
+
+    private var pillDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.4))
+            .frame(width: 1, height: 30)
     }
 
     // MARK: - Xử lý QR
@@ -215,6 +426,9 @@ struct QrScanView: View {
 
     private func handlePickedPhoto(_ item: PhotosPickerItem) async {
         photoPickerItem = nil
+        isDecodingImage = true
+        defer { isDecodingImage = false }
+        errorMessage = nil
         guard let data = try? await item.loadTransferable(type: Data.self),
               let image = UIImage(data: data),
               let ciImage = CIImage(image: image) else {
@@ -244,6 +458,8 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureMetadataOu
 
     @Published private(set) var lastScannedValue: String?
     @Published private(set) var isTorchOn = false
+    /// User đã từ chối quyền camera — hiện màn "Chạm để bật camera" thay cho preview.
+    @Published private(set) var isPermissionDenied = false
 
     private var device: AVCaptureDevice?
     private var isConfigured = false
@@ -251,13 +467,22 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureMetadataOu
     func requestPermissionAndStart() async {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
+            isPermissionDenied = false
             startSession()
         case .notDetermined:
             let granted = await AVCaptureDevice.requestAccess(for: .video)
+            isPermissionDenied = !granted
             if granted { startSession() }
         default:
-            break // đã từ chối — UI có thể thêm trạng thái riêng nếu cần sau này
+            // Từ chối rồi thì app KHÔNG xin lại được, phải qua Cài đặt iOS.
+            isPermissionDenied = true
         }
+    }
+
+    /// Mở Cài đặt iOS để bật lại quyền camera.
+    func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     private func startSession() {
