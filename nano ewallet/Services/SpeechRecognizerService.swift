@@ -34,8 +34,23 @@ final class SpeechRecognizerService: ObservableObject {
     /// Tự dừng khi im lặng — recognizer của iOS không tự chốt như Android.
     private var silenceTimer: Timer?
 
-    /// Máy có hỗ trợ tiếng Việt không. Không hỗ trợ thì không nên mở overlay.
+    /// Nhận diện tiếng Việt có dùng được LÚC NÀY không.
     var isAvailable: Bool { recognizer?.isAvailable ?? false }
+
+    /// Lý do không dùng được — `SFSpeechRecognizer.isAvailable` chỉ trả true/false chứ
+    /// KHÔNG nói vì sao, nên phải tự suy ra. Ghi cứng một lý do là đổ lỗi nhầm: trên
+    /// simulator mạng vẫn tốt mà vẫn `false`.
+    var unavailableReason: String {
+        #if targetEnvironment(simulator)
+        // Tiếng Việt không có model offline (supportsOnDeviceRecognition = false) nên
+        // bắt buộc qua máy chủ Apple, mà simulator không được cấp quyền đó.
+        return "Simulator không chạy được nhận diện giọng nói tiếng Việt. Cần thử trên máy thật."
+        #else
+        return recognizer == nil
+            ? "Máy chưa hỗ trợ nhận diện giọng nói tiếng Việt."
+            : "Giọng nói đang không dùng được. Kiểm tra kết nối mạng rồi thử lại."
+        #endif
+    }
 
     func start() async {
         guard !isListening else { return }
@@ -43,7 +58,7 @@ final class SpeechRecognizerService: ObservableObject {
         partialText = ""
 
         guard isAvailable else {
-            errorMessage = "Thiết bị không hỗ trợ nhận diện giọng nói tiếng Việt."
+            errorMessage = unavailableReason
             return
         }
         guard await requestPermissions() else { return }

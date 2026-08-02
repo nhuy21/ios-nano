@@ -71,6 +71,22 @@ enum SpeechAmountParser {
         return parseVietnameseWords(text).map { min(max($0, 1), maxAmount) }
     }
 
+    /// Câu nói "trông như" có đọc số tiền không — có chữ số, hoặc có từ chỉ số/đơn vị
+    /// tiếng Việt. Dùng để quyết định có nhờ AI backend bóc lại hay không: lượt nói
+    /// linh tinh thì đừng tốn một vòng mạng.
+    static func containsAmountHint(_ raw: String) -> Bool {
+        let lowered = raw.lowercased()
+        if lowered.contains(where: \.isNumber) { return true }
+        let tokens = lowered.split(whereSeparator: { !$0.isLetter }).map(String.init)
+        return tokens.contains { numberWords.contains($0) || $0 == "k" || $0 == "tr" }
+    }
+
+    private static let numberWords: Set<String> = [
+        "không", "một", "mốt", "hai", "ba", "bốn", "tư", "năm", "lăm", "nhăm",
+        "sáu", "bảy", "bẩy", "tám", "chín", "mười", "mươi", "trăm",
+        "nghìn", "ngàn", "triệu", "tỷ", "tỉ", "rưỡi", "lẻ", "linh", "đồng",
+    ]
+
     private static func unitMultiplier(_ unit: String) -> Int64 {
         switch unit {
         case "k", "nghìn", "ngàn": return 1_000

@@ -23,6 +23,12 @@ struct WalletTransferAmountView: View {
     @StateObject private var wallet = WalletStore.shared
     @StateObject private var authStore = AuthStore.shared
     @StateObject private var beneficiaryStore = BeneficiaryStore.shared
+    @StateObject private var speech = SpeechRecognizerService()
+
+    /// Báo ngắn dưới ô số tiền khi nghe không ra số (hoặc không dùng được mic).
+    @State private var voiceHint: String?
+    /// Đang nhờ backend bóc lại số tiền sau khi regex trượt.
+    @State private var isParsingSpeech = false
 
     /// OneTouch bóc được số tiền từ nội dung dán -> điền sẵn, vẫn sửa được.
     @State private var amountText: String
@@ -34,7 +40,10 @@ struct WalletTransferAmountView: View {
     @State private var pendingTransactionId: String?
     @State private var pinError: String?
 
-    @FocusState private var isAmountFocused: Bool
+    /// Bàn phím số tự vẽ đang hiện hay không. Mở sẵn khi vào màn, chạm ra ngoài thì ẩn,
+    /// chạm vào ô số tiền thì mở lại. Không phải @FocusState vì bàn phím này là SwiftUI
+    /// thuần — `endEditing` ở tầng UIWindow không đụng tới được.
+    @State private var isAmountFocused = true
     @FocusState private var isMessageFocused: Bool
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
@@ -93,6 +102,8 @@ struct WalletTransferAmountView: View {
     // MARK: - Nhập số
 
     private func appendDigits(_ digits: String) {
+        // Gõ tay -> tắt mic. Để mic chạy tiếp thì nó sẽ ghi đè số vừa gõ.
+        stopListening()
         // Chặn số 0 dẫn đầu và giới hạn 9 chữ số như bên Android.
         let combined = amountText.isEmpty && digits.allSatisfy { $0 == "0" }
             ? ""
@@ -101,8 +112,68 @@ struct WalletTransferAmountView: View {
     }
 
     private func backspaceDigit() {
+        stopListening()
         guard !amountText.isEmpty else { return }
         amountText.removeLast()
+    }
+
+    // MARK: - Giọng nói
+
+    /// Mic CHỈ điền số tiền, không thu lời nhắn. Số điền xong vẫn sửa được bằng bàn
+    /// phím vì nó ghi thẳng vào `amountText` — không khoá ô.
+    private func handleSpeech(_ candidates: [String]) {
+        // Bóc bằng regex trước — tức thì, không tốn mạng.
+        if let amount = SpeechAmountParser.pickAmount(from: candidates) {
+            applyVoiceAmount(amount)
+            return
+        }
+
+        guard !candidates.isEmpty else {
+            voiceHint = "Chưa nghe được gì, thử lại nhé"
+            return
+        }
+
+        // Regex trượt nhưng câu nói TRÔNG NHƯ có đọc số -> nhờ AI backend bóc lại.
+        // Lượt nói linh tinh thì không gọi, đỡ một vòng mạng vô ích.
+        guard candidates.contains(where: SpeechAmountParser.containsAmountHint) else {
+            voiceHint = "Hãy đọc số tiền, ví dụ \"hai trăm nghìn\""
+            return
+        }
+
+        Task {
+            isParsingSpeech = true
+            defer { isParsingSpeech = false }
+            guard let parsed = try? await SpeechService.parseTransfer(transcripts: candidates),
+                  parsed.amount > 0 else {
+                voiceHint = "Chưa nghe rõ số tiền, thử nói \"hai trăm nghìn\""
+                return
+            }
+            applyVoiceAmount(parsed.amount)
+        }
+    }
+
+    private func applyVoiceAmount(_ amount: Int64) {
+        voiceHint = nil
+        amountText = String(min(amount, Self.maxAmountPerTransfer))
+        // Bắt được số là dừng — nghe tiếp dễ ăn phải tiếng ồn rồi ghi đè số vừa đúng.
+        speech.stop()
+    }
+
+    private func toggleListening() {
+        guard speech.isAvailable else {
+            voiceHint = speech.unavailableReason
+            return
+        }
+        if speech.isListening {
+            speech.stop()
+        } else {
+            voiceHint = nil
+            Task { await speech.start() }
+        }
+    }
+
+    private func stopListening() {
+        if speech.isListening { speech.stop() }
     }
 
     var body: some View {
@@ -123,10 +194,7 @@ struct WalletTransferAmountView: View {
 
             // Bàn phím số tự vẽ thay cho nút "Tiếp tục" rời — nút hành động nằm luôn
             // trong bàn phím, giống màn nhập tiền bên Android.
-            if isMessageFocused {
-                // Đang gõ lời nhắn thì nhường chỗ cho bàn phím chữ của hệ thống.
-                continueBar
-            } else {
+            if isAmountFocused && !isMessageFocused {
                 NumericKeypad(
                     onDigit: appendDigits,
                     onBackspace: backspaceDigit,
@@ -134,9 +202,17 @@ struct WalletTransferAmountView: View {
                     nextTitle: "Tiếp",
                     nextEnabled: canContinue && !isSubmitting
                 )
+            } else {
+                // Ẩn bàn phím số (chạm ra ngoài) hoặc đang gõ lời nhắn bằng bàn phím
+                // hệ thống -> nhường chỗ cho nút bấm rời.
+                continueBar
             }
         }
         .background(Color(hex: 0xF7F8FA))
+        // Bàn phím HỆ THỐNG đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow (xem
+        // DismissKeyboardOnTap). Ở đây chỉ cần lo bàn phím số tự vẽ.
+        .contentShape(Rectangle())
+        .onTapGesture { isAmountFocused = false }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .task {
             // Cần danh bạ để biết người nhận đã được lưu chưa (quyết định ẩn toggle).
@@ -145,7 +221,18 @@ struct WalletTransferAmountView: View {
         .onAppear {
             // Điền sẵn nội dung mặc định (user sửa/xoá được), chỉ làm 1 lần lúc vào màn.
             if message.isEmpty { message = defaultMessage }
+            speech.onResult = { candidates in handleSpeech(candidates) }
         }
+        .task {
+            // Tự bật mic khi vào màn, CHỈ khi chưa có số tiền — vào từ OneTouch/trợ lý
+            // giọng nói/link nhận tiền thì số đã điền sẵn, không còn gì để đọc.
+            guard amountText.isEmpty, speech.isAvailable else { return }
+            // Đệm nhỏ để hiệu ứng chuyển màn xong rồi mới chiếm micro.
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled, amountText.isEmpty else { return }
+            await speech.start()
+        }
+        .onDisappear { speech.stop() }
         .sheet(isPresented: pendingTransactionIdBinding) {
             PinEntrySheet(
                 amountText: Int(amount).vndFormatted,
@@ -241,16 +328,42 @@ struct WalletTransferAmountView: View {
     /// vẽ ở dưới đảm nhiệm nên không dùng ô nhập của hệ thống nữa.
     private var amountSection: some View {
         VStack(spacing: 12) {
-            Text(amountText.isEmpty ? "0đ" : "\(Int(amount).vndGrouped)đ")
-                .font(AppFont.baloo2(34, .bold))
-                .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(maxWidth: .infinity)
+            ZStack {
+                Text(amountText.isEmpty ? "0đ" : "\(Int(amount).vndGrouped)đ")
+                    .font(AppFont.baloo2(34, .bold))
+                    .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity)
+                    .opacity(speech.isListening || isParsingSpeech ? 0 : 1)
+
+                if speech.isListening || isParsingSpeech {
+                    VStack(spacing: 8) {
+                        MicWaveBars(height: 36)
+                        Text(isParsingSpeech ? "Đang xử lý..." : "Đang nghe... (chạm mic để dừng)")
+                            .font(AppFont.beVietnamPro(12, .medium))
+                            .foregroundStyle(AppColor.payMuted)
+                    }
+                }
+            }
+            .frame(height: 62)
+            .contentShape(Rectangle())
+            .onTapGesture { isAmountFocused = true }
+            // Ngang hàng với con số, mép phải. Gắn vào cả thẻ thì mic đè lên chip gợi ý
+            // mệnh giá ở dưới nên phải bó trong vùng số tiền.
+            .overlay(alignment: .trailing) { micButton }
 
             Rectangle()
                 .fill(canContinue ? AppColor.brand : AppColor.line)
                 .frame(height: 2)
+
+            if let voiceHint {
+                Text(voiceHint)
+                    .font(AppFont.beVietnamPro(12))
+                    .foregroundStyle(AppColor.payMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
 
             if overMaxPerTransfer {
                 FieldError(message: "Số tiền chuyển tối đa 1 lần là 10.000.000đ", alignment: .center)
@@ -283,6 +396,29 @@ struct WalletTransferAmountView: View {
         .frame(maxWidth: .infinity)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Không dùng được (mất mạng / máy không hỗ trợ) thì vẫn HIỆN nhưng mờ đi — ẩn hẳn
+    /// sẽ khiến người dùng tưởng app lúc có lúc không tính năng.
+    private var micButton: some View {
+        Button(action: toggleListening) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(micTint)
+                .frame(width: 36, height: 36)
+                .background(
+                    speech.isListening ? AppColor.brand.opacity(0.12) : Color.clear,
+                    in: Circle()
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(speech.isListening ? "Dừng nghe" : "Nhập số tiền bằng giọng nói")
+    }
+
+    private var micTint: Color {
+        if !speech.isAvailable { return AppColor.payMuted.opacity(0.4) }
+        return speech.isListening ? AppColor.brand : AppColor.payMuted
     }
 
 

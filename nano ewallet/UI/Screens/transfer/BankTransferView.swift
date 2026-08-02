@@ -63,6 +63,12 @@ struct BankTransferView: View {
     @State private var content: String
     @FocusState private var isContentFocused: Bool
 
+    @StateObject private var speech = SpeechRecognizerService()
+    /// Báo ngắn khi nghe không ra số / mic không dùng được.
+    @State private var voiceHint: String?
+    /// Đang nhờ backend bóc lại số tiền sau khi regex trượt.
+    @State private var isParsingSpeech = false
+
     @State private var pendingTransactionId: String?
     @State private var pinError: String?
     @State private var isSubmitting = false
@@ -180,7 +186,20 @@ struct BankTransferView: View {
             footer
         }
         .background(Color.white)
+        // Bàn phím HỆ THỐNG (ô số TK / nội dung) đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow
+        // (xem DismissKeyboardOnTap) — nó cũng nhả @FocusState nên tra cứu tên chủ TK
+        // vẫn chạy qua onChange sẵn có. Ở đây chỉ cần lo bàn phím số tự vẽ.
+        .contentShape(Rectangle())
+        .onTapGesture { isAmountFocused = false }
         .task { _ = await bankCache.get() }
+        .task {
+            // Người nhận đã khoá sẵn (QR / danh bạ / pay link) thì vào là đọc số tiền ngay.
+            // Luồng nhập tay không bật ở đây — đợi tra ra tên (xem runLookupIfNeeded).
+            guard recipientLocked else { return }
+            await startVoiceIfReady()
+        }
+        .onAppear { speech.onResult = { candidates in handleSpeech(candidates) } }
+        .onDisappear { speech.stop() }
         .onAppear {
             if initialDraft?.prefillContent == nil { content = defaultContent }
         }
@@ -189,6 +208,13 @@ struct BankTransferView: View {
         }
         .onChange(of: isAccountFocused) { wasFocused, isFocused in
             if wasFocused && !isFocused { runLookupIfNeeded() }
+            // Quay lại sửa số TK thì cất bàn phím số tự vẽ đi, không thì hai bàn phím
+            // chồng nhau. Mic cũng tắt vì người nhận đang được nhập lại — tra cứu xong
+            // `startVoiceIfReady` sẽ bật lại.
+            if isFocused {
+                isAmountFocused = false
+                stopListening()
+            }
         }
         .sheet(isPresented: $showBankSheet) {
             BankPickerSheet(banks: sortedBanks, selectedBin: bankSheetBinding, onDismiss: { showBankSheet = false })
@@ -504,6 +530,14 @@ struct BankTransferView: View {
                     .frame(height: 130)
                     .overlay {
                         ZStack {
+                            if speech.isListening || isParsingSpeech {
+                                VStack(spacing: 8) {
+                                    MicWaveBars(height: 40)
+                                    Text(isParsingSpeech ? "Đang xử lý..." : "Đang nghe... (chạm mic để dừng)")
+                                        .font(AppFont.beVietnamPro(12, .medium))
+                                        .foregroundStyle(AppColor.payMuted)
+                                }
+                            }
                             HStack(spacing: 4) {
                                 Text(amountText.isEmpty ? "0" : amountText)
                                     .font(AppFont.baloo2(amountFontSize, .bold))
@@ -513,6 +547,7 @@ struct BankTransferView: View {
                                     BlinkingCaret(color: AppColor.payInk, height: amountFontSize * 0.85)
                                 }
                             }
+                            .opacity(speech.isListening || isParsingSpeech ? 0 : 1)
                             HStack {
                                 Spacer()
                                 Text("VND")
@@ -530,11 +565,14 @@ struct BankTransferView: View {
                         }
                     }
 
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 18))
+                micButton
+            }
+
+            if let voiceHint {
+                Text(voiceHint)
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
-                    .frame(width: 36, height: 36)
-                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
 
             if amountEditable {
@@ -590,7 +628,12 @@ struct BankTransferView: View {
                     .lineLimit(1...4)
                     .focused($isContentFocused)
                     .onChange(of: isContentFocused) { _, focused in
-                        if focused { isAmountFocused = false }
+                        // Sang ô nội dung thì cất bàn phím số và tắt mic — đang nghe mà
+                        // gõ nội dung thì số tiền tự nhảy, người dùng không hiểu vì sao.
+                        if focused {
+                            isAmountFocused = false
+                            stopListening()
+                        }
                     }
                     .onChange(of: content) { _, newValue in
                         if newValue.count > 250 { content = String(newValue.prefix(250)) }
@@ -668,9 +711,101 @@ struct BankTransferView: View {
         .disabled(!canContinue || isSubmitting)
     }
 
+    /// Không dùng được thì vẫn HIỆN nhưng mờ — ẩn hẳn khiến người dùng tưởng app lúc
+    /// có lúc không tính năng.
+    private var micButton: some View {
+        Button(action: toggleListening) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(micTint)
+                .frame(width: 36, height: 36)
+                .background(
+                    speech.isListening ? AppColor.brand.opacity(0.12) : Color.clear,
+                    in: Circle()
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(10)
+        .accessibilityLabel(speech.isListening ? "Dừng nghe" : "Nhập số tiền bằng giọng nói")
+    }
+
+    private var micTint: Color {
+        if !speech.isAvailable { return AppColor.payMuted.opacity(0.4) }
+        return speech.isListening ? AppColor.brand : AppColor.payMuted
+    }
+
+    // MARK: - Giọng nói
+
+    /// Mic CHỈ điền số tiền. Số điền xong vẫn sửa/xoá được vì ghi thẳng vào `amount`.
+    private func handleSpeech(_ candidates: [String]) {
+        if let value = SpeechAmountParser.pickAmount(from: candidates) {
+            applyVoiceAmount(value)
+            return
+        }
+        guard !candidates.isEmpty else {
+            voiceHint = "Chưa nghe được gì, thử lại nhé"
+            return
+        }
+        // Regex trượt nhưng câu nói trông có số -> nhờ AI backend bóc lại. Lượt nói
+        // linh tinh thì không gọi, đỡ một vòng mạng vô ích.
+        guard candidates.contains(where: SpeechAmountParser.containsAmountHint) else {
+            voiceHint = "Hãy đọc số tiền, ví dụ \"hai trăm nghìn\""
+            return
+        }
+        Task {
+            isParsingSpeech = true
+            defer { isParsingSpeech = false }
+            guard let parsed = try? await SpeechService.parseTransfer(transcripts: candidates),
+                  parsed.amount > 0 else {
+                voiceHint = "Chưa nghe rõ số tiền, thử nói \"hai trăm nghìn\""
+                return
+            }
+            applyVoiceAmount(parsed.amount)
+        }
+    }
+
+    private func applyVoiceAmount(_ value: Int64) {
+        voiceHint = nil
+        amount = min(value, Self.maxAmount)
+        // Bắt được số là dừng — nghe tiếp dễ ăn tiếng ồn rồi ghi đè số vừa đúng.
+        speech.stop()
+    }
+
+    private func toggleListening() {
+        guard speech.isAvailable else {
+            voiceHint = speech.unavailableReason
+            return
+        }
+        if speech.isListening {
+            speech.stop()
+        } else {
+            voiceHint = nil
+            isAmountFocused = true
+            Task { await speech.start() }
+        }
+    }
+
+    private func stopListening() {
+        if speech.isListening { speech.stop() }
+    }
+
+    /// Tự bật mic khi ĐÃ có người nhận và chưa nhập số tiền. Khác màn ví ở chỗ luồng
+    /// nhập tay còn phải chọn ngân hàng + gõ số tài khoản trước — bật mic lúc đó là
+    /// chiếm micro trong khi người dùng chưa có gì để đọc.
+    private func startVoiceIfReady() async {
+        guard amountEditable, amount == 0, recipientReady, speech.isAvailable else { return }
+        guard !speech.isListening else { return }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        guard !Task.isCancelled, amount == 0 else { return }
+        isAmountFocused = true
+        await speech.start()
+    }
+
     // MARK: - Nhập số tiền (bàn phím tự vẽ)
 
     private func pushDigit(_ s: String) {
+        stopListening()
         guard amountEditable else { return }
         let current = amount == 0 ? "" : String(amount)
         let next = String((current + s).filter(\.isNumber).drop(while: { $0 == "0" }).prefix(9))
@@ -678,6 +813,7 @@ struct BankTransferView: View {
     }
 
     private func backspaceDigit() {
+        stopListening()
         guard amountEditable else { return }
         let current = amount == 0 ? "" : String(amount)
         amount = Int64(String(current.dropLast())) ?? 0
@@ -709,6 +845,10 @@ struct BankTransferView: View {
                 holderName = try await TransferService.verifyBeneficiary(
                     VerifyBeneficiaryRequest(accNo: accountNumber, bankNo: bankNo, accType: accType)
                 )
+                // Tra ra tên là bước cuối của phần người nhận -> việc tiếp theo chắc chắn
+                // là nhập số tiền, nên bật mic luôn cho đọc ngay.
+                isAccountFocused = false
+                await startVoiceIfReady()
             } catch let error as APIError {
                 lookupError = error.message
             } catch {
@@ -922,7 +1062,12 @@ struct BankPickerSheet: View {
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
-        .presentationDetents([.large])
+        // Chừa một dải trên đầu để còn chỗ chạm ra ngoài mà đóng — `.large` phủ gần kín
+        // nên hầu như không còn "ngoài" nào để chạm.
+        .presentationDetents([.fraction(0.92)])
+        // iOS 26 để nền sheet là kính mờ, nhìn xuyên thấy màn phía dưới. Phần sheet che
+        // tới đâu thì phải đục tới đó.
+        .presentationBackground(Color.white)
     }
 }
 
