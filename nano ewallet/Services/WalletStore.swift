@@ -66,6 +66,31 @@ final class WalletStore: ObservableObject {
         }
     }
 
+    /// Đối soát ví trực tiếp với Bảo Kim rồi nạp lại bản mới — dùng cho nút "Đồng bộ".
+    /// Nặng hơn `refresh` (BE phải gọi sang Bảo Kim) nên chỉ chạy khi user chủ động bấm,
+    /// không đưa vào poll. BE tự ghi giao dịch đối soát nếu số dư lệch.
+    /// - Returns: `nil` nếu xong, hoặc thông báo lỗi để màn gọi hiển thị.
+    func syncWithBaoKim() async -> String? {
+        do {
+            try await WalletService.checkWalletInfoFromBaoKim()
+        } catch let error as APIError {
+            return error.message
+        } catch {
+            return "Không đồng bộ được ví, vui lòng thử lại"
+        }
+        // BE đã ghi số dư mới vào DB — đọc lại để cập nhật cache/UI. Chờ lượt refresh đang
+        // chạy (nếu có) xong trước: `refresh` có guard `isLoading` nên gọi lúc trùng nhịp
+        // poll 8s sẽ bị bỏ qua, user bấm Đồng bộ mà số dư không đổi.
+        // Trần 3s để không treo nếu có gì bất thường — quá hạn thì cứ gọi, tệ nhất là nhịp
+        // poll sau cập nhật hộ.
+        for _ in 0..<30 {
+            guard isLoading else { break }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        await refresh(force: true)
+        return nil
+    }
+
     /// Set thẳng số dư từ payload push realtime — không gọi mạng.
     func setBalance(_ value: Int64) {
         balance = value

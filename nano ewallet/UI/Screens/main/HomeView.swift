@@ -36,6 +36,8 @@ struct HomeView: View {
     @State private var isResolvingOneTouch = false
     @State private var oneTouchError: String?
     @State private var showVoiceCommand = false
+    @State private var isSyncing = false
+    @State private var syncError: String?
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -164,6 +166,15 @@ struct HomeView: View {
         } message: {
             Text(oneTouchError ?? "")
         }
+        .alert("Đồng bộ ví thất bại", isPresented: syncErrorBinding) {
+            Button("Đóng", role: .cancel) {}
+        } message: {
+            Text(syncError ?? "")
+        }
+    }
+
+    private var syncErrorBinding: Binding<Bool> {
+        Binding(get: { syncError != nil }, set: { if !$0 { syncError = nil } })
     }
 
     private var oneTouchErrorBinding: Binding<Bool> {
@@ -464,6 +475,15 @@ struct HomeView: View {
                     pillButton(systemImage: "clock.arrow.circlepath", title: "Lịch sử") {
                         path.append(.history)
                     }
+                    // Đối soát trực tiếp với Bảo Kim — nặng hơn refresh thường (BE phải
+                    // gọi sang Bảo Kim) nên chỉ chạy khi user chủ động bấm.
+                    pillButton(
+                        systemImage: "arrow.triangle.2.circlepath",
+                        title: isSyncing ? "Đang đồng bộ" : "Đồng bộ",
+                        isLoading: isSyncing
+                    ) {
+                        syncWallet()
+                    }
                     pillButton(systemImage: "link", title: "Liên kết") {
                         path.append(.linkedBanks)
                     }
@@ -532,8 +552,15 @@ struct HomeView: View {
         }
     }
 
-    private func pillButton(systemImage: String, title: String, action: @escaping () -> Void) -> some View {
-        pillButton(title: title, action: action) {
+    /// `isLoading`: nút là HÀNH ĐỘNG (vd "Đồng bộ") -> đổi mũi tên thành spinner và chặn
+    /// bấm lại. Mặc định `false` = nút điều hướng, giữ nguyên mũi tên như Kotlin.
+    private func pillButton(
+        systemImage: String,
+        title: String,
+        isLoading: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        pillButton(title: title, isLoading: isLoading, action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 17))
                 .foregroundStyle(.white)
@@ -552,6 +579,7 @@ struct HomeView: View {
 
     private func pillButton<Icon: View>(
         title: String,
+        isLoading: Bool = false,
         action: @escaping () -> Void,
         @ViewBuilder icon: () -> Icon
     ) -> some View {
@@ -561,9 +589,18 @@ struct HomeView: View {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.8))
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .scaleEffect(0.7)
+                        // Khớp bề rộng chỗ mũi tên chiếm để nút không co giật khi đổi trạng thái.
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
             }
             .foregroundStyle(.white)
             // Lề lệch trái/phải (13/9) đúng như Kotlin — icon cần thoáng hơn mũi tên.
@@ -575,6 +612,22 @@ struct HomeView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .disabled(isLoading)
+    }
+
+    /// Đối soát ví với Bảo Kim. Kéo lại cả giao dịch gần đây vì BE có thể vừa ghi bản ghi
+    /// đối soát cho phần số dư lệch.
+    private func syncWallet() {
+        guard !isSyncing else { return }
+        isSyncing = true
+        Task {
+            defer { isSyncing = false }
+            if let message = await wallet.syncWithBaoKim() {
+                syncError = message
+                return
+            }
+            await transactions.refreshRecent()
+        }
     }
 
     // MARK: - CTA nạp tiền
