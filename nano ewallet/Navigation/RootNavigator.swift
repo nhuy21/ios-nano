@@ -64,6 +64,8 @@ private struct OnboardingFlow: View {
         /// Ký thoả thuận mở ví.
         case agreement(embedLink: String)
         case linkBaoKim
+        /// Bảo Kim từ chối ngay lúc gửi yêu cầu liên kết, chưa tới bước OTP.
+        case linkFailed(message: String)
         /// Đang nhúng trang OTP của Bảo Kim.
         case linking(embedLink: String)
         /// Ví đã đồng bộ xong — đọc quy tắc giao dịch một lần rồi vào Home.
@@ -72,22 +74,11 @@ private struct OnboardingFlow: View {
     }
 
     @State private var step: Step = .choice
-    /// Bảo Kim từ chối ngay lúc gửi yêu cầu liên kết (ví không tồn tại, ví khoá, SĐT đã
-    /// liên kết, tên không khớp).
-    @State private var linkError: String?
     /// Không mở được SDK eKYC (phiên hỏng, không tìm được màn để trình bày).
     @State private var ekycError: String?
 
     var body: some View {
         content
-            .alert(
-                "Không liên kết được ví",
-                isPresented: Binding(get: { linkError != nil }, set: { if !$0 { linkError = nil } })
-            ) {
-                Button("Đã hiểu", role: .cancel) { linkError = nil }
-            } message: {
-                Text(linkError ?? "")
-            }
             .alert(
                 "Không mở được xác thực định danh",
                 isPresented: Binding(get: { ekycError != nil }, set: { if !$0 { ekycError = nil } })
@@ -168,10 +159,19 @@ private struct OnboardingFlow: View {
                 WalletLinkBaoKimView(
                     onBack: { step = .choice },
                     onSubmit: { link in step = .linking(embedLink: link) },
-                    onError: { message in linkError = message }
+                    onError: { message in step = .linkFailed(message: message) }
                 )
                 .hidesSystemNavigationBar()
             }
+
+        case .linkFailed(let message):
+            WalletLinkErrorView(
+                message: message,
+                // "Thử lại" quay về form với thông tin đã nhập — mấy lỗi này thường phải
+                // sửa số ví hoặc tên cho khớp thông tin đăng ký bên Bảo Kim.
+                onRetry: { step = .linkBaoKim },
+                onLogout: { Task { await appState.logout() } }
+            )
 
         case .linking(let embedLink):
             WalletLinkingWebView(
