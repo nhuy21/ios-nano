@@ -110,6 +110,63 @@ struct TransferResult: Decodable {
         case bkTransId = "bk_trans_id"
     }
 
+    /// BE trả nguyên `result.data` của Bảo Kim (xem `wallet.service.ts`: `{...result.data,
+    /// status}`), mà Bảo Kim KHÔNG nhất quán kiểu: `bk_trans_id`/`trans_id`/số tiền có
+    /// lúc là chuỗi, có lúc là số. Decode chặt theo 1 kiểu sẽ ném lỗi và mất luôn màn
+    /// "chuyển tiền thành công" dù tiền đã chuyển xong — nên phải nhận cả hai dạng.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        pending = try container.decodeIfPresent(Bool.self, forKey: .pending)
+        transactionId = Self.flexibleString(container, forKey: .transactionId)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        transAmount = Self.flexibleInt(container, forKey: .transAmount)
+        feeAmount = Self.flexibleInt(container, forKey: .feeAmount)
+        transId = Self.flexibleString(container, forKey: .transId)
+        bkTransId = Self.flexibleString(container, forKey: .bkTransId)
+    }
+
+    /// Nhận String hoặc số -> String. Kiểu lạ/thiếu thì `nil`.
+    ///
+    /// Phải bóc HAI tầng: `decodeIfPresent` trả `T?`, `try?` bọc thêm thành `T??` — bóc
+    /// một tầng thì biến vẫn là optional và không truyền được vào `String(_:)`/`Int64(_:)`.
+    private static func flexibleString(
+        _ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys
+    ) -> String? {
+        if let raw = try? container.decodeIfPresent(String.self, forKey: key), let text = raw {
+            return text
+        }
+        if let raw = try? container.decodeIfPresent(Int64.self, forKey: key), let number = raw {
+            return String(number)
+        }
+        if let raw = try? container.decodeIfPresent(Double.self, forKey: key), let number = raw,
+           let clamped = Self.safeInt64(number) {
+            return String(clamped)
+        }
+        return nil
+    }
+
+    /// Nhận số hoặc chuỗi số -> Int64. Kiểu lạ/thiếu thì `nil`.
+    private static func flexibleInt(
+        _ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys
+    ) -> Int64? {
+        if let raw = try? container.decodeIfPresent(Int64.self, forKey: key), let number = raw {
+            return number
+        }
+        if let raw = try? container.decodeIfPresent(String.self, forKey: key), let text = raw {
+            return Int64(text)
+        }
+        if let raw = try? container.decodeIfPresent(Double.self, forKey: key), let number = raw {
+            return Self.safeInt64(number)
+        }
+        return nil
+    }
+
+    /// `Int64(Double)` TRAP với NaN/vô cực/ngoài biên — trả `nil` thay vì làm sập app.
+    private static func safeInt64(_ value: Double) -> Int64? {
+        guard value.isFinite, value >= -9.2e18, value <= 9.2e18 else { return nil }
+        return Int64(value)
+    }
+
     var isPending: Bool { pending == true }
     var isSuccess: Bool { status == "SUCCESS" }
 }
