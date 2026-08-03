@@ -121,7 +121,9 @@ struct KycReviewView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            BackHeader(action: onBack)
+            // Chặn thoát khi đang đối soát C06: rời màn giữa lúc chờ thì hồ sơ đã quét
+            // xong bị bỏ, người dùng phải quét lại CCCD từ đầu.
+            BackHeader(action: { if !isVerifyingC06 { onBack() } })
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
@@ -438,7 +440,7 @@ struct KycReviewView: View {
 
     private var verifyingOverlay: some View {
         ZStack {
-            Color.white.opacity(0.8).ignoresSafeArea()
+            Color.white.opacity(0.8)
             VStack(spacing: 16) {
                 ProgressView().progressViewStyle(.circular).tint(AppColor.brand)
                 Text("Đang xác thực CCCD…")
@@ -446,9 +448,13 @@ struct KycReviewView: View {
                     .foregroundStyle(AppColor.payInk)
             }
         }
-        // Nuốt chạm để chặn thao tác nền trong lúc đối soát.
+        // Nuốt chạm để chặn thao tác nền trong lúc đối soát. Phải ép ZStack giãn hết
+        // khung TRƯỚC khi `contentShape` — không thì ZStack chỉ to bằng nội dung, để hở
+        // vùng nút back phía trên và chạm vào đó sẽ thoát về màn quét CCCD giữa lúc chờ.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {}
+        .ignoresSafeArea()
     }
 
     private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
