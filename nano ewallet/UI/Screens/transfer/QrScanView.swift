@@ -302,10 +302,13 @@ struct QrScanView: View {
 
             pillDivider
 
-            // PhotosPicker tự là nút nên không bọc thêm Button. Icon tách thành
-            // `photoPickerIcon` cho gọn, không phải vì lý do isolation.
+            // PhotosPicker tự là nút nên không bọc thêm Button. Label closure của nó
+            // KHÔNG kế thừa `@MainActor`, nên phải dựng sẵn view ở đây (context
+            // @MainActor) rồi truyền vào — gọi `pillLabel`/đọc `isDecodingImage` trực
+            // tiếp trong closure sẽ thành lỗi ở Swift 6.
+            let photoLabel = pillLabel(title: "Tải từ ảnh", isNew: false) { photoPickerIcon }
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                pillLabel(title: "Tải từ ảnh", isNew: false) { photoPickerIcon }
+                photoLabel
             }
             .disabled(isDecodingImage)
 

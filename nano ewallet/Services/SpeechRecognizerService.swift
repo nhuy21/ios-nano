@@ -148,8 +148,13 @@ final class SpeechRecognizerService: ObservableObject {
     /// như nói xong — nếu không người dùng phải tự bấm dừng.
     private func restartSilenceTimer() {
         silenceTimer?.invalidate()
+        // Bind `weak` ra HẰNG local trước, rồi `Task` capture hằng đó. Viết
+        // `{ [weak self] _ in Task { self?... } }` sẽ báo lỗi ở Swift 6 vì `self` do
+        // capture list sinh ra là BIẾN, mà `Task` chạy song song thì không được capture
+        // biến. Timer `repeats: false` + `stop()` gọi `invalidate()` nên không rò rỉ.
         silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.finishWithPartial() }
+            let service = self
+            Task { @MainActor in service?.finishWithPartial() }
         }
     }
 
