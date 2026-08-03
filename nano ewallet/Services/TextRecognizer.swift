@@ -18,23 +18,25 @@ enum TextRecognizer {
         guard let cgImage = image.cgImage else { return "" }
 
         return await withCheckedContinuation { continuation in
-            let request = VNRecognizeTextRequest { request, _ in
-                let lines = (request.results as? [VNRecognizedTextObservation] ?? [])
-                    .compactMap { $0.topCandidates(1).first?.string }
-                continuation.resume(returning: lines.joined(separator: "\n"))
-            }
-            // `accurate` vì tin nhắn CK có số tài khoản dài, nhận nhầm 1 chữ số là
-            // chuyển sai người. Chậm hơn `fast` nhưng đây là thao tác một lần.
-            request.recognitionLevel = .accurate
-            // Vision chưa hỗ trợ vi-VN; en-US đọc tốt chữ Latin không dấu và chữ số,
-            // vốn là phần cần thiết (số tài khoản, số tiền, tên ngân hàng).
-            request.recognitionLanguages = ["en-US"]
-            request.usesLanguageCorrection = false
-
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            // `VNRecognizeTextRequest`/`VNImageRequestHandler` là non-Sendable nên phải
+            // tạo NGAY TRONG closure của `async`, không capture từ ngoài vào — capture
+            // sẽ thành lỗi ở Swift 6 (`@Sendable` closure không nhận non-Sendable).
             DispatchQueue.global(qos: .userInitiated).async {
+                let request = VNRecognizeTextRequest { request, _ in
+                    let lines = (request.results as? [VNRecognizedTextObservation] ?? [])
+                        .compactMap { $0.topCandidates(1).first?.string }
+                    continuation.resume(returning: lines.joined(separator: "\n"))
+                }
+                // `accurate` vì tin nhắn CK có số tài khoản dài, nhận nhầm 1 chữ số là
+                // chuyển sai người. Chậm hơn `fast` nhưng đây là thao tác một lần.
+                request.recognitionLevel = .accurate
+                // Vision chưa hỗ trợ vi-VN; en-US đọc tốt chữ Latin không dấu và chữ số,
+                // vốn là phần cần thiết (số tài khoản, số tiền, tên ngân hàng).
+                request.recognitionLanguages = ["en-US"]
+                request.usesLanguageCorrection = false
+
                 do {
-                    try handler.perform([request])
+                    try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
                 } catch {
                     continuation.resume(returning: "")
                 }

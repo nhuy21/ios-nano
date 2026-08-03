@@ -302,20 +302,10 @@ struct QrScanView: View {
 
             pillDivider
 
-            // PhotosPicker tự là nút nên không bọc thêm Button.
+            // PhotosPicker tự là nút nên không bọc thêm Button. Icon tách thành
+            // `photoPickerIcon` cho gọn, không phải vì lý do isolation.
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                pillLabel(title: "Tải từ ảnh", isNew: false) {
-                    if isDecodingImage {
-                        ProgressView()
-                            .tint(.white)
-                            .frame(width: 22, height: 22)
-                    } else {
-                        Image(systemName: "photo")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                    }
-                }
+                pillLabel(title: "Tải từ ảnh", isNew: false) { photoPickerIcon }
             }
             .disabled(isDecodingImage)
 
@@ -349,6 +339,21 @@ struct QrScanView: View {
             pillLabel(title: title, isNew: isNew, icon: icon)
         }
         .buttonStyle(.plain)
+    }
+
+    /// Icon ô "Tải từ ảnh" — vòng xoay khi đang decode, ngược lại là icon ảnh.
+    @ViewBuilder
+    private var photoPickerIcon: some View {
+        if isDecodingImage {
+            ProgressView()
+                .tint(.white)
+                .frame(width: 22, height: 22)
+        } else {
+            Image(systemName: "photo")
+                .font(.system(size: 20))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+        }
     }
 
     private func pillLabel<Icon: View>(

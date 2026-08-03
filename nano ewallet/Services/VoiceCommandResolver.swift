@@ -61,7 +61,7 @@ enum VoiceCommandResolver {
     /// So cả nickname LẪN từng từ của accName: nói "Đức" khớp contact tên "Nguyen Van Duc"
     /// dù chưa đặt nickname. Chọn contact có từ khớp DÀI nhất — tên riêng ("duc") thắng
     /// họ/đệm chung ("van", "nguyen").
-    static func matchWalletRecipient(
+    nonisolated static func matchWalletRecipient(
         candidates: [String],
         contacts: [Beneficiary]
     ) -> Beneficiary? {
@@ -86,7 +86,11 @@ enum VoiceCommandResolver {
     // MARK: - Private
 
     /// Bỏ dấu + hạ chữ thường, tách thành từ, bỏ từ quá ngắn (<2) để đỡ nhiễu.
-    private static func words(_ text: String) -> [String] {
+    ///
+    /// `nonisolated` vì project bật `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`: hàm này
+    /// được truyền làm GIÁ TRỊ vào `flatMap(words)` (context nonisolated), nếu để suy ra
+    /// `@MainActor` thì không truyền được.
+    nonisolated private static func words(_ text: String) -> [String] {
         text.folding(options: .diacriticInsensitive, locale: Locale(identifier: "vi_VN"))
             .replacingOccurrences(of: "đ", with: "d")
             .replacingOccurrences(of: "Đ", with: "d")

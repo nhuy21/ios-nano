@@ -8,7 +8,10 @@
 import SwiftUI
 
 extension Color {
-    init(hex: UInt32) {
+    /// `nonisolated` vì project bật `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`: không
+    /// có nó, init thuần tính toán này bị suy ra `@MainActor` và không gọi được từ
+    /// context nonisolated (vd hàm helper dựng màu trong BankTransferView).
+    nonisolated init(hex: UInt32) {
         self.init(
             .sRGB,
             red: Double((hex >> 16) & 0xFF) / 255,
@@ -19,7 +22,7 @@ extension Color {
     }
 
     /// Parse "#RRGGBB" từ `brandColor` do BE trả (logo/thẻ ngân hàng).
-    init?(hexString: String) {
+    nonisolated init?(hexString: String) {
         var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
         hex = hex.replacingOccurrences(of: "#", with: "")
         guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
