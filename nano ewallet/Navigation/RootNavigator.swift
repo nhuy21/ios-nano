@@ -57,6 +57,12 @@ private struct OnboardingFlow: View {
         case choice
         /// Giới thiệu các bước eKYC trước khi mở SDK.
         case cccdScan
+        /// Xem lại thông tin chip + bổ sung + chọn tài khoản nhận tiền.
+        case kycReview
+        /// Đang gọi create-agreement (Bảo Kim cần 2-5 phút dựng ví).
+        case preparingAgreement
+        /// Ký thoả thuận mở ví.
+        case agreement(embedLink: String)
         case linkBaoKim
         /// Đang nhúng trang OTP của Bảo Kim.
         case linking(embedLink: String)
@@ -92,6 +98,23 @@ private struct OnboardingFlow: View {
             }
     }
 
+    /// Hồ sơ đã sạch lỗi — xin thoả thuận mở ví. BE không tự thử lại nên phải poll ở đây.
+    private func prepareAgreement() {
+        step = .preparingAgreement
+        Task {
+            do {
+                let embedLink = try await OnboardingService.createAgreementAndPoll()
+                step = .agreement(embedLink: embedLink)
+            } catch let error as APIError {
+                ekycError = error.message
+                step = .kycReview
+            } catch {
+                ekycError = "Không tạo được thoả thuận mở ví, vui lòng thử lại"
+                step = .kycReview
+            }
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch step {
@@ -112,10 +135,7 @@ private struct OnboardingFlow: View {
                     onStartEkyc: {
                         Task {
                             await EkycLauncher.start(
-                                onCompleted: { _ in
-                                    // TODO: màn bổ sung thông tin (KycReview) đối soát C06
-                                    // rồi mới gửi hồ sơ. Chưa có nên tạm dừng tại đây.
-                                },
+                                onCompleted: { _ in step = .kycReview },
                                 onFailed: { message in ekycError = message }
                             )
                         }
@@ -123,6 +143,25 @@ private struct OnboardingFlow: View {
                 )
                 .hidesSystemNavigationBar()
             }
+
+        case .kycReview:
+            KycReviewView(
+                onBack: { step = .cccdScan },
+                onSubmitted: { prepareAgreement() }
+            )
+
+        case .preparingAgreement:
+            OnboardingLoadingView(message: "Đang chuẩn bị thoả thuận mở ví...")
+
+        case .agreement(let embedLink):
+            // Trang của Bảo Kim tự có nút đồng ý, không có URL callback báo về nên không
+            // biết chính xác lúc nào user bấm xong. Cả hai lối ra đều dẫn tới màn quy tắc:
+            // "Hoàn tất" có đối soát ví trước, thoát ngang thì không.
+            AgreementWebView(
+                embedLink: embedLink,
+                onBack: { step = .rules },
+                onLinked: { step = .rules }
+            )
 
         case .linkBaoKim:
             NavigationStack {

@@ -193,10 +193,11 @@ struct WalletLinkingWebView: View {
 
 // MARK: - Cầu nối WKWebView
 
-/// Giữ tham chiếu tới `WKWebView` để chạy JS từ phía SwiftUI.
+/// Giữ tham chiếu tới `WKWebView` để chạy JS từ phía SwiftUI. Dùng chung cho cả màn liên
+/// kết ví lẫn màn ký thoả thuận.
 @MainActor
 final class WebViewController {
-    fileprivate weak var webView: WKWebView?
+    weak var webView: WKWebView?
 
     func evaluate(_ script: String) async -> String {
         guard let webView else { return "" }
