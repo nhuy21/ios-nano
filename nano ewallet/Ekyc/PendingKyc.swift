@@ -11,6 +11,28 @@
 import Foundation
 import Combine
 
+/// Bản chốt bất biến để nộp hồ sơ — tách khỏi store đang thay đổi liên tục, tránh
+/// trường hợp người dùng sửa dở giữa lúc request đang bay.
+struct PendingKycSnapshot {
+    let frontImageBase64: String?
+    let backImageBase64: String?
+    let livenessPortraitBase64: String?
+    let portraitInCardBase64: String?
+    let fullName: String
+    let dateOfBirth: String
+    let genderCode: Int
+    let idCardNumber: String
+    let issueDate: String
+    let expireDate: String
+    let placeOfIssues: String?
+    let address: String
+    let temporaryLocation: String?
+    let business: String?
+    let position: String?
+    let purposeOfUsing: String?
+    let businessAreaId: String?
+}
+
 @MainActor
 final class PendingKyc: ObservableObject {
 
@@ -25,6 +47,9 @@ final class PendingKyc: ObservableObject {
     /// soát passive authentication với C06.
     @Published var nfcRaw: [String: Any]?
 
+    /// Ảnh chân dung lấy từ chip — khác `livenessPortraitBase64` (ảnh chụp lúc xác thực).
+    @Published var portraitInCardBase64: String?
+
     /// Trường chữ bóc từ OCR/NFC.
     @Published var idCardNumber: String?
     @Published var fullName: String?
@@ -33,15 +58,69 @@ final class PendingKyc: ObservableObject {
     @Published var address: String?
     @Published var issueDate: String?
     @Published var expireDate: String?
+    /// Chip không trả nơi cấp — để trống, lúc nộp hồ sơ điền mặc định.
+    @Published var placeOfIssues: String?
+
+    /// Người dùng tự nhập/chọn ở màn bổ sung thông tin.
+    @Published var temporaryLocation: String?
+    @Published var business: String?
+    @Published var position: String?
+    @Published var purposeOfUsing: String?
+    @Published var businessAreaId: String?
 
     var hasAllImages: Bool {
         frontImageBase64 != nil && backImageBase64 != nil && livenessPortraitBase64 != nil
+    }
+
+    /// Chuỗi JSON của dữ liệu chip — BE nhận `nfcRawData` dạng chuỗi, không phải object.
+    var nfcRawJson: String? {
+        guard let nfcRaw,
+              let data = try? JSONSerialization.data(withJSONObject: nfcRaw)
+        else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Quy ước Bảo Kim: 1 nam, 2 nữ, 3 khác. Chip trả chuỗi tiếng Việt.
+    var genderCode: Int {
+        switch gender?.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "nam": return 1
+        case "nữ", "nu": return 2
+        default: return 3
+        }
+    }
+
+    /// Chốt dữ liệu để nộp. `nil` khi thiếu trường bắt buộc mà chip phải có — thiếu thì
+    /// phải quét lại CCCD chứ không nộp hồ sơ khuyết.
+    func snapshot() -> PendingKycSnapshot? {
+        guard let fullName, let dateOfBirth, let idCardNumber,
+              let issueDate, let expireDate, let address
+        else { return nil }
+        return PendingKycSnapshot(
+            frontImageBase64: frontImageBase64,
+            backImageBase64: backImageBase64,
+            livenessPortraitBase64: livenessPortraitBase64,
+            portraitInCardBase64: portraitInCardBase64,
+            fullName: fullName,
+            dateOfBirth: dateOfBirth,
+            genderCode: genderCode,
+            idCardNumber: idCardNumber,
+            issueDate: issueDate,
+            expireDate: expireDate,
+            placeOfIssues: placeOfIssues,
+            address: address,
+            temporaryLocation: temporaryLocation,
+            business: business,
+            position: position,
+            purposeOfUsing: purposeOfUsing,
+            businessAreaId: businessAreaId
+        )
     }
 
     func clear() {
         frontImageBase64 = nil
         backImageBase64 = nil
         livenessPortraitBase64 = nil
+        portraitInCardBase64 = nil
         nfcRaw = nil
         idCardNumber = nil
         fullName = nil
@@ -50,6 +129,12 @@ final class PendingKyc: ObservableObject {
         address = nil
         issueDate = nil
         expireDate = nil
+        placeOfIssues = nil
+        temporaryLocation = nil
+        business = nil
+        position = nil
+        purposeOfUsing = nil
+        businessAreaId = nil
     }
 
     /// Tóm tắt để soi log — CHỈ in độ dài base64, không in nội dung ảnh.

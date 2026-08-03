@@ -955,7 +955,8 @@ private struct BlinkingCaret: View {
 }
 
 /// Logo ngân hàng thật (ảnh mạng) kèm fallback khối màu brand + tên viết tắt.
-private struct BankLogoView: View {
+/// Không `private` — dùng lại ở lưới chọn ngân hàng của màn bổ sung thông tin eKYC.
+struct BankLogoView: View {
     let bank: Bank?
     var size: CGFloat = 34
 
