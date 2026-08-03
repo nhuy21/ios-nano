@@ -72,14 +72,14 @@ struct OtpView: View {
                     .foregroundStyle(AppColor.payInk)
 
                 // Sửa bug: hiện đầy đủ câu dẫn thay vì chỉ SĐT trần.
-                (
+                HStack(spacing: 0) {
                     Text("Mã xác thực đã gửi tới ")
                         .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.payMuted)
-                    + Text(maskedPhone)
+                    Text(maskedPhone)
                         .font(AppFont.beVietnamPro(14, .bold))
                         .foregroundStyle(AppColor.payInk)
-                )
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
@@ -225,14 +225,14 @@ struct OtpView: View {
                 .underline()
                 .disabled(vm.isResending)
             } else {
-                (
+                HStack(spacing: 0) {
                     Text("Gửi lại sau ")
                         .font(.system(size: 13))
                         .foregroundStyle(AppColor.muted)
-                    + Text("\(vm.countdown)s")
+                    Text("\(vm.countdown)s")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(AppColor.brand)
-                )
+                }
             }
         }
         .frame(maxWidth: .infinity)

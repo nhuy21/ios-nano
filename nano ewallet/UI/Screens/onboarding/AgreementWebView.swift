@@ -63,6 +63,17 @@ struct AgreementWebView: View {
         "Thực hiện các giao dịch/hành vi không được phép khác theo quy định pháp luật tuỳ từng thời điểm.",
     ]
 
+    /// Câu dẫn danh sách hành vi bị cấm — in đậm riêng "KHÔNG ĐƯỢC" bằng
+    /// `AttributedString` (thay `Text + Text` đã deprecated ở iOS 26).
+    private var prohibitedIntro: AttributedString {
+        var result = AttributedString("Quý khách hàng ")
+        var emphasis = AttributedString("KHÔNG ĐƯỢC")
+        emphasis.font = AppFont.beVietnamPro(14, .bold)
+        result += emphasis
+        result += AttributedString(" sử dụng Ví điện tử Baokim để:")
+        return result
+    }
+
     @State private var stage: Stage = .loading
     @State private var agreeNoViolation = false
     @State private var agreeTerms = false
@@ -192,15 +203,13 @@ struct AgreementWebView: View {
                 .tracking(0.8)
                 .fixedSize(horizontal: false, vertical: true)
 
-            (
-                Text("Quý khách hàng ")
-                    + Text("KHÔNG ĐƯỢC").font(AppFont.beVietnamPro(14, .bold))
-                    + Text(" sử dụng Ví điện tử Baokim để:")
-            )
-            .font(AppFont.beVietnamPro(14))
-            .foregroundStyle(Bk.ink)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 12)
+            // AttributedString thay `Text + Text` (deprecated iOS 26) — vẫn là MỘT `Text`
+            // nên đoạn dài tự wrap đúng.
+            Text(prohibitedIntro)
+                .font(AppFont.beVietnamPro(14))
+                .foregroundStyle(Bk.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Self.prohibitedItems, id: \.self) { item in

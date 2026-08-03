@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct FixEkycFieldsView: View {
 
@@ -280,6 +281,17 @@ struct KycOptionPickerSheet: View {
     /// Ngưỡng hiện ô tìm kiếm — dưới ngưỡng thì lướt mắt nhanh hơn gõ.
     private var showsSearch: Bool { options.count > 8 }
 
+    /// Trần chiều cao vùng cuộn = 55% màn hình. Lấy qua `windowScene.screen` thay
+    /// `UIScreen.main` (deprecated iOS 26); không có scene thì rơi về 872pt (iPhone 15).
+    private var maxListHeight: CGFloat {
+        let screenHeight = (UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)?
+            .screen.bounds.height
+        return (screenHeight ?? 872) * 0.55
+    }
+
     private var filtered: [KycOption] {
         let needle = query.trimmingCharacters(in: .whitespaces).noAccentLowercasedKyc
         guard !needle.isEmpty else { return options }
@@ -349,7 +361,11 @@ struct KycOptionPickerSheet: View {
             // Chỉ giới hạn chiều cao của VÙNG CUỘN, không giới hạn cả thẻ: đặt ở thẻ thì
             // phần đầu bị đẩy khỏi khung, danh sách hiện từ giữa chừng. Cách này danh sách
             // ngắn thì thẻ co vừa đủ, dài thì cuộn bên trong.
-            .frame(maxHeight: UIScreen.main.bounds.height * 0.55)
+            //
+            // `maxListHeight` đọc màn hình qua `connectedScenes` thay `UIScreen.main`
+            // (deprecated iOS 26) — vẫn là `maxHeight` nên danh sách ngắn KHÔNG bị giãn
+            // (khác `containerRelativeFrame`, cái đó ép đúng bằng tỉ lệ).
+            .frame(maxHeight: maxListHeight)
         }
         .frame(maxWidth: .infinity)
         .background(Color.white)

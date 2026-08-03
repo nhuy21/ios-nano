@@ -166,15 +166,14 @@ struct WalletOnboardingChoiceView: View {
     }
 
     private var supportLink: some View {
-        (
+        HStack(spacing: 0) {
             Text("Cần trợ giúp?  ")
                 .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
-            + Text("Liên hệ hỗ trợ")
+            Text("Liên hệ hỗ trợ")
                 .font(AppFont.beVietnamPro(13, .bold))
                 .foregroundStyle(AppColor.brand)
-        )
-        .multilineTextAlignment(.center)
+        }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { onContactSupport() }

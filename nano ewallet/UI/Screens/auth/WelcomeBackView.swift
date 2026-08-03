@@ -131,19 +131,23 @@ struct WelcomeBackView: View {
         }
     }
 
+    /// Dùng `AttributedString` thay `Text + Text` (deprecated iOS 26) — vẫn là MỘT `Text`
+    /// nên câu tự wrap nhiều dòng và canh giữa được, khác `HStack` (không wrap).
     private var greeting: some View {
-        (
-            Text("Chào mừng ")
-                .font(AppFont.baloo2(22, .bold))
-                .foregroundStyle(AppColor.payInk)
-            + Text(maskedPhone)
-                .font(AppFont.baloo2(22, .bold))
-                .foregroundStyle(AppColor.brand)
-            + Text(" trở lại!")
-                .font(AppFont.baloo2(22, .bold))
-                .foregroundStyle(AppColor.payInk)
-        )
-        .multilineTextAlignment(.center)
+        var result = AttributedString("Chào mừng ")
+        result.foregroundColor = AppColor.payInk
+
+        var phone = AttributedString(maskedPhone)
+        phone.foregroundColor = AppColor.brand
+        result += phone
+
+        var suffix = AttributedString(" trở lại!")
+        suffix.foregroundColor = AppColor.payInk
+        result += suffix
+
+        return Text(result)
+            .font(AppFont.baloo2(22, .bold))
+            .multilineTextAlignment(.center)
     }
 
     private func submit() {

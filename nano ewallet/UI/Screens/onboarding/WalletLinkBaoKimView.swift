@@ -150,24 +150,29 @@ struct WalletLinkBaoKimView: View {
         }
     }
 
+    /// `AttributedString` thay `Text + Text` (deprecated iOS 26) — đoạn dài nhiều dòng nên
+    /// phải giữ trong MỘT `Text` để wrap đúng, không dùng HStack được.
     private var consentText: some View {
-        (
-            Text("Bằng việc liên kết ví, bạn đồng ý cho Ví nano truy cập và quản lý thông tin ví Bảo Kim của bạn theo ")
-                .foregroundStyle(AppColor.payMuted)
-            + Text("Điều khoản sử dụng")
-                .font(AppFont.beVietnamPro(12.5, .semibold))
-                .foregroundStyle(AppColor.brand)
-            + Text(" và ")
-                .foregroundStyle(AppColor.payMuted)
-            + Text("Chính sách bảo mật")
-                .font(AppFont.beVietnamPro(12.5, .semibold))
-                .foregroundStyle(AppColor.brand)
-            + Text(".")
-                .foregroundStyle(AppColor.payMuted)
+        func segment(_ text: String, highlighted: Bool) -> AttributedString {
+            var part = AttributedString(text)
+            part.foregroundColor = highlighted ? AppColor.brand : AppColor.payMuted
+            if highlighted { part.font = AppFont.beVietnamPro(12.5, .semibold) }
+            return part
+        }
+
+        var result = segment(
+            "Bằng việc liên kết ví, bạn đồng ý cho Ví nano truy cập và quản lý thông tin ví Bảo Kim của bạn theo ",
+            highlighted: false
         )
-        .font(AppFont.beVietnamPro(12.5))
-        .lineSpacing(4)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        result += segment("Điều khoản sử dụng", highlighted: true)
+        result += segment(" và ", highlighted: false)
+        result += segment("Chính sách bảo mật", highlighted: true)
+        result += segment(".", highlighted: false)
+
+        return Text(result)
+            .font(AppFont.beVietnamPro(12.5))
+            .lineSpacing(4)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func submit() {
