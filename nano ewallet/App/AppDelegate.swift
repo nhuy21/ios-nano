@@ -48,6 +48,27 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Không chặn app — chỉ là push không dùng được (vd Simulator, thiếu capability).
         print("[Push] Đăng ký remote notification thất bại: \(error.localizedDescription)")
     }
+
+    /// App bị ĐÁNH THỨC ở nền để xử lý push (BE gửi `content-available: 1`) — áp số dư và
+    /// giao dịch mới vào cache NGAY, để lúc user mở app là đã tươi, không phải đợi vòng
+    /// refresh/poll đầu tiên.
+    ///
+    /// `willPresent`/`didReceive response` không thay được hàm này: cái đầu chỉ chạy khi
+    /// app đang mở, cái sau chỉ chạy khi user chủ động bấm thông báo.
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard let type = userInfo["type"] as? String, type == "TRANSACTION" else {
+            completionHandler(.noData)
+            return
+        }
+        Task { @MainActor in
+            Self.applyTransactionPush(userInfo)
+            completionHandler(.newData)
+        }
+    }
 }
 
 // MARK: - FCM token
