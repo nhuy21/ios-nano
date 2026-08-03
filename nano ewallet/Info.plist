@@ -31,6 +31,10 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- CHƯA khai `ITSAppUsesNonExemptEncryption` — app nhúng 3 SDK closed-source
+	     (CmcEkycSDK, iProov, KalapaSDK) nên chưa xác minh được chúng có dùng mã hoá
+	     NGOÀI diện miễn trừ hay không. Chờ CMC/iProov xác nhận rồi mới khai cứng;
+	     tạm thời chọn tay trong App Store Connect mỗi lần upload. -->
 	<key>NFCReaderUsageDescription</key>
 	<string>Ứng dụng cần quyền NFC để đọc thông tin chip trên CCCD.</string>
 	<key>NSCameraUsageDescription</key>
