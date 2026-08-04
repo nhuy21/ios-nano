@@ -64,7 +64,9 @@ final class APIClient {
             throw APIError.decoding("\(error)")
         }
         guard let payload = envelope.data else {
-            throw APIError.decoding("thiếu `data` @ \(path)")
+            // Case riêng, không gộp vào `.decoding`: interceptor của BE loại bỏ hẳn field
+            // `data` khi giá trị null, nên có endpoint (giao dịch) coi đây là hợp lệ.
+            throw APIError.missingData(path: path)
         }
         return payload
     }

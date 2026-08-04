@@ -169,4 +169,24 @@ struct TransferResult: Decodable {
 
     var isPending: Bool { pending == true }
     var isSuccess: Bool { status == "SUCCESS" }
+
+    /// Giao dịch đã chạy xong nhưng BE không kèm chi tiết nào — xem
+    /// `TransferService.performTransfer` để biết khi nào dùng.
+    static let empty = TransferResult(
+        pending: nil, transactionId: nil, status: nil,
+        transAmount: nil, feeAmount: nil, transId: nil, bkTransId: nil
+    )
+
+    private init(
+        pending: Bool?, transactionId: String?, status: String?,
+        transAmount: Int64?, feeAmount: Int64?, transId: String?, bkTransId: String?
+    ) {
+        self.pending = pending
+        self.transactionId = transactionId
+        self.status = status
+        self.transAmount = transAmount
+        self.feeAmount = feeAmount
+        self.transId = transId
+        self.bkTransId = bkTransId
+    }
 }

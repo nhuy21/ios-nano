@@ -17,6 +17,12 @@ enum APIError: LocalizedError, Equatable {
     /// Response 2xx nhưng thiếu `data` hoặc decode thất bại.
     case decoding(String)
 
+    /// Response 2xx nhưng KHÔNG có field `data`. Tách riêng khỏi `.decoding` vì có
+    /// endpoint coi đây là hợp lệ: interceptor của BE loại bỏ `data` khi giá trị null,
+    /// nên luồng giao dịch phải hiểu là "đã xong, không kèm chi tiết" thay vì lỗi
+    /// (xem `TransferService.performTransfer`).
+    case missingData(path: String)
+
     /// Chưa đăng nhập / không có token.
     case unauthenticated
 
@@ -33,6 +39,8 @@ enum APIError: LocalizedError, Equatable {
             return message
         case .decoding(let detail):
             return "Dữ liệu trả về không đúng định dạng (\(detail))"
+        case .missingData(let path):
+            return "Dữ liệu trả về không đúng định dạng (thiếu `data` @ \(path))"
         case .unauthenticated:
             return "Chưa đăng nhập, vui lòng đăng nhập lại"
         case .unknown(let detail):
