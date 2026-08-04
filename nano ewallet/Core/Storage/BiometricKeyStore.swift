@@ -189,10 +189,12 @@ nonisolated enum BiometricKeyStore {
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess else { return nil }
-        // `as?` chứ KHÔNG `as!`: status thành công mà item sai kiểu là bất thường nhưng không
-        // đáng crash app ví.
-        return item as? SecKey
+        guard status == errSecSuccess, let item else { return nil }
+        // Phải hỏi TYPE ID rồi mới ép kiểu. `item as? SecKey` không kiểm được gì: ép kiểu
+        // có điều kiện sang kiểu CoreFoundation luôn thành công (trình biên dịch cũng
+        // cảnh báo), nên ý định "sai kiểu thì trả nil thay vì crash" trước đây vô hiệu.
+        guard CFGetTypeID(item) == SecKeyGetTypeID() else { return nil }
+        return (item as! SecKey)
     }
 
     /// Khoá có tồn tại không, KHÔNG bật Face ID.
