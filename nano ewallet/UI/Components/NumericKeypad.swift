@@ -76,7 +76,7 @@ struct NumericKeypad: View {
             onDigit(label)
         } label: {
             Text(label)
-                .font(.system(size: label == "000" ? 20 : 24))
+                .font(AppFont.beVietnamPro(label == "000" ? 20 : 24))
                 .foregroundStyle(KpColor.keyText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(KpColor.key)
@@ -103,7 +103,7 @@ struct NumericKeypad: View {
     private var nextKey: some View {
         Button(action: onNext) {
             Text(nextTitle)
-                .font(.system(size: 17, weight: .semibold))
+                .font(AppFont.beVietnamPro(17, .semibold))
                 .foregroundStyle(nextEnabled ? .white : KpColor.nextDisabledText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(nextEnabled ? nextActiveColor : KpColor.nextDisabled)

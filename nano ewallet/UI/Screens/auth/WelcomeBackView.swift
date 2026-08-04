@@ -146,7 +146,7 @@ struct WelcomeBackView: View {
         result += suffix
 
         return Text(result)
-            .font(AppFont.baloo2(22, .bold))
+            .font(AppFont.beVietnamPro(22, .bold))
             .multilineTextAlignment(.center)
     }
 

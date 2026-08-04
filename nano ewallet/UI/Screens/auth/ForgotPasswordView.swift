@@ -37,7 +37,7 @@ struct ForgotPasswordView: View {
                     Spacer().frame(height: 24)
 
                     Text(title)
-                        .font(AppFont.baloo2(22, .bold))
+                        .font(AppFont.beVietnamPro(22, .bold))
                         .foregroundStyle(AppColor.payInk)
                         .multilineTextAlignment(.center)
 

@@ -226,7 +226,7 @@ struct MainTabView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             Text("Quét QR")
-                .font(.system(size: 11, weight: .medium))
+                .font(AppFont.beVietnamPro(11, .medium))
                 .foregroundStyle(AppColor.payInk)
             Spacer().frame(height: 11)
         }
@@ -247,7 +247,7 @@ struct MainTabView: View {
                 icon(tint)
                     .scaleEffect(isActive ? 1.10 : 1)
                 Text(label)
-                    .font(.system(size: 10, weight: isActive ? .semibold : .regular))
+                    .font(AppFont.beVietnamPro(10, isActive ? .semibold : .regular))
                     .foregroundStyle(tint)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

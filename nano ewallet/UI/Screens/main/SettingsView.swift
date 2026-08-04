@@ -165,7 +165,7 @@ struct SettingsView: View {
                 Spacer().frame(height: 16)
 
                 Text("Phiên bản 1.0.0")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
                     .frame(maxWidth: .infinity, alignment: .center)
 
@@ -215,18 +215,18 @@ struct SettingsView: View {
                 .frame(width: 80, height: 80)
                 .overlay {
                     Text(initials)
-                        .font(AppFont.baloo2(28, .heavy))
+                        .font(AppFont.beVietnamPro(28, .heavy))
                         .foregroundStyle(.white)
                 }
                 .shadow(color: SettingsColor.accent.opacity(0.25), radius: 10, x: 0, y: 4)
 
             Text(displayName)
-                .font(AppFont.baloo2(18, .bold))
+                .font(AppFont.beVietnamPro(18, .bold))
                 .foregroundStyle(AppColor.payInk)
 
             if let phone = authStore.userPhone, !phone.isEmpty {
                 Text("+\(phone)")
-                    .font(.system(size: 14))
+                    .font(AppFont.beVietnamPro(14))
                     .foregroundStyle(AppColor.payMuted)
             }
 
@@ -245,7 +245,7 @@ struct SettingsView: View {
             if !isVerified { comingSoonFeature = "Xác thực tài khoản" }
         } label: {
             Text(isVerified ? "Đã xác thực" : "Xác thực ngay")
-                .font(.system(size: 12, weight: .semibold))
+                .font(AppFont.beVietnamPro(12, .semibold))
                 .foregroundStyle(isVerified ? SettingsColor.greenVerify : SettingsColor.accent)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -461,7 +461,7 @@ private struct SupportSheet: View {
                     }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(label)
-                        .font(.system(size: 11))
+                        .font(AppFont.beVietnamPro(11))
                         .foregroundStyle(AppColor.payMuted)
                     Text(value)
                         .font(AppFont.beVietnamPro(14, .semibold))

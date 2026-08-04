@@ -558,7 +558,7 @@ struct WalletTransferAmountView: View {
         VStack(spacing: 12) {
             ZStack {
                 Text(amountText.isEmpty ? "0đ" : "\(Int(amount).vndGrouped)đ")
-                    .font(AppFont.baloo2(34, .bold))
+                    .font(AppFont.beVietnamPro(34, .bold))
                     .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)

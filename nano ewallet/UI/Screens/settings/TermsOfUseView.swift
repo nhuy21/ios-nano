@@ -87,7 +87,7 @@ struct TermsOfUseView: View {
                     Spacer().frame(height: 4)
 
                     Text("Cập nhật lần cuối: 11/07/2026")
-                        .font(.system(size: 12))
+                        .font(AppFont.beVietnamPro(12))
                         .foregroundStyle(AppColor.payMuted)
 
                     Spacer().frame(height: 20)
@@ -101,7 +101,7 @@ struct TermsOfUseView: View {
                         Spacer().frame(height: 6)
 
                         Text(block.body)
-                            .font(.system(size: 13.5))
+                            .font(AppFont.beVietnamPro(13.5))
                             .foregroundStyle(AppColor.payMuted)
                             .lineSpacing(6)
                             .multilineTextAlignment(.leading)

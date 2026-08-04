@@ -23,7 +23,7 @@ struct ChangePasswordView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Mật khẩu đăng nhập gồm 6 chữ số. Không dùng dãy số dễ đoán (123456, ngày sinh...).")
-                        .font(.system(size: 13))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.payMuted)
 
                     Spacer().frame(height: 16)

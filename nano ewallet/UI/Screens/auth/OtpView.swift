@@ -53,7 +53,7 @@ struct OtpView: View {
                 Spacer()
 
                 Text("Bước 1 / 3")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
             }
             .padding(.horizontal, 24)
@@ -152,7 +152,7 @@ struct OtpView: View {
             .overlay {
                 if let digit {
                     Text(String(digit))
-                        .font(.system(size: 24, weight: .bold))
+                        .font(AppFont.beVietnamPro(24, .bold))
                         .foregroundStyle(vm.hasError ? AppColor.error : AppColor.ink)
                 } else if isActive {
                     Rectangle()
@@ -173,10 +173,10 @@ struct OtpView: View {
         if vm.hasError {
             HStack(spacing: 6) {
                 Text("✕")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(AppFont.beVietnamPro(13, .bold))
                     .foregroundStyle(AppColor.error)
                 Text(vm.errorMsg)
-                    .font(.system(size: 13))
+                    .font(AppFont.beVietnamPro(13))
                     .foregroundStyle(AppColor.error)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -194,9 +194,9 @@ struct OtpView: View {
         return Button(action: submit) {
             HStack(spacing: 8) {
                 Text(vm.isVerifying ? "Đang xác thực..." : "Xác nhận")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(AppFont.beVietnamPro(16, .semibold))
                 if !vm.isVerifying {
-                    Text("✓").font(.system(size: 18, weight: .bold))
+                    Text("✓").font(AppFont.beVietnamPro(18, .bold))
                 }
             }
             .foregroundStyle(isEnabled ? .white : AppColor.muted)
@@ -212,7 +212,7 @@ struct OtpView: View {
     private var resendRow: some View {
         HStack(spacing: 6) {
             Text("Không nhận được mã?")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.muted)
 
             if vm.canResend {
@@ -220,17 +220,17 @@ struct OtpView: View {
                     Task { await vm.resend() }
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 13, weight: .semibold))
+                .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(vm.isResending ? AppColor.muted : AppColor.brand)
                 .underline()
                 .disabled(vm.isResending)
             } else {
                 HStack(spacing: 0) {
                     Text("Gửi lại sau ")
-                        .font(.system(size: 13))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.muted)
                     Text("\(vm.countdown)s")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppFont.beVietnamPro(13, .semibold))
                         .foregroundStyle(AppColor.brand)
                 }
             }

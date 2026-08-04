@@ -541,7 +541,7 @@ struct BankTransferView: View {
                             }
                             HStack(spacing: 4) {
                                 Text(amountText.isEmpty ? "0" : amountText)
-                                    .font(AppFont.baloo2(amountFontSize, .bold))
+                                    .font(AppFont.beVietnamPro(amountFontSize, .bold))
                                     .foregroundStyle(amountText.isEmpty ? AppColor.line : AppColor.payInk)
                                     .lineLimit(1)
                                 if amountEditable && isAmountFocused {

@@ -8,8 +8,8 @@
 import SwiftUI
 import UIKit
 
-/// Font của app. Cần copy 5 file BeVietnamPro + Baloo2 từ
-/// `flash-wallet/app/src/main/res/font/` vào project và khai `UIAppFonts` trong Info.plist.
+/// Font của app: DUY NHẤT BeVietnamPro (5 file weight, copy từ
+/// `flash-wallet/app/src/main/res/font/`, khai trong `UIAppFonts` của Info.plist).
 ///
 /// Khi CHƯA nhúng file font: `.custom()` với tên không tồn tại rơi về system font nhưng
 /// MẤT LUÔN weight -> chữ đáng lẽ bold hiện ra mỏng như regular ở khắp app. Nên phải tự
@@ -46,19 +46,8 @@ enum AppFont {
         }
     }
 
-    // MARK: Baloo2 — chỉ dùng cho số dư và vài tiêu đề
-
-    static func baloo2(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        // Baloo2 bên Android là variable font, iOS cần file static theo weight.
-        // baloo2.ttf là VARIABLE font, chỉ expose đúng 1 face "Baloo2-Regular" — không
-        // có Baloo2-Bold/SemiBold/... như bên Android. Nên nạp face đó rồi áp weight
-        // lên trên để iOS tự chọn instance theo trục weight.
-        let effective: Font.Weight = (weight == .regular) ? .bold : weight
-        let name = "Baloo2-Regular"
-        return isAvailable(name)
-            ? .custom(name, size: size).weight(effective)
-            : .system(size: size, weight: effective)
-    }
+    // Baloo2 đã bỏ: toàn app dùng MỘT font BeVietnamPro, kể cả số dư và số tiền.
+    // File baloo2.ttf vẫn nằm trong bundle/Info.plist nhưng không code nào gọi tới.
 }
 
 /// Type scale lấy đúng từ `Type.kt`.

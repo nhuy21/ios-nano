@@ -369,7 +369,7 @@ struct QrScanView: View {
                 icon()
                 if isNew {
                     Text("MỚI")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(AppFont.beVietnamPro(8, .bold))
                         .foregroundStyle(.white)
                         // fixedSize: badge nằm trong ZStack rộng 22pt nên bị ép xuống
                         // dòng thành "MỚ / I" nếu không cho nó giữ bề rộng tự nhiên.

@@ -45,7 +45,7 @@ struct LinkedBanksView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if wallet.bankNo == nil || wallet.accNo == nil {
                 Text("Chưa có ngân hàng liên kết")
-                    .font(.system(size: 14))
+                    .font(AppFont.beVietnamPro(14))
                     .foregroundStyle(LinkedBanksColor.labelGray)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -152,7 +152,7 @@ struct LinkedBanksView: View {
                     .font(.system(size: 16))
                     .foregroundStyle(LinkedBanksColor.accentGreen)
                 Text("Giao dịch từ \(pinLimitValue.vndFormatted) trở lên cần nhập mã PIN để xác thực. Bạn có thể điều chỉnh ngưỡng này trong mục Cá nhân → Ngưỡng xác thực PIN.")
-                    .font(.system(size: 12.5))
+                    .font(AppFont.beVietnamPro(12.5))
                     .foregroundStyle(LinkedBanksColor.labelGray)
                     .lineSpacing(4)
             }
@@ -166,7 +166,7 @@ struct LinkedBanksView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(label)
-                    .font(.system(size: 14))
+                    .font(AppFont.beVietnamPro(14))
                     .foregroundStyle(LinkedBanksColor.labelGray)
                 Spacer()
                 Text(value)

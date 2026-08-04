@@ -27,11 +27,11 @@ struct DeviceConflictDialog: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Tài khoản đang đăng nhập ở thiết bị khác")
-                .font(.system(size: 17, weight: .bold))
+                .font(AppFont.beVietnamPro(17, .bold))
                 .foregroundStyle(DialogColor.ink)
 
             Text("Mỗi tài khoản chỉ dùng được trên 1 thiết bị. Bạn có muốn gửi mã OTP để đăng xuất thiết bị kia và đăng nhập trên máy này không?")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(DialogColor.muted)
                 .lineSpacing(6)
                 .padding(.top, 8)
@@ -41,7 +41,7 @@ struct DeviceConflictDialog: View {
                     onDismiss()
                 } label: {
                     Text("Huỷ")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppFont.beVietnamPro(14, .semibold))
                         .foregroundStyle(DialogColor.muted)
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
@@ -55,7 +55,7 @@ struct DeviceConflictDialog: View {
                     onConfirm()
                 } label: {
                     Text(sending ? "Đang gửi…" : "Gửi mã OTP")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppFont.beVietnamPro(14, .semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
@@ -89,11 +89,11 @@ struct DeviceOtpDialog: View {
     var body: some View {
         VStack(spacing: 0) {
             Text("Nhập mã OTP")
-                .font(.system(size: 17, weight: .bold))
+                .font(AppFont.beVietnamPro(17, .bold))
                 .foregroundStyle(DialogColor.ink)
 
             Text(subtitle)
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(DialogColor.muted)
                 .multilineTextAlignment(.center)
                 .padding(.top, 6)
@@ -116,11 +116,11 @@ struct DeviceOtpDialog: View {
             Group {
                 if verifying {
                     Text("Đang xác thực…")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFont.beVietnamPro(13, .medium))
                         .foregroundStyle(DialogColor.muted)
                 } else if let errorText {
                     Text(errorText)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFont.beVietnamPro(13, .medium))
                         .foregroundStyle(DialogColor.err)
                         .multilineTextAlignment(.center)
                 } else {
@@ -215,7 +215,7 @@ private struct DialogKeypad: View {
             onDigit(digit)
         } label: {
             Text(digit)
-                .font(AppFont.baloo2(26, .bold))
+                .font(AppFont.beVietnamPro(26, .bold))
                 .foregroundStyle(DialogColor.ink)
                 .frame(maxWidth: .infinity)
                 .frame(height: 62)
@@ -236,7 +236,7 @@ private struct DialogKeypad: View {
     ) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: fontSize, weight: weight))
+                .font(AppFont.beVietnamPro(fontSize, weight))
                 .foregroundStyle(color)
                 .frame(maxWidth: .infinity)
                 .frame(height: 62)

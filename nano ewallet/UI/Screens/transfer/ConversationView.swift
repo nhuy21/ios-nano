@@ -93,7 +93,7 @@ struct ConversationView: View {
                 .frame(width: 38, height: 38)
                 .overlay {
                     Text(Self.initials(for: displayName))
-                        .font(.system(size: 14, weight: .bold))
+                        .font(AppFont.beVietnamPro(14, .bold))
                         .foregroundStyle(AppColor.brand)
                 }
 
@@ -102,7 +102,7 @@ struct ConversationView: View {
                     .font(AppFont.beVietnamPro(16, .bold))
                     .foregroundStyle(AppColor.payInk)
                 Text("Xin chuyển tiền")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
             }
 
@@ -152,12 +152,12 @@ struct ConversationView: View {
 
                 if let note = item.note, !note.isEmpty {
                     Text("\"\(note)\"")
-                        .font(.system(size: 14))
+                        .font(AppFont.beVietnamPro(14))
                         .foregroundStyle(AppColor.payInk.opacity(0.8))
                 }
 
                 Text(item.status.label)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFont.beVietnamPro(12, .medium))
                     .foregroundStyle(statusColor(item.status))
 
                 if pending && !item.outgoing {
@@ -194,7 +194,7 @@ struct ConversationView: View {
                 } else if pending && item.outgoing {
                     Button("Huỷ yêu cầu") { cancel(item) }
                         .buttonStyle(.plain)
-                        .font(.system(size: 13))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.error)
                         .disabled(busyId == item.id)
                         .padding(.top, 2)
@@ -227,7 +227,7 @@ struct ConversationView: View {
                     amountText = Int(suggestedAmount).vndGrouped
                 } label: {
                     Text("Dùng \(Int(suggestedAmount).vndFormatted)")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppFont.beVietnamPro(13, .semibold))
                         .foregroundStyle(AppColor.brand)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)

@@ -142,13 +142,13 @@ struct BankCard: View {
             Spacer().frame(height: 4)
 
             Text("Ngân hàng liên kết")
-                .font(.system(size: 12))
+                .font(AppFont.beVietnamPro(12))
                 .foregroundStyle(ink.opacity(0.75))
 
             Spacer(minLength: 0)
 
             Text("Số thẻ / tài khoản")
-                .font(.system(size: 11))
+                .font(AppFont.beVietnamPro(11))
                 .foregroundStyle(ink.opacity(0.6))
                 .tracking(0.5)
 
@@ -164,7 +164,7 @@ struct BankCard: View {
             HStack(alignment: .bottom, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("CHỦ TÀI KHOẢN")
-                        .font(.system(size: 10))
+                        .font(AppFont.beVietnamPro(10))
                         .foregroundStyle(ink.opacity(0.55))
                         .tracking(0.8)
                     Text(holderName)
@@ -176,7 +176,7 @@ struct BankCard: View {
                 Spacer(minLength: 0)
 
                 Text(syncedDate)
-                    .font(.system(size: 11))
+                    .font(AppFont.beVietnamPro(11))
                     .foregroundStyle(ink.opacity(0.6))
             }
 

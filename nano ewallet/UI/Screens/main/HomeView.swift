@@ -365,7 +365,7 @@ struct HomeView: View {
                 // nên lúc nào cũng đỏ, người dùng không phân biệt được có gì mới hay không.
                 if notifications.unreadCount > 0 {
                     Text(notifications.unreadCount > 9 ? "9+" : "\(notifications.unreadCount)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(AppFont.beVietnamPro(10, .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 4)
                         .frame(minWidth: 16, minHeight: 16)
@@ -409,7 +409,7 @@ struct HomeView: View {
                         .frame(width: 40, height: 40)
                         .overlay {
                             Text(initials)
-                                .font(.system(size: 15, weight: .bold))
+                                .font(AppFont.beVietnamPro(15, .bold))
                                 .foregroundStyle(.white)
                         }
 
@@ -427,7 +427,7 @@ struct HomeView: View {
                             Image(systemName: "qrcode")
                             Text("QR")
                         }
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppFont.beVietnamPro(12, .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -592,7 +592,7 @@ struct HomeView: View {
             HStack(spacing: 6) {
                 icon()
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppFont.beVietnamPro(13, .semibold))
                     .lineLimit(1)
                 if isLoading {
                     ProgressView()
@@ -741,7 +741,7 @@ struct HomeView: View {
                                         .frame(width: 22, height: 22)
                                 }
                             Text(service.title)
-                                .font(.system(size: 11))
+                                .font(AppFont.beVietnamPro(11))
                                 .foregroundStyle(AppColor.payInk)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(2)
@@ -818,11 +818,11 @@ struct HomeView: View {
                     .frame(width: 50, height: 50)
                     .overlay {
                         Text(name.nameInitials)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(AppFont.beVietnamPro(16, .bold))
                             .foregroundStyle(.white)
                     }
                 Text(name)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppFont.beVietnamPro(11, .medium))
                     .foregroundStyle(AppColor.payInk)
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
@@ -859,7 +859,7 @@ struct HomeView: View {
                             .foregroundStyle(isPlain ? Color(hex: 0x00A85E) : AppColor.brand)
                     }
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppFont.beVietnamPro(11, .medium))
                     .foregroundStyle(AppColor.payInk)
                     .lineLimit(1)
             }
@@ -939,7 +939,7 @@ struct HomeView: View {
                         .foregroundStyle(AppColor.payInk)
                         .lineLimit(2)
                     Text(subtitle(for: tx))
-                        .font(.system(size: 11))
+                        .font(AppFont.beVietnamPro(11))
                         .foregroundStyle(AppColor.payMuted)
                 }
 
@@ -950,7 +950,7 @@ struct HomeView: View {
                         .font(AppFont.beVietnamPro(13, .semibold))
                         .foregroundStyle(TransactionDisplay.amountColor(for: tx))
                     Text(formattedTime(tx.createdAt))
-                        .font(.system(size: 11))
+                        .font(AppFont.beVietnamPro(11))
                         .foregroundStyle(AppColor.payMuted)
                 }
             }

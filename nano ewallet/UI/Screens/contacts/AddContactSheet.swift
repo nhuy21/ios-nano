@@ -146,7 +146,7 @@ struct AddContactSheet: View {
                     .font(.system(size: 13))
                     .foregroundStyle(AppColor.payMuted)
                 TextField("Tìm ngân hàng...", text: $bankSearch)
-                    .font(.system(size: 14))
+                    .font(AppFont.beVietnamPro(14))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -159,7 +159,7 @@ struct AddContactSheet: View {
 
             if isLoadingBanks {
                 Text("Đang tải danh sách ngân hàng...")
-                    .font(.system(size: 13))
+                    .font(AppFont.beVietnamPro(13))
                     .foregroundStyle(AppColor.payMuted)
                     .padding(.top, 8)
             } else {
@@ -197,7 +197,7 @@ struct AddContactSheet: View {
                 }
 
                 Text(bank.shortName)
-                    .font(.system(size: 10))
+                    .font(AppFont.beVietnamPro(10))
                     .foregroundStyle(AppColor.payInk)
                     .lineLimit(1)
             }
@@ -211,7 +211,7 @@ struct AddContactSheet: View {
             .fill(color)
             .overlay {
                 Text(String(bank.shortName.prefix(4)))
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppFont.beVietnamPro(9, .bold))
                     .foregroundStyle(.white)
             }
     }

@@ -147,7 +147,7 @@ struct ContactsView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(AppColor.payMuted)
             TextField("Tìm theo tên, số tài khoản...", text: $searchText)
-                .font(.system(size: 14))
+                .font(AppFont.beVietnamPro(14))
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -222,7 +222,7 @@ struct ContactsView: View {
                 .font(AppFont.beVietnamPro(15, .semibold))
                 .foregroundStyle(AppColor.payInk)
             Text(subtitle)
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -249,7 +249,7 @@ struct ContactsView: View {
                 .frame(width: 44, height: 44)
                 .overlay {
                     Text(initials(for: contact.displayName))
-                        .font(.system(size: 16, weight: .bold))
+                        .font(AppFont.beVietnamPro(16, .bold))
                         .foregroundStyle(.white)
                 }
 
@@ -258,7 +258,7 @@ struct ContactsView: View {
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.payInk)
                 Text(subtitle(for: contact))
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
             }
 

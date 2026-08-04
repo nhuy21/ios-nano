@@ -176,7 +176,7 @@ struct TransferSuccessView: View {
             // khoảng cho nét thòng nên căn mép dưới làm chữ "đ" tụt hẳn xuống.
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(Int(info.amount).vndGrouped)
-                    .font(AppFont.baloo2(34, .bold))
+                    .font(AppFont.beVietnamPro(34, .bold))
                     .foregroundStyle(accent)
                     .tracking(-1)
                 Text("đ")

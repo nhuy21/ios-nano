@@ -32,7 +32,7 @@ struct EditNicknameSheet: View {
                 .foregroundStyle(AppColor.payInk)
 
             Text("Ví dụ: Mẹ, Tiền nhà, Anh Nam...")
-                .font(.system(size: 12))
+                .font(AppFont.beVietnamPro(12))
                 .foregroundStyle(AppColor.payMuted)
 
             AppTextField(

@@ -24,11 +24,11 @@ struct TransactionDetailSheet: View {
                     .frame(width: 40, height: 40)
 
                 Text(signedAmount)
-                    .font(AppFont.baloo2(30, .heavy))
+                    .font(AppFont.beVietnamPro(30, .heavy))
                     .foregroundStyle(TransactionDisplay.amountColor(for: tx))
 
                 Text(TransactionDisplay.detailTitle(for: tx))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(AppFont.beVietnamPro(14, .semibold))
                     .foregroundStyle(AppColor.payInk)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -99,7 +99,7 @@ struct TransactionDetailSheet: View {
     private var statusBadge: some View {
         let meta = TransactionDisplay.statusMeta(for: tx)
         return Text(meta.text)
-            .font(.system(size: 12, weight: .semibold))
+            .font(AppFont.beVietnamPro(12, .semibold))
             .foregroundStyle(meta.color)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -111,11 +111,11 @@ struct TransactionDetailSheet: View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 Text(label)
-                    .font(.system(size: 13))
+                    .font(AppFont.beVietnamPro(13))
                     .foregroundStyle(AppColor.payMuted)
                     .frame(width: 130, alignment: .leading)
                 Text(value)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(AppFont.beVietnamPro(13, .medium))
                     .foregroundStyle(AppColor.payInk)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .multilineTextAlignment(.trailing)

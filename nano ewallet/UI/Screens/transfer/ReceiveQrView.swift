@@ -172,7 +172,7 @@ struct ReceiveQrView: View {
                         .aspectRatio(1, contentMode: .fit)
                 } else {
                     Text("Chưa có số ví")
-                        .font(.system(size: 13))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.payMuted)
                         .multilineTextAlignment(.center)
                 }
@@ -214,13 +214,13 @@ struct ReceiveQrView: View {
             Spacer().frame(height: 2)
 
             Text("Số ví · \(displayNo)")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
 
             if let fixedAmount {
                 Spacer().frame(height: 8)
                 Text("Số tiền: \(fixedAmount.vndFormatted)")
-                    .font(AppFont.baloo2(22, .bold))
+                    .font(AppFont.beVietnamPro(22, .bold))
                     .foregroundStyle(AppColor.brand)
             }
         }
@@ -275,7 +275,7 @@ struct ReceiveQrView: View {
                     .font(.system(size: 20))
                     .foregroundStyle(AppColor.brand)
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppFont.beVietnamPro(11, .medium))
                     .foregroundStyle(AppColor.payInk)
             }
             .frame(maxWidth: .infinity)
@@ -361,7 +361,7 @@ struct ReceiveQrView: View {
                 .foregroundStyle(AppColor.payInk)
 
             Text("Nhập số tiền cần nhận (để trống nếu để người gửi tự nhập)")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)

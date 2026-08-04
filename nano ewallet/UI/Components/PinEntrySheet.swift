@@ -34,7 +34,7 @@ struct PinEntrySheet: View {
 
             VStack(spacing: 4) {
                 Text(amountText)
-                    .font(AppFont.baloo2(28, .bold))
+                    .font(AppFont.beVietnamPro(28, .bold))
                     .foregroundStyle(AppColor.brand)
                 Text("Đến \(recipientName)")
                     .font(AppFont.beVietnamPro(13))

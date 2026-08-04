@@ -226,7 +226,7 @@ struct WithdrawView: View {
     private func infoRow(label: String, value: String) -> some View {
         HStack(spacing: 16) {
             Text(label)
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(WdColor.muted)
             Text(value)
                 .font(AppFont.beVietnamPro(13, .bold))
@@ -312,7 +312,7 @@ struct WithdrawView: View {
                     .frame(width: 56, height: 56)
                     .overlay {
                         Text(bank.shortName.prefix(4))
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppFont.beVietnamPro(11, .bold))
                             .foregroundStyle(isSelected ? .white : AppColor.payInk)
                     }
                     .overlay {
@@ -320,7 +320,7 @@ struct WithdrawView: View {
                             .strokeBorder(isSelected ? Color.clear : AppColor.payInputBorder, lineWidth: 1)
                     }
                 Text(bank.shortName)
-                    .font(.system(size: 11))
+                    .font(AppFont.beVietnamPro(11))
                     .foregroundStyle(AppColor.payInk)
                     .lineLimit(1)
             }
@@ -392,11 +392,11 @@ struct WithdrawView: View {
 
             if overMaxPerWithdraw {
                 Text("Số tiền rút tối đa 1 lần là 10.000.000đ")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(WdColor.error)
             } else if overLimit {
                 Text("Số tiền vượt quá số dư khả dụng")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(WdColor.error)
             }
         }

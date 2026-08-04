@@ -113,7 +113,7 @@ private struct FlowChips: View {
                     dateEnd = preset.end
                 } label: {
                     Text(preset.label)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFont.beVietnamPro(13, .medium))
                         .foregroundStyle(isActive ? AppColor.brand : AppColor.payMuted)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)

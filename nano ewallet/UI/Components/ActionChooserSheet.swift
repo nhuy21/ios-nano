@@ -35,7 +35,7 @@ struct ActionChooserSheet: View {
                 .padding(.horizontal, 20)
 
             Text(subtitle)
-                .font(.system(size: 12))
+                .font(AppFont.beVietnamPro(12))
                 .foregroundStyle(AppColor.payMuted)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 2)
@@ -62,7 +62,7 @@ struct ActionChooserSheet: View {
                                 .font(AppFont.beVietnamPro(14, .semibold))
                                 .foregroundStyle(AppColor.payInk)
                             Text(action.subtitle)
-                                .font(.system(size: 12))
+                                .font(AppFont.beVietnamPro(12))
                                 .foregroundStyle(AppColor.payMuted)
                                 .multilineTextAlignment(.leading)
                         }

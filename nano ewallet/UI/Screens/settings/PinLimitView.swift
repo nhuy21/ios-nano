@@ -26,7 +26,7 @@ struct PinLimitView: View {
                     Spacer().frame(height: 16)
 
                     Text("Ngưỡng hiện tại")
-                        .font(.system(size: 13))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.payMuted)
                     Text("\(vm.currentLimit.vndFormatted)")
                         .font(AppFont.beVietnamPro(22, .bold))
@@ -49,7 +49,7 @@ struct PinLimitView: View {
 
     private var explanationBox: some View {
         Text("Giao dịch từ ngưỡng này trở lên sẽ cần nhập mã PIN. Bạn có thể điều chỉnh ngưỡng (tối đa 500.000đ, thấp nhất 0đ = luôn hỏi PIN), không nâng lên cao hơn.")
-            .font(.system(size: 13))
+            .font(AppFont.beVietnamPro(13))
             .foregroundStyle(AppColor.payInk)
             .padding(14)
             .background(AppColor.brandSoft)
@@ -90,9 +90,9 @@ struct PinLimitView: View {
             }
 
             HStack {
-                Text("0đ").font(.system(size: 12)).foregroundStyle(AppColor.payMuted)
+                Text("0đ").font(AppFont.beVietnamPro(12)).foregroundStyle(AppColor.payMuted)
                 Spacer()
-                Text("500.000đ").font(.system(size: 12)).foregroundStyle(AppColor.payMuted)
+                Text("500.000đ").font(AppFont.beVietnamPro(12)).foregroundStyle(AppColor.payMuted)
             }
 
             Spacer().frame(height: 20)
@@ -144,7 +144,7 @@ struct PinLimitView: View {
                     vm.selected = preset
                 } label: {
                     Text(preset.vndFormatted)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFont.beVietnamPro(13, .medium))
                         .foregroundStyle(isSelected ? AppColor.brand : AppColor.payInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
@@ -171,7 +171,7 @@ struct PinLimitView: View {
             Spacer().frame(height: 6)
 
             Text("Mã xác nhận 6 số đã gửi tới số điện thoại của bạn. Ngưỡng mới: \(vm.selected.vndFormatted).")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
 
             Spacer().frame(height: 16)

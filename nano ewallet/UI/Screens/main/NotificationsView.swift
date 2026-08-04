@@ -162,7 +162,7 @@ struct NotificationsView: View {
                         .lineLimit(1)
                     if tab == .unread && store.unreadCount > 0 {
                         Text(store.unreadCount > 9 ? "9+" : "\(store.unreadCount)")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppFont.beVietnamPro(11, .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 5)
                             .frame(minWidth: 18, minHeight: 18)

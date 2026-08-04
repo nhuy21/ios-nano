@@ -46,12 +46,12 @@ struct DevicesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = vm.loadError {
             Text(error)
-                .font(.system(size: 14))
+                .font(AppFont.beVietnamPro(14))
                 .foregroundStyle(AppColor.payMuted)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.devices.isEmpty {
             Text("Chưa có thiết bị nào")
-                .font(.system(size: 14))
+                .font(AppFont.beVietnamPro(14))
                 .foregroundStyle(AppColor.payMuted)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -86,7 +86,7 @@ struct DevicesView: View {
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.payInk)
                 Text("Đăng nhập lần cuối: \(formattedLastUsed(device.lastUsedAt))")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
             }
 
@@ -99,7 +99,7 @@ struct DevicesView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 12))
                     Text("Thiết bị này")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppFont.beVietnamPro(11, .semibold))
                 }
                 .foregroundStyle(AppColor.ok)
                 .padding(.horizontal, 10)

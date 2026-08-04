@@ -70,7 +70,7 @@ struct TransferErrorOverlay: View {
 
                 Button(action: onClose) {
                     Text("ĐÓNG")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(AppFont.beVietnamPro(14, .bold))
                         .tracking(1)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)

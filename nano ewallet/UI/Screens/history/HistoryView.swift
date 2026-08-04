@@ -177,7 +177,7 @@ struct HistoryView: View {
             Image(systemName: "calendar")
                 .font(.system(size: 12))
             Text(rangeLabel)
-                .font(.system(size: 12, weight: .medium))
+                .font(AppFont.beVietnamPro(12, .medium))
             Button {
                 dateStart = nil
                 dateEnd = nil
@@ -233,7 +233,7 @@ struct HistoryView: View {
                         ProgressView().tint(AppColor.brand).padding(.top, 40)
                     } else if isSearchMode, let searchError = store.searchError {
                         Text(searchError)
-                            .font(.system(size: 13))
+                            .font(AppFont.beVietnamPro(13))
                             .foregroundStyle(AppColor.payMuted)
                             .padding(.top, 40)
                     } else if store.items.isEmpty {
@@ -284,7 +284,7 @@ struct HistoryView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // Nhãn ngày 13sp Medium (không SemiBold), padding top 4 / bottom 10.
                     Text(group.label)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFont.beVietnamPro(13, .medium))
                         .foregroundStyle(AppColor.payMuted)
                         .padding(.top, 4)
                         .padding(.bottom, 10)
@@ -315,7 +315,7 @@ struct HistoryView: View {
                 ProgressView().tint(AppColor.brand).padding(.top, 12)
             } else if store.noMoreData && !isSearchMode {
                 Text("Đã hiển thị toàn bộ giao dịch")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
                     .padding(.top, 12)
             } else if !isSearchMode {
@@ -346,7 +346,7 @@ struct HistoryView: View {
                         .lineSpacing(4)
                         .lineLimit(2)
                     Text(timeLabel(tx.createdAt))
-                        .font(.system(size: 12))
+                        .font(AppFont.beVietnamPro(12))
                         .foregroundStyle(AppColor.payMuted)
                         .lineLimit(1)
                 }
@@ -361,7 +361,7 @@ struct HistoryView: View {
                         .lineLimit(1)
                     if let balance = tx.cachedBalanceAfterValue {
                         Text("Số dư: \(Int(balance).vndFormatted)")
-                            .font(.system(size: 11))
+                            .font(AppFont.beVietnamPro(11))
                             .foregroundStyle(AppColor.payMuted)
                             .lineLimit(1)
                     }
@@ -392,7 +392,7 @@ struct HistoryView: View {
                 .foregroundStyle(AppColor.payInk)
 
             Text(isSearchMode ? "Thử đổi từ khoá hoặc khoảng ngày khác" : "Giao dịch của bạn sẽ hiển thị ở đây")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
                 .multilineTextAlignment(.center)
         }
@@ -405,7 +405,7 @@ struct HistoryView: View {
                 .font(AppFont.beVietnamPro(17, .bold))
                 .foregroundStyle(AppColor.payInk)
             Text("Có thể do mạng yếu hoặc chưa kết nối internet....")
-                .font(.system(size: 13))
+                .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
