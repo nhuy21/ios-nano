@@ -55,6 +55,51 @@ final class WelcomeBackViewModel: ObservableObject {
         }
     }
 
+    /// Máy này đã bật đăng nhập sinh trắc chưa — chỉ kiểm tra có token, KHÔNG bật Face ID.
+    var canUseBiometric: Bool { BiometricService.hasLoginToken }
+
+    /// Đăng nhập bằng Face ID: quét mặt để đọc token trong Keychain rồi đổi lấy session.
+    /// KHÔNG gửi mật khẩu — máy không lưu mật khẩu nào cả.
+    ///
+    /// Xử lý outcome giống hệt `submit`: BE vẫn có thể đòi OTP thiết bị nếu máy khác đang đăng
+    /// nhập (sinh trắc không né được ràng buộc 1 thiết bị).
+    func submitBiometric() async -> LoginResult {
+        guard !isSubmitting else { return .failed }
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        do {
+            let outcome = try await BiometricService.loginWithBiometric()
+            switch outcome {
+            case .requireDeviceOtp(let ticket, _):
+                deviceTicket = ticket
+                showDeviceConflict = true
+                return .handledByDialog
+            case .authenticated(let user), .requireOtp(let user):
+                return .success(status: user?.status)
+            }
+        } catch BiometricKeyError.userCancelled {
+            // Huỷ quét mặt: im lặng, người dùng nhập mật khẩu như thường.
+            return .failed
+        } catch BiometricKeyError.keyMissing {
+            // Token đã mất (đổi khuôn mặt, xoá app cài lại) -> tắt hẳn để lần sau không hiện nút.
+            BiometricTokenStore.remove()
+            errorMsg = "Đăng nhập sinh trắc không còn hiệu lực, vui lòng nhập mật khẩu"
+            return .failed
+        } catch let error as APIError {
+            // BE thu hồi token (đổi mật khẩu, bị force-logout ở máy khác) -> xoá token cục bộ,
+            // không thì lần nào mở app cũng quét mặt rồi lỗi.
+            if case .server(let code, _) = error, code == 401 {
+                BiometricTokenStore.remove()
+            }
+            errorMsg = error.message
+            return .failed
+        } catch {
+            errorMsg = "Đăng nhập sinh trắc thất bại, vui lòng nhập mật khẩu"
+            return .failed
+        }
+    }
+
     func confirmDeviceOtp() async {
         guard let ticket = deviceTicket else { return }
         sendingDeviceOtp = true

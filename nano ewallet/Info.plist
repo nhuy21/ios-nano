@@ -39,6 +39,8 @@
 	<string>Ứng dụng cần quyền NFC để đọc thông tin chip trên CCCD.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng cần quyền camera để quét CCCD và xác thực khuôn mặt (eKYC).</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Ứng dụng dùng Face ID để bạn đăng nhập và xác thực giao dịch mà không cần nhập mật khẩu.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ứng dụng cần quyền micro để nhận diện lệnh giọng nói.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

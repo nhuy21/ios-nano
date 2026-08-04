@@ -45,6 +45,24 @@ enum AuthService {
         return try applyAuthData(data, phone: phone, rememberPhone: rememberPhone, isRegisterOtp: true)
     }
 
+    /// `POST auth/biometric/login` — đổi token sinh trắc (đã đọc được sau khi quét mặt) lấy
+    /// session. KHÔNG lưu/gửi mật khẩu.
+    ///
+    /// Dùng chung `applyAuthData` với login thường vì BE trả đúng 3 nhánh giống nhau: có token /
+    /// PENDING / máy khác đang đăng nhập (requireDeviceOtp) — sinh trắc không né được OTP SMS.
+    /// `rememberPhone: false` vì token này chỉ có trên máy đã từng đăng nhập, `lastPhone` đã có.
+    static func loginWithBiometricToken(_ biometricToken: String) async throws -> AuthOutcome {
+        let body = BiometricLoginRequest(
+            deviceId: store.getOrCreateDeviceId(),
+            biometricToken: biometricToken,
+            deviceName: AppConfig.deviceName
+        )
+        let data = try await client.request(
+            .post, "auth/biometric/login", body: body, as: AuthData.self
+        )
+        return try applyAuthData(data, phone: nil, rememberPhone: false, isRegisterOtp: false)
+    }
+
     // MARK: - Đăng ký
 
     /// `POST auth/register` — không trả token, BE tạo user PENDING + gửi OTP qua **SMS**.
@@ -174,6 +192,11 @@ enum AuthService {
         }
         store.clearTokens()
         store.clearLastPhone()
+        // BE đã thu hồi phía server trong `logout` (xem auth.service.ts), nhưng token/khoá trên
+        // MÁY phải xoá theo: để lại thì WelcomeBack vẫn hiện nút Face ID rồi quét mặt xong mới
+        // báo lỗi, và khoá ký giao dịch thành khoá mồ côi.
+        BiometricTokenStore.remove()
+        BiometricKeyStore.deleteKey()
         WalletStore.shared.clear()
         TransactionStore.shared.clear()
         BeneficiaryStore.shared.clear()

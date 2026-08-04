@@ -219,6 +219,11 @@ private struct AuthFlow: View {
                 onLogin: { status in appState.route(status: status, phone: lastPhone) },
                 onUseAnotherAccount: {
                     AuthStore.shared.clearLastPhone()
+                    // Token/khoá sinh trắc gắn với TÀI KHOẢN vừa rời đi. Không xoá thì sau khi
+                    // đăng nhập tài khoản khác, WelcomeBack vẫn thấy "đã bật Face ID" và quét mặt
+                    // sẽ đăng nhập lại vào tài khoản CŨ — sai hoàn toàn ý người dùng.
+                    BiometricTokenStore.remove()
+                    BiometricKeyStore.deleteKey()
                     appState.forceUnauthenticated(lastPhone: nil)
                 },
                 onForgotPassword: { path.append(.forgotPassword) }

@@ -45,6 +45,10 @@ struct WithdrawView: View {
     @State private var submitStartedAt: Date?
     @State private var pinError: String?
 
+    /// Xác thực bằng Face ID thay vì nhập mật khẩu — xem `BiometricAuthSheet`.
+    @State private var useBiometric = BiometricKeyStore.hasKey()
+    @State private var biometricError: String?
+
     // Nhánh chưa liên kết ngân hàng — chọn bank + nhập STK, verify trước khi rút.
     @State private var selectedBin: String?
     @State private var accountNumber = ""
@@ -117,13 +121,28 @@ struct WithdrawView: View {
             BankPickerSheet(banks: sortedBanks, selectedBin: $selectedBin, onDismiss: { showAllBanks = false })
         }
         .sheet(isPresented: pendingTransactionIdBinding) {
-            PinEntrySheet(
-                amountText: Int(amount).vndFormatted,
-                recipientName: isLinked ? linkedBankName : (bankCache.bank(bin: selectedBin)?.shortName ?? "Ngân hàng"),
-                onSubmit: submitPin,
-                onCancel: { pendingTransactionId = nil },
-                externalError: $pinError
-            )
+            if useBiometric {
+                BiometricAuthSheet(
+                    amountText: Int(amount).vndFormatted,
+                    recipientName: pendingRecipientName,
+                    onAuthenticate: submitBiometric,
+                    onUsePassword: {
+                        // Giữ pendingTransactionId — giao dịch còn hạn 120s bên BE.
+                        biometricError = nil
+                        useBiometric = false
+                    },
+                    onCancel: { pendingTransactionId = nil },
+                    externalError: $biometricError
+                )
+            } else {
+                PinEntrySheet(
+                    amountText: Int(amount).vndFormatted,
+                    recipientName: pendingRecipientName,
+                    onSubmit: submitPin,
+                    onCancel: { pendingTransactionId = nil },
+                    externalError: $pinError
+                )
+            }
         }
         .onChange(of: selectedBin) { _, _ in runLookupIfNeeded() }
         .overlay { if isSubmitting { ProcessingOverlay() } }
@@ -466,7 +485,7 @@ struct WithdrawView: View {
         isSubmitting = true
         defer { isSubmitting = false }
 
-        let accNo = isLinked ? (wallet.accNo ?? "") : accountNumber
+        let accNo = effectiveAccNo
         let bankNo = isLinked ? (wallet.bankNo ?? "") : (selectedBin ?? "")
 
         let request = WithdrawRequest(
@@ -486,9 +505,54 @@ struct WithdrawView: View {
         }
     }
 
+    /// Số tài khoản nhận tiền rút: đã liên kết thì lấy từ ví, chưa thì lấy STK vừa nhập.
+    /// Tách ra computed vì cả 3 chỗ (rút, xác thực PIN, xác thực Face ID) phải dùng CÙNG giá trị
+    /// — chữ ký sinh trắc ký chính số này nên lệch một chỗ là BE verify sai.
+    private var effectiveAccNo: String {
+        isLinked ? (wallet.accNo ?? "") : accountNumber
+    }
+
+    private var pendingRecipientName: String {
+        isLinked ? linkedBankName : (bankCache.bank(bin: selectedBin)?.shortName ?? "Ngân hàng")
+    }
+
+    /// Xác thực rút tiền bằng Face ID — ký số tiền + số tài khoản nhận.
+    private func submitBiometric() async {
+        guard let transactionId = pendingTransactionId else { return }
+        let accNo = effectiveAccNo
+        let bankNo = isLinked ? (wallet.bankNo ?? "") : (selectedBin ?? "")
+        do {
+            submitStartedAt = Date()
+            let result = try await BiometricService.verifyTransfer(
+                transactionId: transactionId,
+                amount: amount,
+                recipient: accNo
+            )
+            await handleResult(result, accNo: accNo, bankNo: bankNo)
+        } catch BiometricKeyError.userCancelled {
+            biometricError = nil
+        } catch BiometricKeyError.keyInvalidated {
+            BiometricKeyStore.deleteKey()
+            useBiometric = false
+            pinError = "Face ID đã thay đổi, vui lòng nhập mật khẩu và bật lại trong Cá nhân"
+        } catch let error as BiometricKeyError {
+            biometricError = error.localizedDescription
+        } catch let error as APIError {
+            // 403 = không thể sửa bằng quét lại (cooling-off 24h, chưa đăng ký, bị khoá).
+            if case .server(let code, let message) = error, code == 403 {
+                useBiometric = false
+                pinError = message
+            } else {
+                biometricError = error.message
+            }
+        } catch {
+            biometricError = "Đã có lỗi xảy ra, vui lòng thử lại"
+        }
+    }
+
     private func submitPin(_ pin: String) async {
         guard let transactionId = pendingTransactionId else { return }
-        let accNo = isLinked ? (wallet.accNo ?? "") : accountNumber
+        let accNo = effectiveAccNo
         let bankNo = isLinked ? (wallet.bankNo ?? "") : (selectedBin ?? "")
         do {
             // Đo lại từ lúc gửi PIN — thời gian gõ PIN không phải thời gian xử lý.

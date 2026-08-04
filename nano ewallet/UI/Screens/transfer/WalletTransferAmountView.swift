@@ -58,6 +58,12 @@ struct WalletTransferAmountView: View {
     @State private var submitStartedAt: Date?
     @State private var pinError: String?
 
+    /// Xác thực giao dịch pending bằng Face ID thay vì nhập mật khẩu. Bật khi thiết bị đã đăng
+    /// ký khoá sinh trắc; người dùng bấm "Dùng mật khẩu" thì tắt để rơi về `PinEntrySheet`.
+    /// Chỉ đọc `hasKey()` (không gọi API, không bật Face ID) nên gán được ngay lúc dựng view.
+    @State private var useBiometric = BiometricKeyStore.hasKey()
+    @State private var biometricError: String?
+
     /// Bàn phím số tự vẽ đang hiện hay không. Mở sẵn khi vào màn, chạm ra ngoài thì ẩn,
     /// chạm vào ô số tiền thì mở lại. Không phải @FocusState vì bàn phím này là SwiftUI
     /// thuần — `endEditing` ở tầng UIWindow không đụng tới được.
@@ -300,13 +306,29 @@ struct WalletTransferAmountView: View {
         }
         .onDisappear { speech.stop() }
         .sheet(isPresented: pendingTransactionIdBinding) {
-            PinEntrySheet(
-                amountText: Int(amount).vndFormatted,
-                recipientName: verifiedName ?? username,
-                onSubmit: submitPin,
-                onCancel: { pendingTransactionId = nil },
-                externalError: $pinError
-            )
+            if useBiometric {
+                BiometricAuthSheet(
+                    amountText: Int(amount).vndFormatted,
+                    recipientName: verifiedName ?? username,
+                    onAuthenticate: submitBiometric,
+                    onUsePassword: {
+                        // Chỉ đổi sheet, KHÔNG xoá pendingTransactionId — giao dịch pending vẫn
+                        // còn hạn (BE cho 120s) nên nhập mật khẩu xong là hoàn tất được luôn.
+                        biometricError = nil
+                        useBiometric = false
+                    },
+                    onCancel: { pendingTransactionId = nil },
+                    externalError: $biometricError
+                )
+            } else {
+                PinEntrySheet(
+                    amountText: Int(amount).vndFormatted,
+                    recipientName: verifiedName ?? username,
+                    onSubmit: submitPin,
+                    onCancel: { pendingTransactionId = nil },
+                    externalError: $pinError
+                )
+            }
         }
         .overlay { if isSubmitting { ProcessingOverlay() } }
         .overlay {
@@ -758,6 +780,50 @@ struct WalletTransferAmountView: View {
             errorMessage = error.message
         } catch {
             errorMessage = "Đã có lỗi xảy ra, vui lòng thử lại"
+        }
+    }
+
+    /// Xác thực giao dịch pending bằng Face ID — ký số tiền + số ví người nhận rồi gửi chữ ký.
+    ///
+    /// `username` (không phải `recipient?.username`): ở chế độ nhập tay `recipient` là computed
+    /// từ `verifiedName`, mà sheet này mở sau khi đã tra cứu xong nên `username` luôn là giá trị
+    /// đã dùng để tạo giao dịch pending. Payload PHẢI khớp `signaturePayload()` bên BE.
+    private func submitBiometric() async {
+        guard let transactionId = pendingTransactionId else { return }
+        do {
+            // Đo từ lúc quét mặt xong — thời gian chờ người dùng không phải thời gian xử lý.
+            submitStartedAt = Date()
+            let result = try await BiometricService.verifyTransfer(
+                transactionId: transactionId,
+                amount: Int64(amount),
+                recipient: username
+            )
+            await handleResult(result)
+        } catch BiometricKeyError.userCancelled {
+            // Người dùng huỷ hộp thoại Face ID: giữ sheet, KHÔNG báo lỗi đỏ — họ chỉ cần bấm
+            // "Thử lại" hoặc "Dùng mật khẩu".
+            biometricError = nil
+        } catch BiometricKeyError.keyInvalidated {
+            // Đổi/thêm khuôn mặt trong Cài đặt iOS -> khoá tự vô hiệu (.biometryCurrentSet).
+            // Rơi thẳng về mật khẩu, không bắt người dùng thử lại vô ích.
+            BiometricKeyStore.deleteKey()
+            useBiometric = false
+            pinError = "Face ID đã thay đổi, vui lòng nhập mật khẩu và bật lại trong Cá nhân"
+        } catch let error as BiometricKeyError {
+            biometricError = error.localizedDescription
+        } catch let error as APIError {
+            // 403 = BE nói "đừng quét lại nữa" (cooling-off 24h, thiết bị chưa đăng ký khoá,
+            // sinh trắc bị khoá do thất bại nhiều lần). Chuyển thẳng sang mật khẩu thay vì để
+            // người dùng bấm "Thử lại" mãi không được. Xem quy ước ở đầu `verifyTransfer` bên BE.
+            // 400 và các lỗi khác: quét lại có thể được.
+            if case .server(let code, let message) = error, code == 403 {
+                useBiometric = false
+                pinError = message
+            } else {
+                biometricError = error.message
+            }
+        } catch {
+            biometricError = "Đã có lỗi xảy ra, vui lòng thử lại"
         }
     }
 

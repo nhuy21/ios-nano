@@ -71,6 +71,12 @@ struct BankTransferView: View {
 
     @State private var pendingTransactionId: String?
     @State private var pinError: String?
+
+    /// Xác thực giao dịch pending bằng Face ID thay vì nhập mật khẩu. Bật khi thiết bị đã đăng
+    /// ký khoá sinh trắc; người dùng bấm "Dùng mật khẩu" thì tắt để rơi về `PinEntrySheet`.
+    /// Chỉ đọc `hasKey()` (không gọi API, không bật Face ID) nên gán được ngay lúc dựng view.
+    @State private var useBiometric = BiometricKeyStore.hasKey()
+    @State private var biometricError: String?
     @State private var isSubmitting = false
     /// Mốc bắt đầu gọi API chuyển tiền — để biên lai hiện thời gian xử lý thật.
     @State private var submitStartedAt: Date?
@@ -222,13 +228,29 @@ struct BankTransferView: View {
             BankPickerSheet(banks: sortedBanks, selectedBin: bankSheetBinding, onDismiss: { showBankSheet = false })
         }
         .sheet(isPresented: pendingTransactionIdBinding) {
-            PinEntrySheet(
-                amountText: Int(amount).vndFormatted,
-                recipientName: holderName,
-                onSubmit: submitPin,
-                onCancel: { pendingTransactionId = nil },
-                externalError: $pinError
-            )
+            if useBiometric {
+                BiometricAuthSheet(
+                    amountText: Int(amount).vndFormatted,
+                    recipientName: holderName,
+                    onAuthenticate: submitBiometric,
+                    onUsePassword: {
+                        // Chỉ đổi sheet, KHÔNG xoá pendingTransactionId — giao dịch pending vẫn
+                        // còn hạn (BE cho 120s) nên nhập mật khẩu xong là hoàn tất được luôn.
+                        biometricError = nil
+                        useBiometric = false
+                    },
+                    onCancel: { pendingTransactionId = nil },
+                    externalError: $biometricError
+                )
+            } else {
+                PinEntrySheet(
+                    amountText: Int(amount).vndFormatted,
+                    recipientName: holderName,
+                    onSubmit: submitPin,
+                    onCancel: { pendingTransactionId = nil },
+                    externalError: $pinError
+                )
+            }
         }
         .overlay { if isSubmitting { ProcessingOverlay() } }
         .overlay {
@@ -895,6 +917,43 @@ struct BankTransferView: View {
             transferError = error.message
         } catch {
             transferError = "Đã có lỗi xảy ra, vui lòng thử lại"
+        }
+    }
+
+    /// Xác thực giao dịch pending bằng Face ID — ký số tiền + SỐ TÀI KHOẢN người nhận.
+    /// `accountNumber` chính là `acc_no` đã gửi khi tạo giao dịch, khớp `signaturePayload()` BE.
+    private func submitBiometric() async {
+        guard let transactionId = pendingTransactionId else { return }
+        do {
+            submitStartedAt = Date()
+            let result = try await BiometricService.verifyTransfer(
+                transactionId: transactionId,
+                amount: amount,
+                recipient: accountNumber
+            )
+            await handleResult(result)
+        } catch BiometricKeyError.userCancelled {
+            // Huỷ hộp thoại Face ID: giữ sheet, không báo lỗi đỏ — bấm "Thử lại" hoặc
+            // "Dùng mật khẩu" là được.
+            biometricError = nil
+        } catch BiometricKeyError.keyInvalidated {
+            // Đổi/thêm khuôn mặt trong Cài đặt iOS -> khoá tự vô hiệu (.biometryCurrentSet).
+            BiometricKeyStore.deleteKey()
+            useBiometric = false
+            pinError = "Face ID đã thay đổi, vui lòng nhập mật khẩu và bật lại trong Cá nhân"
+        } catch let error as BiometricKeyError {
+            biometricError = error.localizedDescription
+        } catch let error as APIError {
+            // 403 = BE nói "đừng quét lại nữa" (cooling-off 24h, chưa đăng ký khoá, bị khoá).
+            // 400 và lỗi khác: quét lại có thể được. Xem quy ước ở `verifyTransfer` bên BE.
+            if case .server(let code, let message) = error, code == 403 {
+                useBiometric = false
+                pinError = message
+            } else {
+                biometricError = error.message
+            }
+        } catch {
+            biometricError = "Đã có lỗi xảy ra, vui lòng thử lại"
         }
     }
 

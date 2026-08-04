@@ -78,6 +78,27 @@ struct WelcomeBackView: View {
                     action: submit
                 )
 
+                // Chỉ hiện khi máy này đã bật đăng nhập sinh trắc (có token trong Keychain).
+                // `canUseBiometric` không bật Face ID nên đọc được lúc đang dựng view.
+                if vm.canUseBiometric {
+                    Spacer().frame(height: 12)
+
+                    Button(action: submitBiometric) {
+                        HStack(spacing: 8) {
+                            Image(systemName: biometryIcon)
+                                .font(.system(size: 18))
+                            Text("Đăng nhập bằng \(biometryLabel)")
+                                .font(AppFont.beVietnamPro(15, .semibold))
+                        }
+                        .foregroundStyle(AppColor.brand)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(AppColor.brandSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(vm.isSubmitting)
+                }
+
                 Spacer().frame(height: 20)
 
                 OrDivider()
@@ -150,9 +171,30 @@ struct WelcomeBackView: View {
             .multilineTextAlignment(.center)
     }
 
+    private var biometryLabel: String { BiometricKeyStore.biometryLabel }
+
+    private var biometryIcon: String {
+        switch biometryLabel {
+        case "Touch ID": return "touchid"
+        case "Face ID": return "faceid"
+        default: return "lock.shield"
+        }
+    }
+
     private func submit() {
         Task {
             switch await vm.submit(phone: phone) {
+            case .success(let status):
+                onLogin(status)
+            case .handledByDialog, .failed:
+                break
+            }
+        }
+    }
+
+    private func submitBiometric() {
+        Task {
+            switch await vm.submitBiometric() {
             case .success(let status):
                 onLogin(status)
             case .handledByDialog, .failed:
