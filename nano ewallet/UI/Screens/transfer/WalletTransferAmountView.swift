@@ -381,7 +381,7 @@ struct WalletTransferAmountView: View {
         .background(Color.white)
     }
 
-    // MARK: - TK nguồn (ví của người gửi + số dư)
+    // MARK: - Ví nguồn (số ví người gửi + số dư)
 
     private var sourceAccountCard: some View {
         SourceAccountCard(username: wallet.bkUsername, balance: wallet.balance)
@@ -407,7 +407,7 @@ struct WalletTransferAmountView: View {
                 .frame(width: 44, height: 44)
                 .overlay {
                     Text((verifiedName ?? username).nameInitials)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(AppFont.beVietnamPro(16, .bold))
                         .foregroundStyle(AppColor.brand)
                 }
             VStack(alignment: .leading, spacing: 2) {
@@ -415,7 +415,7 @@ struct WalletTransferAmountView: View {
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.payInk)
                 Text("Ví nano · \(username)")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
             }
             Spacer()
@@ -662,7 +662,7 @@ struct WalletTransferAmountView: View {
                     .foregroundStyle(AppColor.payMuted)
                 Spacer()
                 Text("\(message.count)/\(Self.maxMessageLength)")
-                    .font(.system(size: 13))
+                    .font(AppFont.beVietnamPro(13))
                     .foregroundStyle(AppColor.payMuted)
             }
 
@@ -688,7 +688,7 @@ struct WalletTransferAmountView: View {
                         message = suggestion
                     } label: {
                         Text(suggestion)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(AppFont.beVietnamPro(12, .medium))
                             .foregroundStyle(AppColor.brand)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)

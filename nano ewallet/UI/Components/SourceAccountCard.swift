@@ -2,10 +2,10 @@
 //  SourceAccountCard.swift
 //  nano ewallet
 //
-//  Thẻ "TK nguồn" đặt trên thẻ người nhận ở các màn chuyển tiền — gộp số ví nguồn
-//  + số dư vào 1 khối, thay cho dòng "Số dư khả dụng" tách rời trước đây. Dùng
-//  chung cho cả luồng chuyển ví (WalletTransferAmountView) và ngân hàng
-//  (BankTransferView) nên số dư luôn hiển thị cùng một kiểu ở mọi màn.
+//  Thẻ ví nguồn đặt trên thẻ người nhận ở các màn chuyển tiền — gộp số ví + số dư
+//  vào 1 khối, thay cho dòng "Số dư khả dụng" tách rời trước đây. Dùng chung cho cả
+//  luồng chuyển ví (WalletTransferAmountView) và ngân hàng (BankTransferView) nên số
+//  dư luôn hiển thị cùng một kiểu ở mọi màn.
 //
 
 import SwiftUI
@@ -25,7 +25,7 @@ struct SourceAccountCard: View {
                         .foregroundStyle(.white)
                 }
             VStack(alignment: .leading, spacing: 4) {
-                row(label: "TK nguồn", value: username ?? "—")
+                row(label: "Số ví", value: username ?? "—")
                 row(label: "Số dư", value: balance.map { "\(Int($0).vndGrouped) VNĐ" } ?? "—")
             }
             Spacer()

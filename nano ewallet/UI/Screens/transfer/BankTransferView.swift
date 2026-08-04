@@ -273,7 +273,7 @@ struct BankTransferView: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    // MARK: - TK nguồn (ví của người gửi + số dư)
+    // MARK: - Ví nguồn (số ví người gửi + số dư)
 
     private var sourceAccountCard: some View {
         SourceAccountCard(username: wallet.bkUsername, balance: wallet.balance)
@@ -324,7 +324,7 @@ struct BankTransferView: View {
                         .foregroundStyle(onBrand)
                         .lineLimit(1)
                     Text(bank.name)
-                        .font(.system(size: 12))
+                        .font(AppFont.beVietnamPro(12))
                         .foregroundStyle(onBrand.opacity(0.85))
                         .lineLimit(2)
                 }
@@ -395,7 +395,7 @@ struct BankTransferView: View {
                         .font(AppFont.beVietnamPro(12.5, .medium))
                         .foregroundStyle(AppColor.payMuted)
                     Text(" *")
-                        .font(.system(size: 12.5))
+                        .font(AppFont.beVietnamPro(12.5))
                         .foregroundStyle(AppColor.error)
                 }
                 Spacer()
@@ -423,7 +423,7 @@ struct BankTransferView: View {
                         .lineLimit(1)
                 } else {
                     Text(lookupError ?? "")
-                        .font(.system(size: 13))
+                        .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.error)
                         .lineLimit(2)
                 }
@@ -447,7 +447,7 @@ struct BankTransferView: View {
             setAccType(index)
         } label: {
             Text(title)
-                .font(.system(size: 12, weight: selected ? .bold : .medium))
+                .font(AppFont.beVietnamPro(12, selected ? .bold : .medium))
                 .foregroundStyle(selected ? Color(hex: 0x00542F) : AppColor.payMuted)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
@@ -519,7 +519,7 @@ struct BankTransferView: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 12))
                         Text("Vượt số dư")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(AppFont.beVietnamPro(12, .medium))
                     }
                     .foregroundStyle(AppColor.error)
                 }
@@ -552,7 +552,7 @@ struct BankTransferView: View {
                             HStack {
                                 Spacer()
                                 Text("VND")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(AppFont.beVietnamPro(16, .medium))
                                     .foregroundStyle(AppColor.payMuted)
                                     .tracking(0.6)
                             }
@@ -597,7 +597,7 @@ struct BankTransferView: View {
     private func quickChip(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13, weight: .bold))
+                .font(AppFont.beVietnamPro(13, .bold))
                 .foregroundStyle(AppColor.payInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
@@ -617,7 +617,7 @@ struct BankTransferView: View {
                     .foregroundStyle(AppColor.payMuted)
                 Spacer()
                 Text("\(content.count)/250")
-                    .font(.system(size: 12))
+                    .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
             }
 
@@ -658,7 +658,7 @@ struct BankTransferView: View {
                         content = suggestion
                     } label: {
                         Text(suggestion)
-                            .font(.system(size: 12.5, weight: .medium))
+                            .font(AppFont.beVietnamPro(12.5, .medium))
                             .foregroundStyle(AppColor.payMuted)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 7)
@@ -697,7 +697,7 @@ struct BankTransferView: View {
         } label: {
             HStack(spacing: 10) {
                 Text("TIẾP TỤC")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(AppFont.beVietnamPro(14, .bold))
                     .tracking(1.2)
                 Image(systemName: "arrow.right")
                     .font(.system(size: 16, weight: .semibold))
@@ -988,7 +988,7 @@ struct BankLogoView: View {
             .fill(bank.brandColor.flatMap(Color.init(hexString:)) ?? AppColor.brand)
             .overlay {
                 Text(bank.shortName.prefix(4))
-                    .font(.system(size: size * 0.28, weight: .bold))
+                    .font(AppFont.beVietnamPro(size * 0.28, .bold))
                     .foregroundStyle(.white)
             }
     }
@@ -1038,7 +1038,7 @@ struct BankPickerSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(AppColor.payMuted)
                 TextField("Tìm ngân hàng...", text: $query)
-                    .font(.system(size: 14))
+                    .font(AppFont.beVietnamPro(14))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -1061,7 +1061,7 @@ struct BankPickerSheet: View {
                                     .foregroundStyle(AppColor.payInk)
                                 Spacer()
                                 Text(bank.name)
-                                    .font(.system(size: 12))
+                                    .font(AppFont.beVietnamPro(12))
                                     .foregroundStyle(AppColor.payMuted)
                                     .lineLimit(1)
                             }
