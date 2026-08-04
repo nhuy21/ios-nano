@@ -59,14 +59,17 @@ struct HistoryView: View {
             content
         }
         .background(HistoryColor.screenBg)
-        .sheet(isPresented: $showDateFilter) {
+        // `fullScreenCover` nền trong suốt rồi tự vẽ lớp mờ + thẻ, thay cho `sheet` nhiều
+        // nấc: sheet co theo nấc nên thẻ dính đáy màn, nền kính mờ của iOS 26 lại để lộ
+        // màn phía sau, và vùng mờ của nó không nhận chạm để đóng.
+        .fullScreenCover(isPresented: $showDateFilter) {
             DateFilterSheet(
                 dateStart: $dateStart,
                 dateEnd: $dateEnd,
                 onApply: { triggerSearchOrReload() },
                 onDismiss: { showDateFilter = false }
             )
-            .presentationDetents([.medium, .large])
+            .presentationBackground(.clear)
         }
         .sheet(item: $detailTransaction) { tx in
             TransactionDetailSheet(tx: tx, onDismiss: { detailTransaction = nil })
