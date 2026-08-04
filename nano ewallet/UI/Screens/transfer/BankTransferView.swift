@@ -240,35 +240,34 @@ struct BankTransferView: View {
 
     // MARK: - Header
 
+    /// Header nền TRẮNG, chữ mực đen — mirror TransferScreen.kt L878-903 (không phải dải
+    /// gradient xanh: gradient chỉ dùng ở màn thành công).
     private var header: some View {
         HStack {
             headerCircleButton(systemImage: "arrow.left", action: onBack, accessibilityLabel: "Quay lại")
             Spacer()
             Text("Chuyển tiền")
                 .font(AppFont.beVietnamPro(18, .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(AppColor.payInk)
             Spacer()
             headerCircleButton(systemImage: "house.fill", action: onHome, accessibilityLabel: "Trang chủ")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        )
+        .background(Color.white)
     }
 
+    /// Nút tròn 38pt nền xám nhạt `#F1F3F5`, icon mực đen — mirror `HeaderCircleButton`
+    /// (TransferScreen.kt L425-450). Không shadow: trên nền trắng thì viền xám là đủ.
     private func headerCircleButton(systemImage: String, action: @escaping () -> Void, accessibilityLabel: String) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(AppColor.payInk)
                 .frame(width: 38, height: 38)
-                .background(Color.white)
+                .background(Color(hex: 0xF1F3F5))
                 .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)

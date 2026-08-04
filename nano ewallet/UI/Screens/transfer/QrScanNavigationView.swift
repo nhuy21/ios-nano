@@ -57,7 +57,8 @@ struct QrScanNavigationView: View {
             WalletTransferAmountView(
                 draft: draft,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onSuccess: { info in path.append(.transferSuccess(info)) }
+                onSuccess: { info in path.append(.transferSuccess(info)) },
+                onHome: onDismiss
             )
         case .transferSuccess(let info):
             TransferSuccessView(info: info, onHome: onDismiss)

@@ -27,6 +27,9 @@ struct WalletTransferAmountView: View {
     let onSuccess: (TransferSuccessInfo) -> Void
     /// Mở danh bạ ví — chỉ dùng ở chế độ nhập tay.
     var onOpenContacts: () -> Void = {}
+    /// Về Home — nút nhà ở header, luôn hiện như bản Kotlin. Mặc định lùi 1 bước để nơi
+    /// gọi không bắt buộc truyền.
+    var onHome: () -> Void = {}
 
     private static let maxAmountPerTransfer: Int64 = 10_000_000
     /// 140 ký tự cho luồng ví (bank transfer dùng 250).
@@ -69,18 +72,23 @@ struct WalletTransferAmountView: View {
     @State private var lastVerified: String?
     @FocusState private var isUsernameFocused: Bool
 
+    /// Popup hotline — Kotlin để nút Hỗ trợ ở header màn này.
+    @State private var showSupport = false
+
     private let idempotencyKey = TransferService.newIdempotencyKey()
 
     init(
         draft: WalletTransferDraft? = nil,
         onBack: @escaping () -> Void,
         onSuccess: @escaping (TransferSuccessInfo) -> Void,
-        onOpenContacts: @escaping () -> Void = {}
+        onOpenContacts: @escaping () -> Void = {},
+        onHome: @escaping () -> Void = {}
     ) {
         self.initialDraft = draft
         self.onBack = onBack
         self.onSuccess = onSuccess
         self.onOpenContacts = onOpenContacts
+        self.onHome = onHome
         _amountText = State(initialValue: draft?.prefillAmount.map(String.init) ?? "")
         _username = State(initialValue: draft?.username ?? "")
         _verifiedName = State(initialValue: draft?.holderName)
@@ -254,7 +262,8 @@ struct WalletTransferAmountView: View {
                 continueBar
             }
         }
-        .background(Color(hex: 0xF7F8FA))
+        // Nền xám nhạt `WtPageBg` — khác màn chuyển khoản ngân hàng (nền trắng).
+        .background(Color(hex: 0xF1F3F5))
         // Bàn phím HỆ THỐNG đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow (xem
         // DismissKeyboardOnTap). Ở đây chỉ cần lo bàn phím số tự vẽ.
         .contentShape(Rectangle())
@@ -300,6 +309,11 @@ struct WalletTransferAmountView: View {
                 }
             }
         }
+        .overlay {
+            if showSupport {
+                SupportDialog(onDismiss: { showSupport = false })
+            }
+        }
     }
 
     private var pendingTransactionIdBinding: Binding<Bool> {
@@ -308,34 +322,63 @@ struct WalletTransferAmountView: View {
 
     // MARK: - Header
 
+    /// Header nền TRẮNG, chữ mực đen — mirror WalletTransferScreen.kt L482-538 (không phải
+    /// dải gradient xanh: gradient chỉ dùng ở màn thành công). Nút back tròn xám bên trái,
+    /// Hỗ trợ + Trang chủ bên phải, luôn hiện ở cả 2 chế độ.
     private var header: some View {
         HStack {
             Button(action: onBack) {
                 Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.2))
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(AppColor.payInk)
+                    .frame(width: 38, height: 38)
+                    .background(Color(hex: 0xF1F3F5))
                     .clipShape(Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Quay lại")
+
             Spacer()
-            Text("SỐ TIỀN")
-                .font(AppFont.beVietnamPro(15, .bold))
-                .foregroundStyle(.white)
-                .tracking(2)
+
+            Text("Chuyển tiền ví")
+                .font(AppFont.beVietnamPro(18, .bold))
+                .foregroundStyle(AppColor.payInk)
+
             Spacer()
-            Color.clear.frame(width: 40, height: 40)
+
+            HStack(spacing: 0) {
+                // Khung 38pt quanh glyph 22pt: chạm vào đúng icon nhỏ như vậy rất khó,
+                // Apple khuyến nghị vùng chạm tối thiểu ~44pt.
+                Button { showSupport = true } label: {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.system(size: 22))
+                        .foregroundStyle(AppColor.payInk)
+                        .frame(width: 38, height: 38)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Hỗ trợ")
+
+                Rectangle()
+                    .fill(AppColor.payInk.opacity(0.15))
+                    .frame(width: 1, height: 20)
+                    .padding(.horizontal, 10)
+
+                Button(action: onHome) {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(AppColor.payInk)
+                        .frame(width: 38, height: 38)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Trang chủ")
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        )
+        .padding(.vertical, 12)
+        .background(Color.white)
     }
 
     // MARK: - TK nguồn (ví của người gửi + số dư)

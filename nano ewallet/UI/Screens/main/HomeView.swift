@@ -246,13 +246,15 @@ struct HomeView: View {
                 draft: draft,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onSuccess: { info in path.append(.transferSuccess(info)) },
-                onOpenContacts: { path.append(.contacts) }
+                onOpenContacts: { path.append(.contacts) },
+                onHome: { path.removeAll() }
             )
         case .walletTransferAmount(let draft):
             WalletTransferAmountView(
                 draft: draft,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onSuccess: { info in path.append(.transferSuccess(info)) }
+                onSuccess: { info in path.append(.transferSuccess(info)) },
+                onHome: { path.removeAll() }
             )
         case .transferSuccess(let info):
             TransferSuccessView(info: info, onHome: { path.removeAll() })
