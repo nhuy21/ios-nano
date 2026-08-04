@@ -34,6 +34,12 @@ final class SpeechRecognizerService: ObservableObject {
     /// Tự dừng khi im lặng — recognizer của iOS không tự chốt như Android.
     private var silenceTimer: Timer?
 
+    /// Lượt nghe này đã trả kết quả chưa. BẮT BUỘC phải có: `stop()` gọi `task?.cancel()`,
+    /// mà `cancel()` làm closure của `recognitionTask` bắn thêm một lần với `error != nil`.
+    /// Không chốt cờ thì lượt nào cũng gọi `onResult` hai lần — lần sau thường rỗng, đè
+    /// hint "chưa nghe được gì" lên đúng số vừa bóc ra được. Timer im lặng cũng vậy.
+    private var hasDelivered = false
+
     /// Nhận diện tiếng Việt có dùng được LÚC NÀY không.
     var isAvailable: Bool { recognizer?.isAvailable ?? false }
 
@@ -56,6 +62,9 @@ final class SpeechRecognizerService: ObservableObject {
         guard !isListening else { return }
         errorMessage = nil
         partialText = ""
+        // Mở cờ cho lượt mới. KHÔNG reset trong `stop()`: `deliver()` gọi `stop()` ngay
+        // sau khi bật cờ, reset ở đó là tự vô hiệu hoá chính lớp chặn vừa dựng.
+        hasDelivered = false
 
         guard isAvailable else {
             errorMessage = unavailableReason
@@ -72,7 +81,16 @@ final class SpeechRecognizerService: ObservableObject {
         }
     }
 
+    /// Dừng do NGƯỜI DÙNG (chạm mic) hoặc do màn hình biến mất — không phát kết quả.
+    /// Chốt cờ luôn: `task?.cancel()` bên dưới sẽ sinh callback `error != nil`, thiếu cờ
+    /// thì nó lại `finishWithPartial()` và bắn `onResult` sau khi đã chủ động tắt mic.
     func stop() {
+        hasDelivered = true
+        teardown()
+    }
+
+    /// Nhả tài nguyên, KHÔNG động tới `hasDelivered` — `deliver()` tự quản cờ.
+    private func teardown() {
         silenceTimer?.invalidate()
         silenceTimer = nil
 
@@ -121,6 +139,10 @@ final class SpeechRecognizerService: ObservableObject {
         task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
             guard let self else { return }
             Task { @MainActor in
+                // Lượt này chốt rồi thì bỏ hết callback đến sau. Không chặn ở đây thì
+                // `restartSilenceTimer()` dựng lại đúng cái timer `teardown()` vừa huỷ,
+                // và 1,6s sau nó phát thêm một kết quả cho lượt đã xong.
+                guard !self.hasDelivered else { return }
                 if let result {
                     self.partialText = result.bestTranscription.formattedString
                     self.restartSilenceTimer()
@@ -151,7 +173,7 @@ final class SpeechRecognizerService: ObservableObject {
         // Bind `weak` ra HẰNG local trước, rồi `Task` capture hằng đó. Viết
         // `{ [weak self] _ in Task { self?... } }` sẽ báo lỗi ở Swift 6 vì `self` do
         // capture list sinh ra là BIẾN, mà `Task` chạy song song thì không được capture
-        // biến. Timer `repeats: false` + `stop()` gọi `invalidate()` nên không rò rỉ.
+        // biến. Timer `repeats: false` + `teardown()` gọi `invalidate()` nên không rò rỉ.
         silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: false) { [weak self] _ in
             let service = self
             Task { @MainActor in service?.finishWithPartial() }
@@ -159,16 +181,24 @@ final class SpeechRecognizerService: ObservableObject {
     }
 
     private func finish(with result: SFSpeechRecognitionResult) {
+        guard !hasDelivered else { return }
         // Nhiều phương án: `transcriptions` khi có, thiếu thì dùng bản tốt nhất.
         var candidates = result.transcriptions.map(\.formattedString)
         if candidates.isEmpty { candidates = [result.bestTranscription.formattedString] }
-        stop()
-        onResult?(candidates.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+        deliver(candidates.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
     }
 
     private func finishWithPartial() {
+        guard !hasDelivered else { return }
         let heard = partialText.trimmingCharacters(in: .whitespaces)
-        stop()
-        onResult?(heard.isEmpty ? [] : [heard])
+        deliver(heard.isEmpty ? [] : [heard])
+    }
+
+    /// Chốt cờ TRƯỚC khi `stop()` — `stop()` sinh callback error đồng bộ trên cùng
+    /// MainActor, cờ phải bật rồi mới chặn được vòng gọi lại.
+    private func deliver(_ candidates: [String]) {
+        hasDelivered = true
+        teardown()
+        onResult?(candidates)
     }
 }

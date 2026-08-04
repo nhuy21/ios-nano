@@ -182,6 +182,11 @@ struct WalletTransferAmountView: View {
             return
         }
 
+        // Đã có số tiền rồi thì kết quả đến sau KHÔNG được phép báo lỗi: bắt được tiền là
+        // xong việc của mic. Chốt thêm ở đây vì lượt nghe có thể đã bị dừng giữa đường
+        // (người dùng chạm mic, hoặc nhánh AI phía dưới về muộn sau khi số đã điền).
+        guard amountText.isEmpty else { return }
+
         guard !candidates.isEmpty else {
             voiceHint = "Chưa nghe được gì, thử lại nhé"
             return
@@ -197,8 +202,11 @@ struct WalletTransferAmountView: View {
         Task {
             isParsingSpeech = true
             defer { isParsingSpeech = false }
-            guard let parsed = try? await SpeechService.parseTransfer(transcripts: candidates),
-                  parsed.amount > 0 else {
+            let parsed = try? await SpeechService.parseTransfer(transcripts: candidates)
+            // Vòng mạng có thể về SAU khi user đã tự gõ số hoặc lượt nghe khác đã điền —
+            // lúc đó tuyệt đối không ghi đè, cũng không báo lỗi.
+            guard amountText.isEmpty else { return }
+            guard let parsed, parsed.amount > 0 else {
                 voiceHint = "Chưa nghe rõ số tiền, thử nói \"hai trăm nghìn\""
                 return
             }
