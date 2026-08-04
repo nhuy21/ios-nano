@@ -28,9 +28,17 @@ final class DeepLinkStore: ObservableObject {
     /// Nơi quan sát chỉ mở QR khi chắc chắn không còn deep link nào chờ.
     @Published private(set) var pendingDefaultQr = false
 
+    /// Home Screen Quick Action "Chuyển tiền tới ví" — mirror Shortcuts.ACTION_WALLET_TRANSFER
+    /// bên Android (nhánh không kèm benUsername, tức nhập tay chứ không phải "Chuyển cho X").
+    @Published private(set) var pendingWalletTransferShortcut = false
+
+    /// Quick Action "Chuyển khoản ngân hàng".
+    @Published private(set) var pendingBankTransferShortcut = false
+
     /// Còn deep link nào đang chờ xử lý không — dùng để QR không đè lên link nhận tiền.
     var hasPendingDeepLink: Bool {
         pendingPayToken != nil || pendingConversationBkUsername != nil
+            || pendingWalletTransferShortcut || pendingBankTransferShortcut
     }
 
     // MARK: - Phát
@@ -55,6 +63,32 @@ final class DeepLinkStore: ObservableObject {
         pendingDefaultQr = true
     }
 
+    /// `UIApplicationShortcutItem.type` của 2 Quick Action khai trong Info.plist
+    /// (`UIApplicationShortcutItems`). PHẢI giữ đúng 2 chuỗi này khớp với Info.plist — đây là
+    /// XML tĩnh nên không tham chiếu hằng số Swift được, không có cách nào compiler tự phát
+    /// hiện lệch. Đổi 1 bên mà quên bên kia thì Quick Action rơi thẳng vào `default: return
+    /// false` — không crash, không log, chỉ lặng lẽ không làm gì khi người dùng bấm.
+    private enum ShortcutType {
+        static let walletTransfer = "vn.casso.nano.shortcut.walletTransfer"
+        static let bankTransfer = "vn.casso.nano.shortcut.bankTransfer"
+    }
+
+    /// Nhận `UIApplicationShortcutItem.type` từ Quick Action (gọi từ AppDelegate) — trả `false`
+    /// nếu type lạ không khớp shortcut nào của app.
+    @discardableResult
+    func handleShortcut(type: String) -> Bool {
+        switch type {
+        case ShortcutType.walletTransfer:
+            pendingWalletTransferShortcut = true
+            return true
+        case ShortcutType.bankTransfer:
+            pendingBankTransferShortcut = true
+            return true
+        default:
+            return false
+        }
+    }
+
     // MARK: - Tiêu thụ (lấy 1 lần)
 
     func consumePayToken() -> String? {
@@ -71,6 +105,18 @@ final class DeepLinkStore: ObservableObject {
     func consumeDefaultQr() -> Bool {
         defer { pendingDefaultQr = false }
         return pendingDefaultQr
+    }
+
+    @discardableResult
+    func consumeWalletTransferShortcut() -> Bool {
+        defer { pendingWalletTransferShortcut = false }
+        return pendingWalletTransferShortcut
+    }
+
+    @discardableResult
+    func consumeBankTransferShortcut() -> Bool {
+        defer { pendingBankTransferShortcut = false }
+        return pendingBankTransferShortcut
     }
 
     // MARK: - Private

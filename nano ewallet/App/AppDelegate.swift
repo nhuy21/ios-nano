@@ -25,7 +25,28 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
         PushRegistrar.shared.registerForPushNotifications(application: application)
+
+        // App bị TERMINATE, mở lại bằng Home Screen Quick Action (long-press icon) — launchOptions
+        // mang shortcutItem thay vì gọi `performActionFor` (chỉ chạy khi app đã sống sẵn).
+        // Không xử lý ở đây thì bấm Quick Action lúc app đã tắt hẳn sẽ mở app lên Trang chủ
+        // trơ, bỏ qua ý định của người dùng.
+        if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
+            DeepLinkStore.shared.handleShortcut(type: shortcutItem.type)
+        }
         return true
+    }
+
+    /// App ĐANG SỐNG (foreground/background) — mirror MainActivity.handleDeepLink nhánh
+    /// App Shortcut. Vẫn hoạt động dù app dùng scene-based `WindowGroup` vì project không khai
+    /// `UISceneDelegateClassName` riêng (`UIApplicationSupportsMultipleScenes = false` trong
+    /// Info.plist) — UIKit fallback callback Quick Action về app-level thay vì scene-level.
+    func application(
+        _ application: UIApplication,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        let handled = DeepLinkStore.shared.handleShortcut(type: shortcutItem.type)
+        completionHandler(handled)
     }
 
     // Deep link (Universal Link + nanowallet://) KHÔNG xử lý ở đây. App dùng

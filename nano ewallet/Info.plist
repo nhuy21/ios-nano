@@ -61,6 +61,29 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<!-- Home Screen Quick Actions (giữ icon app) — mirror res/xml/shortcuts.xml bên Android.
+	     type PHẢI khớp DeepLinkStore.ShortcutType (Services/DeepLinkStore.swift) — XML tĩnh
+	     này không tham chiếu hằng số Swift được, đổi 1 bên quên bên kia thì Quick Action lặng
+	     lẽ không làm gì (rơi vào default: return false), không crash không log. -->
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>vn.casso.nano.shortcut.walletTransfer</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Chuyển tiền tới ví</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeShare</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>vn.casso.nano.shortcut.bankTransfer</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Chuyển khoản ngân hàng</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCompose</string>
+		</dict>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

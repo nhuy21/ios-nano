@@ -101,6 +101,20 @@ struct MainTabView: View {
             _ = deepLinkStore.consumePayToken()
             Task { await resolvePayLink(token: token) }
         }
+        // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
+        // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
+        // Cả 2 draft đều nil vì đây là mở màn NHẬP TAY, không phải "Chuyển cho <tên>" có sẵn
+        // người nhận (đó là chỗ dành cho shortcut động theo danh bạ, không làm ở đây).
+        .onChange(of: deepLinkStore.pendingWalletTransferShortcut, initial: true) { _, pending in
+            guard pending else { return }
+            _ = deepLinkStore.consumeWalletTransferShortcut()
+            openOnHome(.walletTransfer(draft: nil))
+        }
+        .onChange(of: deepLinkStore.pendingBankTransferShortcut, initial: true) { _, pending in
+            guard pending else { return }
+            _ = deepLinkStore.consumeBankTransferShortcut()
+            openOnHome(.bankTransfer(draft: nil))
+        }
         .alert(
             "Không mở được link nhận tiền", isPresented: payLinkErrorBinding,
             actions: { Button("Đóng", role: .cancel) {} },
