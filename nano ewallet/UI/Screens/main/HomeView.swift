@@ -291,9 +291,10 @@ struct HomeView: View {
                 // bo cong lõm, đè lên đáy CTA — mirror WhiteTopShape bên Android, thay vì
                 // ba card trắng rời nhau.
                 whiteSurface
-                    // Chỉ đè nhẹ vào đáy CTA: phần võng giữa của đường cong đã ăn sâu
-                    // sẵn, đè thêm nhiều nữa sẽ cắt mất dòng chữ thứ hai của CTA.
-                    .padding(.top, -10)
+                    // -80 ăn đúng vào 81 điểm nối thêm ở đáy CTA (mirror spacedBy(-80)
+                    // bên Android): phủ kín phần nền xanh dôi ra, chừa lại 1 điểm nên
+                    // không thấy khe hở mà cũng không cắt vào dòng chữ của CTA.
+                    .padding(.top, -80)
             }
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
@@ -668,16 +669,24 @@ struct HomeView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(
-                LinearGradient(
-                    colors: [AppColor.brand, Color(hex: 0x00934F)],
-                    startPoint: .leading, endPoint: .trailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .shadow(color: AppColor.brand.opacity(0.3), radius: 10, x: 0, y: 4)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Kéo đáy dải xanh dài thêm 81 để nền trắng đè lên mà không hở — mirror
+        // `padding(bottom = 81.dp)` bên Android. Vùng nối thêm CHỈ là nền, không bấm
+        // được (nút chỉ bọc phần chữ ở trên), nên bấm vào chỗ trống không mở màn nạp tiền.
+        .padding(.bottom, 81)
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [AppColor.brand, Color(hex: 0x00934F)],
+                startPoint: .leading, endPoint: .trailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        // Bóng theo đúng Kotlin: xanh rất tối, lệch dọc nhỏ, blur rộng — toả quanh hai
+        // bên CTA. Dùng màu brand như trước thì bóng nhạt và không thấy CTA nổi lên.
+        .shadow(color: Color(hex: 0x012E1D).opacity(0.48), radius: 9, x: 0, y: 3)
     }
 
     // MARK: - Dịch vụ (quick actions)

@@ -127,18 +127,19 @@ struct TransferResult: Decodable {
 
     /// Nhận String hoặc số -> String. Kiểu lạ/thiếu thì `nil`.
     ///
-    /// Phải bóc HAI tầng: `decodeIfPresent` trả `T?`, `try?` bọc thêm thành `T??` — bóc
-    /// một tầng thì biến vẫn là optional và không truyền được vào `String(_:)`/`Int64(_:)`.
+    /// Chỉ bóc MỘT tầng: Swift hiện tại làm phẳng `try?` của một biểu thức optional, nên
+    /// `try? decodeIfPresent(...)` ra `T?` chứ không phải `T??`. Bóc hai tầng như trước
+    /// không biên dịch được nữa.
     private static func flexibleString(
         _ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys
     ) -> String? {
-        if let raw = try? container.decodeIfPresent(String.self, forKey: key), let text = raw {
+        if let text = try? container.decodeIfPresent(String.self, forKey: key) {
             return text
         }
-        if let raw = try? container.decodeIfPresent(Int64.self, forKey: key), let number = raw {
+        if let number = try? container.decodeIfPresent(Int64.self, forKey: key) {
             return String(number)
         }
-        if let raw = try? container.decodeIfPresent(Double.self, forKey: key), let number = raw,
+        if let number = try? container.decodeIfPresent(Double.self, forKey: key),
            let clamped = Self.safeInt64(number) {
             return String(clamped)
         }
@@ -149,13 +150,13 @@ struct TransferResult: Decodable {
     private static func flexibleInt(
         _ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys
     ) -> Int64? {
-        if let raw = try? container.decodeIfPresent(Int64.self, forKey: key), let number = raw {
+        if let number = try? container.decodeIfPresent(Int64.self, forKey: key) {
             return number
         }
-        if let raw = try? container.decodeIfPresent(String.self, forKey: key), let text = raw {
+        if let text = try? container.decodeIfPresent(String.self, forKey: key) {
             return Int64(text)
         }
-        if let raw = try? container.decodeIfPresent(Double.self, forKey: key), let number = raw {
+        if let number = try? container.decodeIfPresent(Double.self, forKey: key) {
             return Self.safeInt64(number)
         }
         return nil
