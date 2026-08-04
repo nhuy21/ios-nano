@@ -133,7 +133,7 @@ struct LinkedBanksView: View {
 
             VStack(spacing: 0) {
                 limitRow(label: "Xác thực PIN từ", value: pinLimitValue.vndFormatted, showDivider: true)
-                limitRow(label: "Tối đa mỗi giao dịch", value: 10_000_000.vndFormatted, showDivider: true)
+                limitRow(label: "Tối đa mỗi giao dịch", value: Int(TransferLimits.faceFixed).vndFormatted, showDivider: true)
                 limitRow(label: "Tối đa mỗi ngày", value: 20_000_000.vndFormatted, showDivider: true)
                 limitRow(label: "Tối đa mỗi tháng", value: 100_000_000.vndFormatted, showDivider: false)
             }

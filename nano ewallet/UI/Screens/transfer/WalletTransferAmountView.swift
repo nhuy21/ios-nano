@@ -31,7 +31,6 @@ struct WalletTransferAmountView: View {
     /// gọi không bắt buộc truyền.
     var onHome: () -> Void = {}
 
-    private static let maxAmountPerTransfer: Int64 = 10_000_000
     /// 140 ký tự cho luồng ví (bank transfer dùng 250).
     private static let maxMessageLength = 140
     private static let suggestions = ["Mình chuyển nhé", "Cảm ơn nha", "Chúc mừng"]
@@ -123,7 +122,7 @@ struct WalletTransferAmountView: View {
         if let balance = wallet.balance { return amount > balance }
         return false
     }
-    private var overMaxPerTransfer: Bool { amount > Self.maxAmountPerTransfer }
+    private var overMaxPerTransfer: Bool { amount > TransferLimits.faceFixed }
     /// Chế độ nhập tay phải tra cứu ra tên chủ ví trước — `recipient` mới có giá trị.
     private var canContinue: Bool { amount > 0 && !overMaxPerTransfer && recipient != nil }
 
@@ -156,7 +155,7 @@ struct WalletTransferAmountView: View {
         // Gõ quá 3 chữ số coi như đang nhập số tiền đầy đủ, không gợi ý nữa.
         guard amount <= 999 else { return [] }
         return [amount * 1_000, amount * 10_000, amount * 100_000]
-            .filter { $0 <= Self.maxAmountPerTransfer }
+            .filter { $0 <= TransferLimits.faceFixed }
     }
 
     // MARK: - Nhập số
@@ -222,7 +221,7 @@ struct WalletTransferAmountView: View {
 
     private func applyVoiceAmount(_ amount: Int64) {
         voiceHint = nil
-        amountText = String(min(amount, Self.maxAmountPerTransfer))
+        amountText = String(min(amount, TransferLimits.faceFixed))
         // Bắt được số là dừng — nghe tiếp dễ ăn phải tiếng ồn rồi ghi đè số vừa đúng.
         speech.stop()
     }

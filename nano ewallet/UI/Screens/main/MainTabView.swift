@@ -115,6 +115,14 @@ struct MainTabView: View {
             _ = deepLinkStore.consumeBankTransferShortcut()
             openOnHome(.bankTransfer(draft: nil))
         }
+        // Siri "chuyển tiền tới ví" tầng 2 (limitPin < amount ≤ limitFace) — draft đã điền sẵn
+        // người nhận/số tiền từ QuickTransferOpenAppIntent, vào thẳng màn xác nhận số tiền
+        // (khác 2 nhánh Quick Action ở trên: draft KHÔNG nil).
+        .onChange(of: deepLinkStore.pendingQuickTransferDraft, initial: true) { _, draft in
+            guard let draft else { return }
+            _ = deepLinkStore.consumeQuickTransfer()
+            openOnHome(.walletTransferAmount(draft))
+        }
         .alert(
             "Không mở được link nhận tiền", isPresented: payLinkErrorBinding,
             actions: { Button("Đóng", role: .cancel) {} },

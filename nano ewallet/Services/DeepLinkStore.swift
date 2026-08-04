@@ -35,10 +35,16 @@ final class DeepLinkStore: ObservableObject {
     /// Quick Action "Chuyển khoản ngân hàng".
     @Published private(set) var pendingBankTransferShortcut = false
 
+    /// Siri "chuyển tiền tới ví" ở tầng 2 (limitPin < amount ≤ limitFace) — draft đã điền sẵn
+    /// người nhận/số tiền, người dùng tự xem lại rồi xác nhận như luồng thường. Xem
+    /// `QuickTransferOpenAppIntent` và docs/siri-quick-transfer.md mục 1/4.
+    @Published private(set) var pendingQuickTransferDraft: WalletTransferDraft?
+
     /// Còn deep link nào đang chờ xử lý không — dùng để QR không đè lên link nhận tiền.
     var hasPendingDeepLink: Bool {
         pendingPayToken != nil || pendingConversationBkUsername != nil
             || pendingWalletTransferShortcut || pendingBankTransferShortcut
+            || pendingQuickTransferDraft != nil
     }
 
     // MARK: - Phát
@@ -61,6 +67,12 @@ final class DeepLinkStore: ObservableObject {
 
     func requestDefaultQr() {
         pendingDefaultQr = true
+    }
+
+    /// Gọi từ `QuickTransferOpenAppIntent.perform()` khi Siri intent quyết định giao dịch cần
+    /// mở app xác nhận (tầng 2, limitPin < amount ≤ limitFace).
+    func requestQuickTransfer(draft: WalletTransferDraft) {
+        pendingQuickTransferDraft = draft
     }
 
     /// `UIApplicationShortcutItem.type` của 2 Quick Action khai trong Info.plist
@@ -117,6 +129,11 @@ final class DeepLinkStore: ObservableObject {
     func consumeBankTransferShortcut() -> Bool {
         defer { pendingBankTransferShortcut = false }
         return pendingBankTransferShortcut
+    }
+
+    func consumeQuickTransfer() -> WalletTransferDraft? {
+        defer { pendingQuickTransferDraft = nil }
+        return pendingQuickTransferDraft
     }
 
     // MARK: - Private

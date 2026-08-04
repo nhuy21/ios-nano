@@ -26,7 +26,6 @@ struct BankTransferView: View {
     var onOpenContacts: () -> Void = {}
 
     private static let maxAmount: Int64 = 999_999_999
-    private static let maxAmountPerTransfer: Int64 = 10_000_000
     private static let quickAmounts: [(label: String, value: Int64)] = [
         ("50k", 50_000), ("100k", 100_000), ("200k", 200_000), ("500k", 500_000),
     ]
@@ -891,7 +890,7 @@ struct BankTransferView: View {
     // MARK: - Submit
 
     private func startTransfer() {
-        guard amount <= Self.maxAmountPerTransfer else {
+        guard amount <= TransferLimits.faceFixed else {
             transferError = "Số tiền chuyển tối đa 1 lần là 10.000.000đ"
             return
         }

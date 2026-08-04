@@ -29,10 +29,6 @@ struct WithdrawView: View {
     let onBack: () -> Void
     let onSuccess: (TransferSuccessInfo) -> Void
 
-    /// Hạn mức 1 lần rút — mirror MAX_AMOUNT_PER_WITHDRAW (WithdrawScreen.kt), khớp
-    /// wallets.limitFace mặc định phía BE (Bảo Kim từ chối thẳng nếu vượt, mã lỗi 128).
-    private static let maxAmountPerWithdraw: Int64 = 10_000_000
-
     @StateObject private var wallet = WalletStore.shared
     @StateObject private var bankCache = BankCache.shared
 
@@ -94,7 +90,7 @@ struct WithdrawView: View {
         return false
     }
 
-    private var overMaxPerWithdraw: Bool { amount > Self.maxAmountPerWithdraw }
+    private var overMaxPerWithdraw: Bool { amount > TransferLimits.faceFixed }
 
     private var canContinue: Bool { amount > 0 && !overMaxPerWithdraw && hasBeneficiary }
 
