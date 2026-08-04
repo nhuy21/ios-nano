@@ -9,6 +9,23 @@
 import SwiftUI
 import Combine
 
+/// Palette riêng của màn này — mirror các hằng private trong HistoryScreen.kt (L93-115).
+/// Tên `AccentOrange` bên Kotlin gây nhầm: giá trị là XANH LÁ, không phải cam.
+private enum HistoryColor {
+    /// Nền TRẮNG — card phân biệt bằng shadow mỏng, không phải xám nhạt.
+    static let screenBg = Color.white
+    static let accent = Color(hex: 0x00A85E)
+    static let activeTabBg = Color(hex: 0xE6F7EE)
+    /// Viền viên thuốc filter (Tất cả/Nhận/Chuyển) — xanh rất đậm.
+    static let pillBorder = Color(hex: 0x00542F)
+    /// Tiền vào — đồng bộ với `HomeScreen.TxnRow`.
+    static let greenPositive = Color(hex: 0x12A67E)
+    /// Đường kẻ mảnh trong card.
+    static let cardLine = Color(hex: 0xF0EAE6)
+    /// Viền card + viền ô tìm kiếm.
+    static let cardBorder = Color(hex: 0xEDEFF2)
+}
+
 struct HistoryView: View {
     let onBack: () -> Void
 
@@ -41,7 +58,7 @@ struct HistoryView: View {
 
             content
         }
-        .background(Color(hex: 0xF7F8FA))
+        .background(HistoryColor.screenBg)
         .sheet(isPresented: $showDateFilter) {
             DateFilterSheet(
                 dateStart: $dateStart,
@@ -62,67 +79,80 @@ struct HistoryView: View {
 
     // MARK: - Header
 
+    /// Mirror HistoryScreen.kt L395-423: nút back TRẦN (không nền trắng + shadow như các màn
+    /// Settings), title 20sp Bold, hai nút phải cách nhau 10.
     private var header: some View {
-        HStack(spacing: 12) {
-            Button(action: onBack) {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(AppColor.payInk)
-                    .frame(width: 40, height: 40)
-                    .background(Color.white)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .circleButtonShadow()
-
-            Text("Lịch sử giao dịch")
-                .font(AppFont.beVietnamPro(18, .bold))
-                .foregroundStyle(AppColor.payInk)
-
-            Spacer()
-
-            headerIconButton(systemImage: "magnifyingglass", isActive: showSearch) {
-                showSearch.toggle()
-                if !showSearch {
-                    searchText = ""
-                    triggerSearchOrReload()
+        HStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button(action: onBack) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(AppColor.payInk)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quay lại")
+
+                Text("Lịch sử giao dịch")
+                    .font(AppFont.beVietnamPro(20, .bold))
+                    .foregroundStyle(AppColor.payInk)
             }
-            headerIconButton(systemImage: "calendar", isActive: dateStart != nil || dateEnd != nil) {
-                showDateFilter = true
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 10) {
+                headerIconButton(systemImage: "magnifyingglass", isActive: showSearch) {
+                    showSearch.toggle()
+                    if !showSearch {
+                        searchText = ""
+                        triggerSearchOrReload()
+                    }
+                }
+                headerIconButton(systemImage: "calendar", isActive: dateStart != nil || dateEnd != nil) {
+                    showDateFilter = true
+                }
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
     }
 
+    /// Icon LUÔN tint accent (kể cả khi không active) — chỉ nền đổi. Mirror
+    /// `HeaderIconButton` (HistoryScreen.kt L911-933).
     private func headerIconButton(systemImage: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 16))
-                .foregroundStyle(isActive ? AppColor.brand : AppColor.payInk)
+                .font(.system(size: 20))
+                .foregroundStyle(HistoryColor.accent)
                 .frame(width: 40, height: 40)
-                .background(isActive ? AppColor.brandSoft : Color.clear)
+                .background(isActive ? HistoryColor.activeTabBg : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
         .buttonStyle(.plain)
     }
 
     // MARK: - Search bar + date chip
 
+    /// Mirror HistoryScreen.kt L426-474: cao 46, viền `#EDEFF2`, icon kính lúp tint ACCENT
+    /// (không phải muted), nút xoá chỉ hiện khi có chữ.
     private var searchBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14))
-                .foregroundStyle(AppColor.payMuted)
+                .font(.system(size: 18))
+                .foregroundStyle(HistoryColor.accent)
             TextField("Tìm theo tên, nội dung...", text: $searchText)
-                .font(.system(size: 14))
+                .font(AppFont.beVietnamPro(14, .medium))
+                .foregroundStyle(AppColor.payInk)
+                .tint(HistoryColor.accent)
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark")
+                        .font(.system(size: 18))
                         .foregroundStyle(AppColor.payMuted)
                 }
                 .buttonStyle(.plain)
@@ -130,12 +160,16 @@ struct HistoryView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .frame(height: 46)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color(hex: 0x784628).opacity(0x0A / 255.0), radius: 4, x: 0, y: 2)
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(HistoryColor.cardBorder, lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)
         .padding(.horizontal, 20)
-        .padding(.bottom, 12)
+        .padding(.bottom, 10)
     }
 
     private var dateChip: some View {
@@ -193,7 +227,7 @@ struct HistoryView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     filterTabs
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 20)
 
                     if isSearchMode && store.isSearching {
                         ProgressView().tint(AppColor.brand).padding(.top, 40)
@@ -215,8 +249,11 @@ struct HistoryView: View {
         }
     }
 
+    /// Ba viên thuốc RỜI (không segmented liền trong 1 capsule như bản trước) — mirror
+    /// HistoryScreen.kt L525-558: active nền `#00542F` chữ trắng, inactive nền trắng chữ
+    /// `#00542F`, cả hai đều có viền `#00542F`.
     private var filterTabs: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 10) {
             ForEach(HistoryFilter.allCases, id: \.self) { tab in
                 let isActive = filter == tab
                 Button {
@@ -224,43 +261,53 @@ struct HistoryView: View {
                     triggerSearchOrReload()
                 } label: {
                     Text(tab.label)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(isActive ? AppColor.brand : AppColor.payMuted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(isActive ? AppColor.brandSoft : Color.clear)
+                        .font(AppFont.beVietnamPro(13, .semibold))
+                        .foregroundStyle(isActive ? .white : HistoryColor.pillBorder)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 9)
+                        .background(isActive ? HistoryColor.pillBorder : Color.white)
                         .clipShape(Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(HistoryColor.pillBorder, lineWidth: 1)
+                        }
                 }
                 .buttonStyle(.plain)
             }
+            Spacer(minLength: 0)
         }
-        .padding(4)
-        .background(Color.white)
-        .clipShape(Capsule())
-        .shadow(color: Color(hex: 0x784628).opacity(0x0A / 255.0), radius: 4, x: 0, y: 2)
     }
 
     private var transactionGroups: some View {
         let groups = groupedByDay(store.items)
         return VStack(spacing: 12) {
             ForEach(groups, id: \.label) { group in
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Nhãn ngày 13sp Medium (không SemiBold), padding top 4 / bottom 10.
                     Text(group.label)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(AppColor.payMuted)
-                        .padding(.leading, 4)
+                        .padding(.top, 4)
+                        .padding(.bottom, 10)
 
                     VStack(spacing: 0) {
                         ForEach(Array(group.items.enumerated()), id: \.element.id) { index, tx in
+                            // Divider chạy HẾT bề rộng card (Kotlin không thụt lề trái).
                             if index > 0 {
-                                Rectangle().fill(Color(hex: 0xECECEC)).frame(height: 1).padding(.leading, 42)
+                                Rectangle()
+                                    .fill(HistoryColor.cardLine)
+                                    .frame(height: 1)
                             }
                             row(tx)
                         }
                     }
+                    .padding(.horizontal, 16)
                     .background(Color.white)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: Color(hex: 0x784628).opacity(0x0A / 255.0), radius: 4, x: 0, y: 2)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(HistoryColor.cardBorder, lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(0x1A / 255.0), radius: 8, x: 0, y: 2)
                 }
             }
 
@@ -279,44 +326,49 @@ struct HistoryView: View {
         }
     }
 
+    /// Mirror `TxnRow` (HistoryScreen.kt:936-1005). Khác bản trước ở 4 điểm theo bản Kotlin
+    /// mới: KHÔNG vẽ nền tròn pastel sau icon, glyph to 24 thay vì 16, canh TOP thay vì
+    /// giữa, và tiền RA để màu mực đen (`payInk`) chứ không đỏ — chỉ tiền vào mới lên màu.
     private func row(_ tx: TransactionEntity) -> some View {
         let icon = TransactionDisplay.iconStyle(for: tx)
         return Button {
             detailTransaction = tx
         } label: {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(icon.background)
+            HStack(alignment: .top, spacing: 8) {
+                TransactionIcon(kind: icon.icon, tint: icon.tint)
+                    .frame(width: 24, height: 24)
                     .frame(width: 30, height: 30)
-                    .overlay {
-                        TransactionIcon(kind: icon.icon, tint: icon.tint)
-                            .frame(width: 16, height: 16)
-                    }
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(TransactionDisplay.listTitle(for: tx))
                         .font(AppFont.beVietnamPro(14, .semibold))
                         .foregroundStyle(AppColor.payInk)
+                        .lineSpacing(4)
                         .lineLimit(2)
                     Text(timeLabel(tx.createdAt))
                         .font(.system(size: 12))
                         .foregroundStyle(AppColor.payMuted)
+                        .lineLimit(1)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
+                // Khoá bề rộng cột phải để cột tên luôn nhận tỉ lệ cố định -> số dòng ổn
+                // định giữa các máy, không phụ thuộc độ dài chuỗi.
+                VStack(alignment: .trailing, spacing: 0) {
                     Text(signedAmount(tx))
-                        .font(AppFont.beVietnamPro(14, .semibold))
-                        .foregroundStyle(TransactionDisplay.amountColor(for: tx))
+                        .font(AppFont.beVietnamPro(14, .bold))
+                        .foregroundStyle(tx.isIncome ? HistoryColor.greenPositive : AppColor.payInk)
+                        .lineLimit(1)
                     if let balance = tx.cachedBalanceAfterValue {
                         Text("Số dư: \(Int(balance).vndFormatted)")
                             .font(.system(size: 11))
                             .foregroundStyle(AppColor.payMuted)
+                            .lineLimit(1)
                     }
                 }
+                .frame(minWidth: 96, maxWidth: 132, alignment: .trailing)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 4)
             .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
