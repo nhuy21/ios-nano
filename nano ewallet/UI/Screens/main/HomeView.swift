@@ -239,11 +239,13 @@ struct HomeView: View {
                 onSuccess: { info in path.append(.transferSuccess(info)) },
                 onOpenContacts: { path.append(.contacts) }
             )
+        // Hai route, MỘT màn: luồng chuyển ví giờ gộp số ví + số tiền + lời nhắn vào cùng
+        // màn. `.walletTransfer(nil)` = nhập tay, có draft = người nhận đã khoá.
         case .walletTransfer(let draft):
-            WalletTransferView(
+            WalletTransferAmountView(
+                draft: draft,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                initialDraft: draft,
-                onContinue: { draft in path.append(.walletTransferAmount(draft)) },
+                onSuccess: { info in path.append(.transferSuccess(info)) },
                 onOpenContacts: { path.append(.contacts) }
             )
         case .walletTransferAmount(let draft):

@@ -111,7 +111,9 @@ struct BankTransferDraft: Hashable {
     var payLinkToken: String?
 }
 
-/// Người nhận ví-ví đã xác thực — cầu nối giữa WalletTransferView -> WalletTransferAmountView.
+/// Người nhận ví-ví. `nil` ở `HomeRoute.walletTransfer` = chế độ nhập tay; có giá trị =
+/// đã xác thực từ danh bạ/QR/OneTouch/giọng nói/pay-link nên `WalletTransferAmountView`
+/// khoá phần chọn người nhận lại.
 struct WalletTransferDraft: Hashable {
     var username: String
     var holderName: String

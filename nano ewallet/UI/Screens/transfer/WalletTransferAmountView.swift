@@ -2,18 +2,31 @@
 //  WalletTransferAmountView.swift
 //  nano ewallet
 //
-//  Mirror WalletTransferAmountScreen.kt — số tiền + lời nhắn (140 ký tự, khác 250
-//  của bank transfer), PIN sheet dùng chung với luồng ngân hàng.
+//  Màn GỘP của luồng chuyển ví→ví: số ví người nhận + số tiền + lời nhắn trên CÙNG
+//  một màn. Mirror `WalletTransferScreen` (bản Kotlin mới đã bỏ màn nhập số tiền
+//  riêng — `WalletTransferAmountScreen.kt` còn trong repo nhưng không còn được đăng
+//  ký vào navigation).
+//
+//  Hai chế độ, quyết định bởi `draft`:
+//   - `draft == nil`  -> NHẬP TAY: hiện ô số ví, tra cứu tên chủ ví khi rời ô.
+//   - `draft != nil`  -> người nhận KHOÁ (từ danh bạ/QR/OneTouch/giọng nói/pay-link),
+//     vào thẳng phần nhập tiền.
+//
+//  Lời nhắn giới hạn 140 ký tự (luồng ngân hàng dùng 250). PIN sheet dùng chung.
 //
 
 import SwiftUI
 import Combine
+import UIKit
 
 @MainActor
 struct WalletTransferAmountView: View {
-    let draft: WalletTransferDraft
+    /// `nil` = chế độ nhập tay. Có giá trị = người nhận đã xác thực, khoá lại.
+    let initialDraft: WalletTransferDraft?
     let onBack: () -> Void
     let onSuccess: (TransferSuccessInfo) -> Void
+    /// Mở danh bạ ví — chỉ dùng ở chế độ nhập tay.
+    var onOpenContacts: () -> Void = {}
 
     private static let maxAmountPerTransfer: Int64 = 10_000_000
     /// 140 ký tự cho luồng ví (bank transfer dùng 250).
@@ -45,21 +58,51 @@ struct WalletTransferAmountView: View {
     /// Bàn phím số tự vẽ đang hiện hay không. Mở sẵn khi vào màn, chạm ra ngoài thì ẩn,
     /// chạm vào ô số tiền thì mở lại. Không phải @FocusState vì bàn phím này là SwiftUI
     /// thuần — `endEditing` ở tầng UIWindow không đụng tới được.
-    @State private var isAmountFocused = true
+    @State private var isAmountFocused: Bool
     @FocusState private var isMessageFocused: Bool
+
+    // Chế độ nhập tay — tra cứu số ví người nhận ngay trên màn này.
+    @State private var username: String
+    @State private var verifiedName: String?
+    @State private var isVerifying = false
+    @State private var lookupError: String?
+    @State private var lastVerified: String?
+    @FocusState private var isUsernameFocused: Bool
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
 
     init(
-        draft: WalletTransferDraft,
+        draft: WalletTransferDraft? = nil,
         onBack: @escaping () -> Void,
-        onSuccess: @escaping (TransferSuccessInfo) -> Void
+        onSuccess: @escaping (TransferSuccessInfo) -> Void,
+        onOpenContacts: @escaping () -> Void = {}
     ) {
-        self.draft = draft
+        self.initialDraft = draft
         self.onBack = onBack
         self.onSuccess = onSuccess
-        _amountText = State(initialValue: draft.prefillAmount.map(String.init) ?? "")
+        self.onOpenContacts = onOpenContacts
+        _amountText = State(initialValue: draft?.prefillAmount.map(String.init) ?? "")
+        _username = State(initialValue: draft?.username ?? "")
+        _verifiedName = State(initialValue: draft?.holderName)
+        _lastVerified = State(initialValue: draft?.username)
+        // Nhập tay: chưa biết người nhận nên KHÔNG mở bàn phím số (nó che ô số ví) —
+        // chỉ mở sau khi tra cứu ra tên chủ ví. Vào từ danh bạ/QR thì mở ngay.
+        _isAmountFocused = State(initialValue: draft != nil)
     }
+
+    /// Người nhận đã xác thực xong — dùng cho cả 2 chế độ. `nil` = chưa đủ để chuyển tiền.
+    private var recipient: WalletTransferDraft? {
+        guard let verifiedName, !username.isEmpty else { return nil }
+        return WalletTransferDraft(
+            username: username,
+            holderName: verifiedName,
+            payLinkToken: initialDraft?.payLinkToken,
+            prefillAmount: initialDraft?.prefillAmount
+        )
+    }
+
+    /// Người nhận truyền sẵn từ ngoài -> khoá, không cho sửa số ví.
+    private var recipientLocked: Bool { initialDraft != nil }
 
     private var amount: Int64 { Int64(amountText) ?? 0 }
     private var overLimit: Bool {
@@ -67,7 +110,8 @@ struct WalletTransferAmountView: View {
         return false
     }
     private var overMaxPerTransfer: Bool { amount > Self.maxAmountPerTransfer }
-    private var canContinue: Bool { amount > 0 && !overMaxPerTransfer }
+    /// Chế độ nhập tay phải tra cứu ra tên chủ ví trước — `recipient` mới có giá trị.
+    private var canContinue: Bool { amount > 0 && !overMaxPerTransfer && recipient != nil }
 
     /// Nội dung mặc định điền sẵn vào ô lời nhắn để user SỬA được, không phải chỉ thay
     /// thế ngầm lúc gửi. Dùng tên người GỬI vì đây là dòng người nhận sẽ thấy.
@@ -85,7 +129,7 @@ struct WalletTransferAmountView: View {
     /// Người nhận đã nằm trong danh bạ -> ẩn luôn toggle "Lưu vào danh bạ".
     private var alreadySaved: Bool {
         beneficiaryStore.beneficiaries.contains {
-            $0.type == .wallet && $0.benUsername == draft.username
+            $0.type == .wallet && $0.benUsername == username
         }
     }
 
@@ -195,8 +239,8 @@ struct WalletTransferAmountView: View {
             }
 
             // Bàn phím số tự vẽ thay cho nút "Tiếp tục" rời — nút hành động nằm luôn
-            // trong bàn phím, giống màn nhập tiền bên Android.
-            if isAmountFocused && !isMessageFocused {
+            // trong bàn phím. Ẩn khi đang gõ số ví/lời nhắn để nhường bàn phím hệ thống.
+            if isAmountFocused && !isMessageFocused && !isUsernameFocused {
                 NumericKeypad(
                     onDigit: appendDigits,
                     onBackspace: backspaceDigit,
@@ -228,7 +272,10 @@ struct WalletTransferAmountView: View {
         .task {
             // Tự bật mic khi vào màn, CHỈ khi chưa có số tiền — vào từ OneTouch/trợ lý
             // giọng nói/link nhận tiền thì số đã điền sẵn, không còn gì để đọc.
-            guard amountText.isEmpty, speech.isAvailable else { return }
+            //
+            // Chế độ nhập tay thì chờ tra cứu ra tên chủ ví xong mới bật (xem
+            // `runVerifyIfNeeded`) — bật ngay lúc user đang gõ số ví là vô nghĩa.
+            guard recipientLocked, amountText.isEmpty, speech.isAvailable else { return }
             // Đệm nhỏ để hiệu ứng chuyển màn xong rồi mới chiếm micro.
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled, amountText.isEmpty else { return }
@@ -238,7 +285,7 @@ struct WalletTransferAmountView: View {
         .sheet(isPresented: pendingTransactionIdBinding) {
             PinEntrySheet(
                 amountText: Int(amount).vndFormatted,
-                recipientName: draft.holderName,
+                recipientName: verifiedName ?? username,
                 onSubmit: submitPin,
                 onCancel: { pendingTransactionId = nil },
                 externalError: $pinError
@@ -297,23 +344,34 @@ struct WalletTransferAmountView: View {
         SourceAccountCard(username: wallet.bkUsername, balance: wallet.balance)
     }
 
-    // MARK: - Người nhận (read-only)
+    // MARK: - Người nhận
 
+    /// Khoá (vào từ danh bạ/QR/OneTouch) -> card chỉ đọc. Nhập tay -> ô nhập số ví +
+    /// ô tên chủ ví chỉ đọc hiện trạng thái tra cứu.
+    @ViewBuilder
     private var recipientCard: some View {
+        if recipientLocked {
+            lockedRecipientCard
+        } else {
+            usernameSection
+        }
+    }
+
+    private var lockedRecipientCard: some View {
         HStack(spacing: 12) {
             Circle()
                 .fill(AppColor.brandSoft)
                 .frame(width: 44, height: 44)
                 .overlay {
-                    Text(draft.holderName.nameInitials)
+                    Text((verifiedName ?? username).nameInitials)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(AppColor.brand)
                 }
             VStack(alignment: .leading, spacing: 2) {
-                Text(draft.holderName)
+                Text(verifiedName ?? username)
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.payInk)
-                Text("Ví nano · \(draft.username)")
+                Text("Ví nano · \(username)")
                     .font(.system(size: 12))
                     .foregroundStyle(AppColor.payMuted)
             }
@@ -322,6 +380,131 @@ struct WalletTransferAmountView: View {
         .padding(14)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Ô nhập số ví + nút "Dán" nằm TRONG ô, kèm ô tên chủ ví chỉ đọc bên dưới.
+    private var usernameSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Số ví người nhận")
+                    .font(AppFont.beVietnamPro(14, .bold))
+                    .foregroundStyle(AppColor.payInk)
+                Spacer()
+                Button(action: onOpenContacts) {
+                    HStack(spacing: 2) {
+                        Text("Danh bạ")
+                            .font(AppFont.beVietnamPro(13, .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(AppColor.brand)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 8) {
+                TextField("", text: $username, prompt: Text("Nhập số ví")
+                    .font(AppFont.beVietnamPro(15))
+                    .foregroundColor(AppColor.payMuted))
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(AppColor.payInk)
+                    .keyboardType(.numberPad)
+                    .tint(AppColor.brand)
+                    .focused($isUsernameFocused)
+                    .onChange(of: isUsernameFocused) { wasFocused, focusedNow in
+                        if wasFocused && !focusedNow { runVerifyIfNeeded() }
+                    }
+
+                Button {
+                    if let clip = UIPasteboard.general.string { username = clip }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 15))
+                        Text("Dán")
+                            .font(AppFont.beVietnamPro(12.5, .bold))
+                    }
+                    .foregroundStyle(AppColor.brand)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(AppColor.brand.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .frame(height: 52)
+            .background(AppColor.bgSoft)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            Text("Tên chủ ví")
+                .font(AppFont.beVietnamPro(14, .bold))
+                .foregroundStyle(AppColor.payInk)
+                .padding(.top, 6)
+
+            // Ô CHỈ ĐỌC, luôn hiện — mang trạng thái tra cứu chứ không ẩn/hiện.
+            HStack(spacing: 8) {
+                if isVerifying {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(AppColor.brand)
+                    Text("Đang tra cứu...")
+                        .font(AppFont.beVietnamPro(13))
+                        .foregroundStyle(AppColor.payMuted)
+                } else if let lookupError {
+                    Text(lookupError)
+                        .font(AppFont.beVietnamPro(13))
+                        .foregroundStyle(AppColor.error)
+                        .lineLimit(2)
+                } else if let verifiedName {
+                    Text(verifiedName)
+                        .font(AppFont.beVietnamPro(15, .semibold))
+                        .foregroundStyle(AppColor.payInk)
+                        .lineLimit(1)
+                } else {
+                    Text("Nhập số ví để tra cứu")
+                        .font(AppFont.beVietnamPro(13))
+                        .foregroundStyle(AppColor.payMuted)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+            .background(AppColor.bgSoft)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Tra cứu tên chủ ví. Xong thì mở bàn phím số + bật mic để đi tiếp ngay.
+    private func runVerifyIfNeeded() {
+        let trimmed = username.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != lastVerified else { return }
+        lastVerified = trimmed
+        lookupError = nil
+        verifiedName = nil
+        Task {
+            isVerifying = true
+            defer { isVerifying = false }
+            do {
+                verifiedName = try await TransferService.verifyBeneficiary(
+                    VerifyBeneficiaryRequest(benUsername: trimmed)
+                )
+                // Có người nhận rồi mới mở bàn phím số (trước đó nó che ô số ví).
+                isAmountFocused = true
+                if amountText.isEmpty, speech.isAvailable { await speech.start() }
+            } catch let error as APIError {
+                lookupError = error.message
+            } catch {
+                lookupError = "Không xác thực được số ví người nhận"
+            }
+        }
     }
 
     // MARK: - Số tiền
@@ -503,13 +686,16 @@ struct WalletTransferAmountView: View {
     // MARK: - Submit
 
     private func submitTransfer() async {
+        // Chưa tra cứu ra người nhận thì không gửi — `canContinue` đã chặn nút, đây là
+        // lớp cuối để không bao giờ gọi API với số ví chưa xác thực.
+        guard let recipient else { return }
         errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
 
         let request = TransferToWalletRequest(
-            idempotencyKey: idempotencyKey, benUsername: draft.username,
-            accName: draft.holderName, transAmount: Int(amount), memo: effectiveMessage
+            idempotencyKey: idempotencyKey, benUsername: recipient.username,
+            accName: recipient.holderName, transAmount: Int(amount), memo: effectiveMessage
         )
 
         do {
@@ -546,22 +732,25 @@ struct WalletTransferAmountView: View {
             return
         }
         pendingTransactionId = nil
+        // Đọc từ state chứ không nhận qua tham số: `handleResult` còn được gọi lại từ
+        // `submitPin`, lúc đó không còn `recipient` của lời gọi đầu.
+        let holderName = verifiedName ?? username
         let elapsed = submitStartedAt.map { Date().timeIntervalSince($0) }
         // `alreadySaved` phải kiểm lại ở đây: khi người nhận đã có trong danh bạ thì
         // toggle bị ẩn nhưng saveRecipient vẫn còn true -> tạo trùng bản ghi.
         if saveRecipient && !alreadySaved {
             _ = try? await BeneficiaryStore.shared.create(
-                CreateBeneficiaryRequest(type: .wallet, accName: draft.holderName, benUsername: draft.username)
+                CreateBeneficiaryRequest(type: .wallet, accName: holderName, benUsername: username)
             )
         }
-        if let token = draft.payLinkToken {
+        if let token = initialDraft?.payLinkToken {
             await PayLinkService.consume(reqToken: token, txId: result.transId)
         }
         await WalletStore.shared.refresh(force: true)
         onSuccess(
             TransferSuccessInfo(
-                kind: .wallet, amount: amount, recipientName: draft.holderName,
-                accountNumber: draft.username,
+                kind: .wallet, amount: amount, recipientName: holderName,
+                accountNumber: username,
                 noteLabel: "Lời nhắn", note: effectiveMessage,
                 transactionCode: result.bkTransId ?? result.transId,
                 elapsedSeconds: elapsed,
@@ -572,7 +761,11 @@ struct WalletTransferAmountView: View {
     }
 }
 
-#Preview {
+#Preview("Nhập tay") {
+    WalletTransferAmountView(onBack: {}, onSuccess: { _ in })
+}
+
+#Preview("Người nhận đã khoá") {
     WalletTransferAmountView(
         draft: WalletTransferDraft(username: "19957873068", holderName: "NGUYEN VAN A"),
         onBack: {}, onSuccess: { _ in }
