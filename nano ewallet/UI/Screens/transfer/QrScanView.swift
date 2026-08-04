@@ -33,6 +33,12 @@ struct QrScanView: View {
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var lastHandledValue: String?
     @State private var isDecodingImage = false
+    /// Thanh quét đang ở nửa dưới khung — lật một lần lúc hiện màn để khởi động vòng lặp.
+    @State private var isScanLineDown = false
+
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    /// Người dùng bật "Giảm chuyển động" thì bỏ hẳn thanh trượt.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // Số đo lấy nguyên từ QrScanScreen.kt.
     private static let frameSize: CGFloat = 310
@@ -51,6 +57,7 @@ struct QrScanView: View {
 
             scrimOverlay
             viewfinder
+            doubleTapToHomeLayer
 
             VStack {
                 header
@@ -166,6 +173,23 @@ struct QrScanView: View {
     }
 
     /// Lớp tối phủ ngoài khung, KHOÉT LỖ VUÔNG ở giữa để vùng quét sáng rõ.
+    /// Chạm hai lần vào vùng camera là về Home — phím tắt cho người dùng quen tay, nút
+    /// mũi tên góc trên trái vẫn là đường chính.
+    ///
+    /// Nằm TRƯỚC lớp header/dải nút trong `ZStack` nên hai lớp đó vẽ đè lên và nhận chạm
+    /// trước — không tranh cử chỉ với nút nào.
+    ///
+    /// Tắt khi VoiceOver đang bật: với trình đọc màn hình, chạm hai lần là cách kích hoạt
+    /// phần tử đang chọn, gán thêm nghĩa "về Home" lên đó sẽ gây nhầm.
+    @ViewBuilder
+    private var doubleTapToHomeLayer: some View {
+        if !voiceOverEnabled {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2, perform: onBack)
+        }
+    }
+
     private var scrimOverlay: some View {
         GeometryReader { geo in
             let center = frameCenter(in: geo.size)
@@ -198,6 +222,12 @@ struct QrScanView: View {
                 .frame(width: Self.frameSize, height: Self.frameSize)
                 .position(center)
 
+                if !reduceMotion {
+                    scanLine
+                        .frame(width: Self.frameSize, height: Self.frameSize)
+                        .position(center)
+                }
+
                 Image("logo_white")
                     .resizable()
                     .renderingMode(.template)
@@ -217,6 +247,33 @@ struct QrScanView: View {
             }
         }
         .allowsHitTesting(false)
+    }
+
+    /// Thanh ngang trượt lên xuống trong khung ngắm — dấu hiệu "đang quét" cho người dùng
+    /// biết camera còn sống, vì màn này không có gì khác động đậy.
+    ///
+    /// Dừng khi đang xử lý kết quả: lúc đó camera đã ngừng nhận, để thanh chạy tiếp là báo
+    /// sai rằng vẫn đang quét.
+    private var scanLine: some View {
+        // Chừa 8 điểm mỗi đầu để thanh không đè lên nét góc chữ L.
+        let travel = Self.frameSize - 16
+        return LinearGradient(
+            colors: [
+                AppColor.brand.opacity(0),
+                AppColor.brand.opacity(0.9),
+                AppColor.brand.opacity(0),
+            ],
+            startPoint: .leading, endPoint: .trailing
+        )
+        .frame(height: 2)
+        .shadow(color: AppColor.brand.opacity(0.8), radius: 6)
+        .offset(y: isScanLineDown ? travel / 2 : -travel / 2)
+        .animation(
+            .easeInOut(duration: 1.6).repeatForever(autoreverses: true),
+            value: isScanLineDown
+        )
+        .opacity(isParsing || isDecodingImage ? 0 : 1)
+        .onAppear { isScanLineDown = true }
     }
 
     /// Cổng thanh toán hỗ trợ — logo tô trắng, ngăn nhau bằng vạch dọc mờ.
