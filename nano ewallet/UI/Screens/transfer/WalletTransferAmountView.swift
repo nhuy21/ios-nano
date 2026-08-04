@@ -425,7 +425,8 @@ struct WalletTransferAmountView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// Ô nhập số ví + nút "Dán" nằm TRONG ô, kèm ô tên chủ ví chỉ đọc bên dưới.
+    /// Ô nhập số ví + nút "Dán" nằm TRONG ô. Tên chủ ví chỉ hiện SAU khi tra cứu
+    /// (đang tra / ra tên / lỗi), không chiếm chỗ sẵn.
     private var usernameSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -483,41 +484,40 @@ struct WalletTransferAmountView: View {
             .background(AppColor.bgSoft)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            Text("Tên chủ ví")
-                .font(AppFont.beVietnamPro(14, .bold))
-                .foregroundStyle(AppColor.payInk)
-                .padding(.top, 6)
+            // Chỉ hiện khi CÓ GÌ để hiện (đang tra / ra tên / lỗi) — mirror cách màn
+            // chuyển khoản ngân hàng làm. Ô rỗng kèm chữ "Nhập số ví để tra cứu" chiếm
+            // chỗ vô ích và trông như một ô nhập thứ hai.
+            if isVerifying || verifiedName != nil || lookupError != nil {
+                Rectangle()
+                    .fill(AppColor.line)
+                    .frame(height: 1)
+                    .padding(.vertical, 8)
 
-            // Ô CHỈ ĐỌC, luôn hiện — mang trạng thái tra cứu chứ không ẩn/hiện.
-            HStack(spacing: 8) {
+                Text("Tên chủ ví")
+                    .font(AppFont.beVietnamPro(12.5, .medium))
+                    .foregroundStyle(AppColor.payMuted)
+
                 if isVerifying {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(AppColor.brand)
-                    Text("Đang tra cứu...")
-                        .font(AppFont.beVietnamPro(13))
-                        .foregroundStyle(AppColor.payMuted)
-                } else if let lookupError {
-                    Text(lookupError)
-                        .font(AppFont.beVietnamPro(13))
-                        .foregroundStyle(AppColor.error)
-                        .lineLimit(2)
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(AppColor.brand)
+                        Text("Đang tra cứu...")
+                            .font(AppFont.beVietnamPro(14))
+                            .foregroundStyle(AppColor.payMuted)
+                    }
                 } else if let verifiedName {
-                    Text(verifiedName)
-                        .font(AppFont.beVietnamPro(15, .semibold))
+                    Text(verifiedName.uppercased())
+                        .font(AppFont.beVietnamPro(16, .bold))
                         .foregroundStyle(AppColor.payInk)
                         .lineLimit(1)
                 } else {
-                    Text("Nhập số ví để tra cứu")
+                    Text(lookupError ?? "")
                         .font(AppFont.beVietnamPro(13))
-                        .foregroundStyle(AppColor.payMuted)
+                        .foregroundStyle(AppColor.error)
+                        .lineLimit(2)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
-            .frame(height: 52)
-            .background(AppColor.bgSoft)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .padding(16)
         .frame(maxWidth: .infinity)
