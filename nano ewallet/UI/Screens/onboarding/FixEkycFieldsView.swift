@@ -277,6 +277,9 @@ struct KycOptionPickerSheet: View {
     let onDismiss: () -> Void
 
     @State private var query = ""
+    /// Chiều cao thật của danh sách — dùng để quyết định có cần thanh cuộn hay không.
+    @State private var listHeight: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
 
     /// Ngưỡng hiện ô tìm kiếm — dưới ngưỡng thì lướt mắt nhanh hơn gõ.
     private var showsSearch: Bool { options.count > 8 }
@@ -299,26 +302,22 @@ struct KycOptionPickerSheet: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             // Chạm ra ngoài thẻ là đóng.
             Color.black.opacity(0.35)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onDismiss)
 
             card
+                .padding(.horizontal, 24)
         }
-        .ignoresSafeArea(edges: .bottom)
     }
 
     private var card: some View {
+        // Hộp thoại nổi GIỮA màn, không phải tấm trượt dính đáy — nên bo cả bốn góc và bỏ
+        // thanh kéo, vì thanh kéo là dấu hiệu "kéo xuống để đóng" mà giờ không kéo được.
         VStack(spacing: 0) {
             // Tiêu đề và ô tìm kiếm nằm NGOÀI vùng cuộn nên đứng yên khi lướt danh sách.
-            Capsule()
-                .fill(AppColor.line)
-                .frame(width: 40, height: 4)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-
             Text(title)
                 .font(AppFont.beVietnamPro(16, .bold))
                 .foregroundStyle(AppColor.payInk)
@@ -357,6 +356,20 @@ struct KycOptionPickerSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in
+                scrollOffset = y
+            }
+            // Thanh cuộn TỰ VẼ, chỉ hiện khi danh sách thực sự dài hơn khung. Thanh cuộn
+            // của hệ thống chỉ nhá lên lúc đang kéo (`.scrollIndicators(.visible)` cũng
+            // không ghim lại được), nên người dùng không biết còn mục bên dưới.
+            //
+            // Đo chiều cao THẬT chứ không đếm số mục: nhãn dài như "Trang sức, đá quý,
+            // đồng hồ, phụ kiện cao cấp" chiếm hai dòng nên đếm mục ra sai.
+            .scrollIndicators(.hidden)
+            .overlay(alignment: .topTrailing) {
+                if listHeight > maxListHeight { scrollThumb }
             }
             // Chỉ giới hạn chiều cao của VÙNG CUỘN, không giới hạn cả thẻ: đặt ở thẻ thì
             // phần đầu bị đẩy khỏi khung, danh sách hiện từ giữa chừng. Cách này danh sách
@@ -367,9 +380,25 @@ struct KycOptionPickerSheet: View {
             // (khác `containerRelativeFrame`, cái đó ép đúng bằng tỉ lệ).
             .frame(maxHeight: maxListHeight)
         }
+        .padding(.top, 20)
         .frame(maxWidth: .infinity)
         .background(Color.white)
-        .clipShape(.rect(topLeadingRadius: 24, topTrailingRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color.black.opacity(0.18), radius: 20, y: 8)
+    }
+
+    /// Con trượt: cao theo tỉ lệ phần đang thấy, chạy dọc theo tiến độ cuộn.
+    private var scrollThumb: some View {
+        let track = maxListHeight
+        let thumbHeight = max(track * (track / listHeight), 32)
+        // `max(..., 1)` chặn chia cho 0 ở nhịp render đầu, lúc listHeight vừa bằng track.
+        let progress = min(max(scrollOffset / max(listHeight - track, 1), 0), 1)
+        return Capsule()
+            .fill(AppColor.payMuted.opacity(0.35))
+            .frame(width: 3, height: thumbHeight)
+            .offset(y: (track - thumbHeight) * progress)
+            .padding(.trailing, 7)
+            .allowsHitTesting(false)
     }
 
     private func row(_ option: KycOption) -> some View {
