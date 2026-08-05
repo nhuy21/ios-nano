@@ -53,7 +53,7 @@ struct PinDotsField: View {
                 .focused($isFocused)
                 .opacity(0)
                 .frame(width: 1, height: 1)
-                .onChange(of: value) { _, newValue in
+                .onChangeNewCompat(of: value) { newValue in
                     let filtered = String(newValue.filter(\.isNumber).prefix(maxLength))
                     if filtered != newValue { value = filtered }
                 }
@@ -110,11 +110,11 @@ struct PinDotsField: View {
             }
             caretVisible.toggle()
         }
-        .onChange(of: isFocused, initial: true) { _, focused in
+        .onChangeCompat(of: isFocused, initial: true) { _, focused in
             // Vừa focus: hiện caret ngay, không phải chờ tới nhịp timer kế tiếp.
             caretVisible = focused
         }
-        .onChange(of: value) { _, _ in
+        .onChangeNewCompat(of: value) { _ in
             // Vừa gõ/xoá: caret sáng lại và nhảy sang ô mới ngay, giống caret thật.
             if isFocused { caretVisible = true }
         }

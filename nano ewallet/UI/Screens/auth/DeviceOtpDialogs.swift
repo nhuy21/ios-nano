@@ -146,7 +146,7 @@ struct DeviceOtpDialog: View {
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .padding(.horizontal, 24)
         .interactiveDismissDisabled(verifying)
-        .onChange(of: otp) { _, newValue in
+        .onChangeNewCompat(of: otp) { newValue in
             if newValue.count == 6 { submit() }
         }
     }

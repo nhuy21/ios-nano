@@ -77,7 +77,7 @@ struct HistoryView: View {
         .task {
             await store.loadFirstPage(filter: filter)
         }
-        .onChange(of: searchText) { _, _ in triggerSearchOrReload() }
+        .onChangeNewCompat(of: searchText) { _ in triggerSearchOrReload() }
     }
 
     // MARK: - Header

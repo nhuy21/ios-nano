@@ -324,7 +324,7 @@ struct SettingsView: View {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .tint(SettingsColor.accent)
-                .onChange(of: isOn.wrappedValue) { _, newValue in onChange(newValue) }
+                .onChangeNewCompat(of: isOn.wrappedValue) { newValue in onChange(newValue) }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 10)

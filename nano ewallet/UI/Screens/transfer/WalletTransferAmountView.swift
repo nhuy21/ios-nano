@@ -485,7 +485,7 @@ struct WalletTransferAmountView: View {
                     .keyboardType(.numberPad)
                     .tint(AppColor.brand)
                     .focused($isUsernameFocused)
-                    .onChange(of: isUsernameFocused) { wasFocused, focusedNow in
+                    .onChangeCompat(of: isUsernameFocused) { wasFocused, focusedNow in
                         if wasFocused && !focusedNow { runVerifyIfNeeded() }
                     }
 
@@ -701,7 +701,7 @@ struct WalletTransferAmountView: View {
                 .tint(AppColor.brand)
                 .lineLimit(1...4)
                 .focused($isMessageFocused)
-                .onChange(of: message) { _, newValue in
+                .onChangeCompat(of: message) { _, newValue in
                     if newValue.count > Self.maxMessageLength {
                         message = String(newValue.prefix(Self.maxMessageLength))
                     }

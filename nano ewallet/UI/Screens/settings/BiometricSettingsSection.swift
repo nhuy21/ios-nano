@@ -181,7 +181,7 @@ struct BiometricSettingsSection: View {
                 onSubmit: { Task { await enable(kind) } }
             )
             .padding(.horizontal, 24)
-            .onChange(of: password) { _, value in
+            .onChangeNewCompat(of: password) { value in
                 if value.count == 6 { Task { await enable(kind) } }
             }
 

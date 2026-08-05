@@ -53,7 +53,7 @@ struct AddContactSheet: View {
                             keyboardType: .numberPad,
                             digitsOnly: true
                         )
-                        .onChange(of: accountNumber) { _, _ in triggerLookup() }
+                        .onChangeNewCompat(of: accountNumber) { _ in triggerLookup() }
                     }
 
                     fieldBlock(label: "Tên chủ tài khoản") {

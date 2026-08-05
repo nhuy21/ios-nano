@@ -140,7 +140,7 @@ struct WalletLinkBaoKimView: View {
                             lineWidth: 1
                         )
                 }
-                .onChange(of: text.wrappedValue) { _, newValue in
+                .onChangeNewCompat(of: text.wrappedValue) { newValue in
                     // Số ví chỉ nhận chữ số — bàn phím số vẫn gõ được dấu chấm/phẩy trên
                     // vài bố cục bàn phím, và dán từ clipboard thì lọt mọi ký tự.
                     guard field == .walletNo else { return }

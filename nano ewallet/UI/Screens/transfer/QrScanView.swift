@@ -109,12 +109,12 @@ struct QrScanView: View {
             await scanner.requestPermissionAndStart()
         }
         .onDisappear { scanner.stop() }
-        .onChange(of: scanner.lastScannedValue) { _, newValue in
+        .onChangeCompat(of: scanner.lastScannedValue) { _, newValue in
             guard let newValue, newValue != lastHandledValue else { return }
             lastHandledValue = newValue
             handleQrDetected(newValue)
         }
-        .onChange(of: photoPickerItem) { _, item in
+        .onChangeNewCompat(of: photoPickerItem) { item in
             guard let item else { return }
             Task { await handlePickedPhoto(item) }
         }

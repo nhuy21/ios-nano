@@ -210,10 +210,10 @@ struct BankTransferView: View {
         .onAppear {
             if initialDraft?.prefillContent == nil { content = defaultContent }
         }
-        .onChange(of: selectedBin) { _, _ in
+        .onChangeCompat(of: selectedBin) { _, _ in
             if holderName.isEmpty { runLookupIfNeeded() }
         }
-        .onChange(of: isAccountFocused) { wasFocused, isFocused in
+        .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
             if wasFocused && !isFocused { runLookupIfNeeded() }
             // Quay lại sửa số TK thì cất bàn phím số tự vẽ đi, không thì hai bàn phím
             // chồng nhau. Mic cũng tắt vì người nhận đang được nhập lại — tra cứu xong
@@ -493,7 +493,7 @@ struct BankTransferView: View {
             .submitLabel(.done)
             .focused($isAccountFocused)
             .onSubmit { runLookupIfNeeded() }
-            .onChange(of: accountNumber) { _, newValue in
+            .onChangeCompat(of: accountNumber) { _, newValue in
                 let filtered = String(newValue.filter(\.isNumber).prefix(19))
                 if filtered != newValue {
                     accountNumber = filtered
@@ -649,7 +649,7 @@ struct BankTransferView: View {
                     .tint(AppColor.brand)
                     .lineLimit(1...4)
                     .focused($isContentFocused)
-                    .onChange(of: isContentFocused) { _, focused in
+                    .onChangeCompat(of: isContentFocused) { _, focused in
                         // Sang ô nội dung thì cất bàn phím số và tắt mic — đang nghe mà
                         // gõ nội dung thì số tiền tự nhảy, người dùng không hiểu vì sao.
                         if focused {
@@ -657,7 +657,7 @@ struct BankTransferView: View {
                             stopListening()
                         }
                     }
-                    .onChange(of: content) { _, newValue in
+                    .onChangeCompat(of: content) { _, newValue in
                         if newValue.count > 250 { content = String(newValue.prefix(250)) }
                     }
             } else {

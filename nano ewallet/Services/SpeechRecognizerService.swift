@@ -3,17 +3,42 @@
 //  nano ewallet
 //
 //  Nhận diện giọng nói tiếng Việt — tương ứng `rememberVoiceInput` bên Android.
-//  Android dùng SpeechRecognizer của hệ thống, iOS dùng Speech framework
-//  (SFSpeechRecognizer + AVAudioEngine).
 //
-//  Cần NSMicrophoneUsageDescription + NSSpeechRecognitionUsageDescription trong
-//  Info.plist (đã có).
+//  HAI ENGINE, chọn theo phiên bản máy (deployment target của app là 16.0):
+//
+//   - iOS 26+: `SpeechAnalyzer` + `DictationTranscriber` — chạy hoàn toàn ON-DEVICE cho
+//     `vi_VN`, không round-trip mạng nên bắt số tiền nhạy hơn hẳn. Đây là engine ưu tiên.
+//   - iOS 16-25: `SFSpeechRecognizer` — tiếng Việt KHÔNG có model on-device
+//     (`supportsOnDeviceRecognition == false` cho `vi-VN`) nên mọi lượt nghe phải qua server
+//     Apple, có độ trễ mạng. Đây là giới hạn của nền tảng, không phải thiếu sót cấu hình.
+//
+//  Cả hai engine chia sẻ: bộ đếm im lặng 0.8s (mirror
+//  `EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS` bên Android), từ vựng gợi ý số tiền, và
+//  giao diện công khai (`start`/`stop`/`onResult`/`partialText`/`isListening`) — 3 màn gọi
+//  (`WalletTransferAmountView`/`BankTransferView`/`VoiceCommandOverlay`) không cần biết engine nào.
+//
+//  Cần NSMicrophoneUsageDescription + NSSpeechRecognitionUsageDescription trong Info.plist.
 //
 
 import Foundation
 import Combine
 import Speech
 import AVFoundation
+
+/// Từ vựng gợi ý cho engine — mirror `EXTRA_BIASING_STRINGS` bên Android. Engine ưu tiên khớp
+/// các từ này khi phân vân, giảm nghe nhầm số/đơn vị tiếng Việt ("trăm" -> "trăng").
+private let amountBiasingStrings = [
+    "không", "một", "hai", "ba", "bốn", "tư", "năm", "lăm", "sáu", "bảy", "tám", "chín",
+    "mười", "mươi", "trăm", "nghìn", "ngàn", "triệu", "tỷ", "rưỡi", "lẻ", "linh",
+    "chuyển", "đồng",
+]
+
+/// 0.8s — mirror `EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS` bên Android, đã kiểm chứng
+/// ổn với câu chuyển tiền tiếng Việt (ngắn, kiểu "chuyển hai trăm nghìn"). Chờ lâu hơn không chỉ
+/// chậm mà còn dễ lẫn tạp âm vào ngay trước lúc chốt kết quả.
+private let silenceInterval: TimeInterval = 0.8
+
+private let speechLocale = Locale(identifier: "vi-VN")
 
 @MainActor
 final class SpeechRecognizerService: ObservableObject {
@@ -23,89 +48,78 @@ final class SpeechRecognizerService: ObservableObject {
     @Published private(set) var partialText = ""
     @Published private(set) var errorMessage: String?
 
-    /// Các phương án nhận diện của lượt vừa xong. Nhiều phương án giúp bóc số tiền
-    /// chính xác hơn (chọn giá trị lặp lại nhiều nhất).
+    /// Các phương án nhận diện của lượt vừa xong. Engine mới chỉ trả 1 bản text; engine cũ
+    /// (`SFSpeechRecognizer`) trả nhiều phương án, giúp bóc số tiền chính xác hơn.
     var onResult: (([String]) -> Void)?
 
-    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "vi-VN"))
     private let audioEngine = AVAudioEngine()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
-    /// Tự dừng khi im lặng — recognizer của iOS không tự chốt như Android.
-    private var silenceTimer: Timer?
 
-    /// Lượt nghe này đã trả kết quả chưa. BẮT BUỘC phải có: `stop()` gọi `task?.cancel()`,
-    /// mà `cancel()` làm closure của `recognitionTask` bắn thêm một lần với `error != nil`.
-    /// Không chốt cờ thì lượt nào cũng gọi `onResult` hai lần — lần sau thường rỗng, đè
-    /// hint "chưa nghe được gì" lên đúng số vừa bóc ra được. Timer im lặng cũng vậy.
+    /// Tự dừng khi im lặng — cả hai engine đều không tự chốt như Android.
+    private var silenceTimer: Timer?
+    /// Lượt nghe này đã trả kết quả chưa — chặn `stop()`/silence timer bắn `onResult` hai lần.
     private var hasDelivered = false
 
-    /// Nhận diện tiếng Việt có dùng được LÚC NÀY không.
-    var isAvailable: Bool { recognizer?.isAvailable ?? false }
+    // Engine mới (iOS 26+). Không thể khai kiểu tường minh vì kiểu đó chỉ tồn tại từ iOS 26 —
+    // giữ dưới dạng `Any?` rồi ép kiểu trong nhánh `@available`.
+    private var modernSession: Any?
+    // Engine cũ (iOS 15-25).
+    private var legacyRecognizer: SFSpeechRecognizer?
+    private var legacyRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var legacyTask: SFSpeechRecognitionTask?
 
-    /// Lý do không dùng được — `SFSpeechRecognizer.isAvailable` chỉ trả true/false chứ
-    /// KHÔNG nói vì sao, nên phải tự suy ra. Ghi cứng một lý do là đổ lỗi nhầm: trên
-    /// simulator mạng vẫn tốt mà vẫn `false`.
+    /// Nhận diện tiếng Việt có dùng được LÚC NÀY không.
+    ///
+    /// Engine mới không có API đồng bộ để kiểm tra (phải `await supportedLocales`), nên trước
+    /// lượt `start()` đầu tiên chỗ này lạc quan (`true`) rồi `start()` tự set `errorMessage`
+    /// nếu hoá ra không dùng được. Engine cũ thì kiểm tra được ngay.
+    var isAvailable: Bool {
+        if #available(iOS 26.0, *) { return isModernAvailable }
+        return SFSpeechRecognizer(locale: speechLocale)?.isAvailable ?? false
+    }
+
+    private var isModernAvailable = true
+
     var unavailableReason: String {
+        if let errorMessage { return errorMessage }
         #if targetEnvironment(simulator)
-        // Tiếng Việt không có model offline (supportsOnDeviceRecognition = false) nên
-        // bắt buộc qua máy chủ Apple, mà simulator không được cấp quyền đó.
+        // Tiếng Việt không có model offline trên engine cũ nên bắt buộc qua máy chủ Apple, mà
+        // simulator không được cấp quyền đó.
         return "Simulator không chạy được nhận diện giọng nói tiếng Việt. Cần thử trên máy thật."
         #else
-        return recognizer == nil
-            ? "Máy chưa hỗ trợ nhận diện giọng nói tiếng Việt."
-            : "Giọng nói đang không dùng được. Kiểm tra kết nối mạng rồi thử lại."
+        return "Giọng nói đang không dùng được. Kiểm tra kết nối mạng rồi thử lại."
         #endif
     }
+
+    // MARK: - Vòng đời
 
     func start() async {
         guard !isListening else { return }
         errorMessage = nil
         partialText = ""
-        // Mở cờ cho lượt mới. KHÔNG reset trong `stop()`: `deliver()` gọi `stop()` ngay
-        // sau khi bật cờ, reset ở đó là tự vô hiệu hoá chính lớp chặn vừa dựng.
         hasDelivered = false
 
-        guard isAvailable else {
-            errorMessage = unavailableReason
-            return
-        }
         guard await requestPermissions() else { return }
 
         do {
-            try beginSession()
+            if #available(iOS 26.0, *) {
+                try await startModern()
+            } else {
+                try startLegacy()
+            }
             isListening = true
+            restartSilenceTimer()
         } catch {
-            errorMessage = "Không mở được micro, vui lòng thử lại."
-            stop()
+            if #available(iOS 26.0, *) { isModernAvailable = false }
+            errorMessage = Self.message(for: error)
+            teardown()
         }
     }
 
     /// Dừng do NGƯỜI DÙNG (chạm mic) hoặc do màn hình biến mất — không phát kết quả.
-    /// Chốt cờ luôn: `task?.cancel()` bên dưới sẽ sinh callback `error != nil`, thiếu cờ
-    /// thì nó lại `finishWithPartial()` và bắn `onResult` sau khi đã chủ động tắt mic.
     func stop() {
         hasDelivered = true
         teardown()
     }
-
-    /// Nhả tài nguyên, KHÔNG động tới `hasDelivered` — `deliver()` tự quản cờ.
-    private func teardown() {
-        silenceTimer?.invalidate()
-        silenceTimer = nil
-
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        request?.endAudio()
-        task?.cancel()
-        request = nil
-        task = nil
-        isListening = false
-
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-
-    // MARK: - Private
 
     private func requestPermissions() async -> Bool {
         let speechStatus = await withCheckedContinuation { continuation in
@@ -116,9 +130,7 @@ final class SpeechRecognizerService: ObservableObject {
             return false
         }
 
-        let micGranted = await withCheckedContinuation { continuation in
-            AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
-        }
+        let micGranted = await Self.requestMicPermission()
         guard micGranted else {
             errorMessage = "Cần quyền micro để dùng giọng nói."
             return false
@@ -126,79 +138,315 @@ final class SpeechRecognizerService: ObservableObject {
         return true
     }
 
-    private func beginSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
+    /// `AVAudioApplication.requestRecordPermission` là iOS 17+ và là API được khuyến nghị;
+    /// `AVAudioSession.requestRecordPermission` bị deprecated từ 17 nên chỉ dùng cho iOS 16.
+    private static func requestMicPermission() async -> Bool {
+        if #available(iOS 17.0, *) {
+            return await withCheckedContinuation { continuation in
+                AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
+            }
+        }
+        return await withCheckedContinuation { continuation in
+            AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) }
+        }
+    }
+
+    // MARK: - Engine mới (iOS 26+)
+
+    @available(iOS 26.0, *)
+    private func startModern() async throws {
+        let session = try await ModernSpeechSession.make(
+            onPartial: { [weak self] text in
+                guard let self, !self.hasDelivered else { return }
+                self.partialText = text
+                self.restartSilenceTimer()
+            },
+            onFinal: { [weak self] text in
+                guard let self, !self.hasDelivered else { return }
+                self.deliver(text.trimmingCharacters(in: .whitespaces).isEmpty ? [] : [text])
+            },
+            onFailure: { [weak self] in
+                Task { @MainActor in await self?.finishWithPartial() }
+            }
+        )
+        modernSession = session
+        try startAudioTap { [weak self] buffer in
+            guard let self, let session = self.modernSession as? ModernSpeechSession else { return }
+            session.append(buffer)
+        }
+    }
+
+    // MARK: - Engine cũ (iOS 15-25)
+
+    private func startLegacy() throws {
+        guard let recognizer = SFSpeechRecognizer(locale: speechLocale), recognizer.isAvailable else {
+            throw SpeechSetupError.localeNotSupported
+        }
+        legacyRecognizer = recognizer
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        self.request = request
+        // Tương đương `EXTRA_BIASING_STRINGS` bên Android.
+        request.contextualStrings = amountBiasingStrings
+        legacyRequest = request
 
-        let inputNode = audioEngine.inputNode
-        task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
+        legacyTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self else { return }
             Task { @MainActor in
-                // Lượt này chốt rồi thì bỏ hết callback đến sau. Không chặn ở đây thì
-                // `restartSilenceTimer()` dựng lại đúng cái timer `teardown()` vừa huỷ,
-                // và 1,6s sau nó phát thêm một kết quả cho lượt đã xong.
                 guard !self.hasDelivered else { return }
                 if let result {
                     self.partialText = result.bestTranscription.formattedString
                     self.restartSilenceTimer()
                     if result.isFinal {
-                        self.finish(with: result)
+                        // Nhiều phương án giúp `SpeechAmountParser` chọn số tiền chính xác hơn.
+                        var candidates = result.transcriptions.map(\.formattedString)
+                        if candidates.isEmpty { candidates = [result.bestTranscription.formattedString] }
+                        self.deliver(candidates.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
                     }
                 } else if error != nil {
-                    // Hết thời gian chờ / không nghe được — chốt bằng phần đã nghe.
-                    self.finishWithPartial()
+                    await self.finishWithPartial()
                 }
             }
         }
 
+        try startAudioTap { [weak self] buffer in
+            self?.legacyRequest?.append(buffer)
+        }
+    }
+
+    // MARK: - Audio dùng chung
+
+    /// Mở session + gắn tap lên micro. `onBuffer` chạy trên audio thread, KHÔNG phải main.
+    private func startAudioTap(_ onBuffer: @escaping (AVAudioPCMBuffer) -> Void) throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+        let inputNode = audioEngine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-            request.append(buffer)
+            onBuffer(buffer)
         }
-
         audioEngine.prepare()
         try audioEngine.start()
-        restartSilenceTimer()
     }
 
-    /// iOS chỉ chốt `isFinal` khi hết audio, mà micro thì chạy mãi. Im lặng ~1,6s coi
-    /// như nói xong — nếu không người dùng phải tự bấm dừng.
+    // MARK: - Chốt kết quả
+
     private func restartSilenceTimer() {
         silenceTimer?.invalidate()
-        // Bind `weak` ra HẰNG local trước, rồi `Task` capture hằng đó. Viết
-        // `{ [weak self] _ in Task { self?... } }` sẽ báo lỗi ở Swift 6 vì `self` do
-        // capture list sinh ra là BIẾN, mà `Task` chạy song song thì không được capture
-        // biến. Timer `repeats: false` + `teardown()` gọi `invalidate()` nên không rò rỉ.
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: false) { [weak self] _ in
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceInterval, repeats: false) { [weak self] _ in
             let service = self
-            Task { @MainActor in service?.finishWithPartial() }
+            Task { @MainActor in await service?.finishWithPartial() }
         }
     }
 
-    private func finish(with result: SFSpeechRecognitionResult) {
-        guard !hasDelivered else { return }
-        // Nhiều phương án: `transcriptions` khi có, thiếu thì dùng bản tốt nhất.
-        var candidates = result.transcriptions.map(\.formattedString)
-        if candidates.isEmpty { candidates = [result.bestTranscription.formattedString] }
-        deliver(candidates.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
-    }
-
-    private func finishWithPartial() {
+    private func finishWithPartial() async {
         guard !hasDelivered else { return }
         let heard = partialText.trimmingCharacters(in: .whitespaces)
         deliver(heard.isEmpty ? [] : [heard])
     }
 
-    /// Chốt cờ TRƯỚC khi `stop()` — `stop()` sinh callback error đồng bộ trên cùng
-    /// MainActor, cờ phải bật rồi mới chặn được vòng gọi lại.
     private func deliver(_ candidates: [String]) {
         hasDelivered = true
         teardown()
         onResult?(candidates)
+    }
+
+    private func teardown() {
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+
+        if #available(iOS 26.0, *), let session = modernSession as? ModernSpeechSession {
+            session.finish()
+        }
+        modernSession = nil
+
+        legacyRequest?.endAudio()
+        legacyTask?.cancel()
+        legacyRequest = nil
+        legacyTask = nil
+        legacyRecognizer = nil
+
+        isListening = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private static func message(for error: Error) -> String {
+        if let setupError = error as? SpeechSetupError {
+            switch setupError {
+            case .localeNotSupported:
+                return "Máy chưa hỗ trợ nhận diện giọng nói tiếng Việt."
+            case .conversionFailed:
+                return "Không xử lý được âm thanh từ micro, vui lòng thử lại."
+            }
+        }
+        return "Không mở được micro, vui lòng thử lại."
+    }
+}
+
+private enum SpeechSetupError: Error {
+    case localeNotSupported
+    case conversionFailed
+}
+
+// MARK: - Engine mới, tách riêng để `@available` gọn
+
+/// Bọc `SpeechAnalyzer` + `DictationTranscriber` (iOS 26+) — tách class riêng để phần
+/// `SpeechRecognizerService` không phải rải `@available` khắp nơi.
+@available(iOS 26.0, *)
+private final class ModernSpeechSession {
+    private let analyzer: SpeechAnalyzer
+    private let analyzerFormat: AVAudioFormat?
+    private let inputBuilder: AsyncStream<AnalyzerInput>.Continuation
+    private let converter = BufferConverter()
+    private var resultsTask: Task<Void, Never>?
+
+    private init(
+        analyzer: SpeechAnalyzer,
+        analyzerFormat: AVAudioFormat?,
+        inputBuilder: AsyncStream<AnalyzerInput>.Continuation
+    ) {
+        self.analyzer = analyzer
+        self.analyzerFormat = analyzerFormat
+        self.inputBuilder = inputBuilder
+    }
+
+    /// Dựng phiên: đảm bảo model `vi-VN` đã tải, mở analyzer, bắt đầu đọc kết quả.
+    static func make(
+        onPartial: @escaping @MainActor (String) -> Void,
+        onFinal: @escaping @MainActor (String) -> Void,
+        onFailure: @escaping () -> Void
+    ) async throws -> ModernSpeechSession {
+        try await ensureModelReady()
+
+        let transcriber = DictationTranscriber(locale: speechLocale, preset: .progressiveShortDictation)
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        let (stream, builder) = AsyncStream<AnalyzerInput>.makeStream()
+        try await analyzer.start(inputSequence: stream)
+
+        let session = ModernSpeechSession(
+            analyzer: analyzer, analyzerFormat: format, inputBuilder: builder
+        )
+        session.resultsTask = Task {
+            do {
+                for try await result in transcriber.results {
+                    let text = String(result.text.characters)
+                    let isFinal = result.isFinal
+                    await MainActor.run {
+                        if isFinal { onFinal(text) } else { onPartial(text) }
+                    }
+                }
+            } catch {
+                // Stream lỗi/bị huỷ giữa chừng — chốt bằng phần đã nghe, không treo im lặng.
+                onFailure()
+            }
+        }
+        return session
+    }
+
+    /// Đẩy buffer micro vào analyzer. Gọi từ audio thread.
+    func append(_ buffer: AVAudioPCMBuffer) {
+        guard let analyzerFormat,
+              let converted = try? converter.convert(buffer, to: analyzerFormat) else { return }
+        inputBuilder.yield(AnalyzerInput(buffer: converted))
+    }
+
+    /// Kết thúc phiên. Phải gọi `finalizeAndFinishThroughEndOfInput` (không chỉ đóng stream) để
+    /// analyzer trả nốt kết quả cuối thay vì treo.
+    func finish() {
+        inputBuilder.finish()
+        let analyzer = self.analyzer
+        Task { try? await analyzer.finalizeAndFinishThroughEndOfInput() }
+        resultsTask?.cancel()
+        resultsTask = nil
+    }
+
+    /// Kiểm tra `vi-VN` được hỗ trợ + đã cài on-device chưa, tải nếu thiếu. Cache bằng `Task`
+    /// tĩnh: nhiều màn gọi `start()` chỉ tải model đúng một lần.
+    private static var modelReady: Task<Bool, Never>?
+
+    private static func ensureModelReady() async throws {
+        if let existing = modelReady {
+            guard await existing.value else { throw SpeechSetupError.localeNotSupported }
+            return
+        }
+        let task = Task<Bool, Never> {
+            do {
+                try await downloadModelIfNeeded()
+                return true
+            } catch {
+                return false
+            }
+        }
+        modelReady = task
+        guard await task.value else { throw SpeechSetupError.localeNotSupported }
+    }
+
+    private static func downloadModelIfNeeded() async throws {
+        let target = speechLocale.identifier(.bcp47)
+
+        let supported = await DictationTranscriber.supportedLocales
+        guard supported.map({ $0.identifier(.bcp47) }).contains(target) else {
+            throw SpeechSetupError.localeNotSupported
+        }
+
+        let installed = await DictationTranscriber.installedLocales
+        guard !installed.map({ $0.identifier(.bcp47) }).contains(target) else { return }
+
+        // Locale được hỗ trợ nhưng chưa tải model xuống máy — xin AssetInventory tải về. Lần đầu
+        // có thể mất vài giây tới vài chục giây tuỳ mạng; các lượt sau rơi vào `installed` ở trên.
+        let transcriber = DictationTranscriber(locale: speechLocale, preset: .progressiveShortDictation)
+        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            try await request.downloadAndInstall()
+        }
+    }
+}
+
+/// Chuyển `AVAudioPCMBuffer` từ format của input node (hardware, thường 48kHz) sang format mà
+/// `SpeechAnalyzer` yêu cầu. BẮT BUỘC phải có — feed thẳng buffer sai format khiến analyzer chạy
+/// nhưng không bao giờ trả kết quả, không có lỗi nào để biết vì sao.
+private final class BufferConverter {
+    private var converter: AVAudioConverter?
+
+    func convert(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) throws -> AVAudioPCMBuffer {
+        if buffer.format == format { return buffer }
+
+        let converter: AVAudioConverter
+        if let existing = self.converter,
+           existing.outputFormat == format, existing.inputFormat == buffer.format {
+            converter = existing
+        } else {
+            guard let created = AVAudioConverter(from: buffer.format, to: format) else {
+                throw SpeechSetupError.conversionFailed
+            }
+            converter = created
+            self.converter = converter
+        }
+
+        let sampleRateRatio = converter.outputFormat.sampleRate / converter.inputFormat.sampleRate
+        let scaledInputFrameLength = Double(buffer.frameLength) * sampleRateRatio
+        let frameCapacity = AVAudioFrameCount(scaledInputFrameLength.rounded(.up))
+        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
+            throw SpeechSetupError.conversionFailed
+        }
+
+        var error: NSError?
+        var hasFedInput = false
+        converter.convert(to: outputBuffer, error: &error) { _, inputStatus in
+            if hasFedInput {
+                inputStatus.pointee = .noDataNow
+                return nil
+            }
+            hasFedInput = true
+            inputStatus.pointee = .haveData
+            return buffer
+        }
+        if let error { throw error }
+        return outputBuffer
     }
 }

@@ -84,19 +84,19 @@ struct MainTabView: View {
         // chờ, nếu không sẽ đè lên link nhận tiền mà người dùng vừa bấm.
         // `initial: true` vì cờ có thể được bật TRƯỚC khi view này xuất hiện (bootstrap
         // chạy ở Splash) — thiếu nó thì onChange không bao giờ khớp và QR không mở.
-        .onChange(of: deepLinkStore.pendingDefaultQr, initial: true) { _, pending in
+        .onChangeCompat(of: deepLinkStore.pendingDefaultQr, initial: true) { _, pending in
             guard pending, !deepLinkStore.hasPendingDeepLink else { return }
             deepLinkStore.consumeDefaultQr()
             showQrScan = true
         }
         // Push "xin tiền" -> mở thẳng màn Cuộc thoại. Quan sát ở đây (gốc, luôn sống)
         // thay vì trong HomeView, để bấm push lúc đang ở tab Cá nhân vẫn mở được.
-        .onChange(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
+        .onChangeCompat(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
             guard let bkUsername = value else { return }
             _ = deepLinkStore.consumeConversation()
             openOnHome(.conversation(otherName: "", otherBkUsername: bkUsername))
         }
-        .onChange(of: deepLinkStore.pendingPayToken, initial: true) { _, value in
+        .onChangeCompat(of: deepLinkStore.pendingPayToken, initial: true) { _, value in
             guard let token = value else { return }
             _ = deepLinkStore.consumePayToken()
             Task { await resolvePayLink(token: token) }
@@ -105,12 +105,12 @@ struct MainTabView: View {
         // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
         // Cả 2 draft đều nil vì đây là mở màn NHẬP TAY, không phải "Chuyển cho <tên>" có sẵn
         // người nhận (đó là chỗ dành cho shortcut động theo danh bạ, không làm ở đây).
-        .onChange(of: deepLinkStore.pendingWalletTransferShortcut, initial: true) { _, pending in
+        .onChangeCompat(of: deepLinkStore.pendingWalletTransferShortcut, initial: true) { _, pending in
             guard pending else { return }
             _ = deepLinkStore.consumeWalletTransferShortcut()
             openOnHome(.walletTransfer(draft: nil))
         }
-        .onChange(of: deepLinkStore.pendingBankTransferShortcut, initial: true) { _, pending in
+        .onChangeCompat(of: deepLinkStore.pendingBankTransferShortcut, initial: true) { _, pending in
             guard pending else { return }
             _ = deepLinkStore.consumeBankTransferShortcut()
             openOnHome(.bankTransfer(draft: nil))
@@ -118,7 +118,7 @@ struct MainTabView: View {
         // Siri "chuyển tiền tới ví" tầng 2 (limitPin < amount ≤ limitFace) — draft đã điền sẵn
         // người nhận/số tiền từ QuickTransferOpenAppIntent, vào thẳng màn xác nhận số tiền
         // (khác 2 nhánh Quick Action ở trên: draft KHÔNG nil).
-        .onChange(of: deepLinkStore.pendingQuickTransferDraft, initial: true) { _, draft in
+        .onChangeCompat(of: deepLinkStore.pendingQuickTransferDraft, initial: true) { _, draft in
             guard let draft else { return }
             _ = deepLinkStore.consumeQuickTransfer()
             openOnHome(.walletTransferAmount(draft))

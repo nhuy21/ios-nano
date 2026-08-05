@@ -80,12 +80,12 @@ struct DateFilterSheet: View {
             .datePickerStyle(.compact)
             // Bấm preset -> đổ ngược vào 2 ô cho khớp. "Tất cả" (nil) giữ nguyên ngày
             // đang hiện, không ghi đè ngược lại bộ lọc.
-            .onChange(of: dateStart) { _, value in
+            .onChangeNewCompat(of: dateStart) { value in
                 if let value, !Calendar.app.isDate(value, inSameDayAs: customStart) {
                     customStart = value
                 }
             }
-            .onChange(of: dateEnd) { _, value in
+            .onChangeNewCompat(of: dateEnd) { value in
                 if let value, !Calendar.app.isDate(value, inSameDayAs: customEnd) {
                     customEnd = value
                 }

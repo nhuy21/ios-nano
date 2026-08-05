@@ -159,6 +159,8 @@ struct QuickTransferOpenAppIntent: AppIntent {
     }
 }
 
+/// Không cần `@available`: `AppShortcutsProvider` là iOS 16+, đúng bằng deployment target
+/// của app (16.0).
 struct QuickTransferShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(

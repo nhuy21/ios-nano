@@ -57,7 +57,7 @@ struct PinEntrySheet: View {
                 onSubmit: submit
             )
             .padding(.horizontal, 24)
-            .onChange(of: pin) { _, newValue in
+            .onChangeNewCompat(of: pin) { newValue in
                 if newValue.count == 6 { submit() }
             }
 

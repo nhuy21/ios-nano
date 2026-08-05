@@ -140,7 +140,7 @@ struct WithdrawView: View {
                 )
             }
         }
-        .onChange(of: selectedBin) { _, _ in runLookupIfNeeded() }
+        .onChangeCompat(of: selectedBin) { _, _ in runLookupIfNeeded() }
         .overlay { if isSubmitting { ProcessingOverlay() } }
         .overlay {
             if let errorMessage {
@@ -285,7 +285,7 @@ struct WithdrawView: View {
                     keyboardType: .numberPad, submitLabel: .done, digitsOnly: true
                 )
                 .focused($isAccountFocused)
-                .onChange(of: isAccountFocused) { wasFocused, isFocused in
+                .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
                     if wasFocused && !isFocused { runLookupIfNeeded() }
                 }
             }

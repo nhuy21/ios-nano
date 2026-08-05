@@ -46,7 +46,7 @@ struct AppTextField: View {
                     .strokeBorder(hasError ? AppColor.error : AppColor.payInputBorder, lineWidth: 1)
             }
             .inputShadow()
-            .onChange(of: text) { _, newValue in
+            .onChangeNewCompat(of: text) { newValue in
                 var cleaned = digitsOnly ? newValue.filter(\.isNumber) : newValue
                 if let maxLength { cleaned = String(cleaned.prefix(maxLength)) }
                 if cleaned != newValue { text = cleaned }

@@ -407,7 +407,7 @@ struct KycReviewView: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
                 }
-                .onChange(of: accNo) { _, newValue in
+                .onChangeNewCompat(of: accNo) { newValue in
                     let digits = newValue.filter(\.isNumber)
                     if digits != newValue { accNo = digits }
                     accName = ""
@@ -415,7 +415,7 @@ struct KycReviewView: View {
                 }
                 // Chỉ tra khi đã nhập XONG (rời focus) — gọi theo từng ký tự vừa tốn
                 // request vừa hiện tên sai lúc số còn gõ dở.
-                .onChange(of: isAccountFocused) { wasFocused, focused in
+                .onChangeCompat(of: isAccountFocused) { wasFocused, focused in
                     if wasFocused && !focused { runLookup() }
                 }
         }

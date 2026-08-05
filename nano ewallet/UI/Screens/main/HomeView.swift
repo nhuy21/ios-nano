@@ -77,7 +77,7 @@ struct HomeView: View {
         }
         // Từ nền quay ra: làm mới NGAY cả 3, không chờ hết nhịp 8s — mirror nhánh
         // ON_RESUME bên Kotlin.
-        .onChange(of: scenePhase) { previous, phase in
+        .onChangeCompat(of: scenePhase) { previous, phase in
             guard phase == .active, previous != .active else { return }
             Task {
                 async let walletTask: Void = wallet.refresh(force: true)
@@ -135,7 +135,7 @@ struct HomeView: View {
             .presentationBackground(.clear)
         }
         .photosPicker(isPresented: $showOneTouchPhotoPicker, selection: $oneTouchPhoto, matching: .images)
-        .onChange(of: oneTouchPhoto) { _, item in
+        .onChangeNewCompat(of: oneTouchPhoto) { item in
             guard let item else { return }
             oneTouchPhoto = nil
             Task {

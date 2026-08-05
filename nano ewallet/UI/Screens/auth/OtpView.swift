@@ -29,7 +29,7 @@ struct OtpView: View {
             isFocused = true
             vm.startCountdown()
         }
-        .onChange(of: vm.otp) { _, newValue in
+        .onChangeNewCompat(of: vm.otp) { newValue in
             if newValue.count == OtpViewModel.otpLength {
                 submit()
             }
