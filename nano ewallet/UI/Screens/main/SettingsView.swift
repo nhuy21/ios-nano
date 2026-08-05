@@ -30,8 +30,8 @@ enum SettingsRowMetrics {
     /// mỗi bên).
     ///
     /// Phải ghim cứng chứ không để `padding` tự quyết: hàng có công tắc chứa `Toggle` cao
-    /// ~31pt và hàng sinh trắc có 2 dòng chữ, còn hàng thường chỉ có chữ + chevron — cùng
-    /// một padding vẫn cho ra ba chiều cao khác nhau.
+    /// ~31pt, còn hàng thường chỉ có chữ + chevron — cùng một padding vẫn cho ra hai chiều
+    /// cao khác nhau.
     static let height: CGFloat = 68
 
     /// Cỡ chữ tiêu đề của hàng — dùng chung để 3 loại hàng không lệch nhau.

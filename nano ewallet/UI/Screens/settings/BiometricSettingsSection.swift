@@ -48,17 +48,19 @@ struct BiometricSettingsSection: View {
     /// lớp nữa sẽ thành thẻ lồng trong thẻ.
     var body: some View {
         VStack(spacing: 0) {
+            // Tiêu đề NGẮN, không kèm "bằng Face ID": bỏ dòng mô tả rồi nên chỉ còn một
+            // dòng, mà "Xác thực giao dịch bằng Face ID" dài quá khung còn lại sau icon và
+            // công tắc — nó bị cắt thành "Xác thực giao dịch bằng F...". Icon `faceid` đứng
+            // ngay cạnh đã nói rõ đây là Face ID.
             toggleRow(
                 title: "Đăng nhập bằng \(label)",
-                subtitle: "Không cần nhập mật khẩu khi mở app",
                 systemImage: "person.badge.key.fill",
                 isOn: loginEnabled,
                 kind: .login
             )
             Rectangle().fill(AppColor.line).frame(height: 1).padding(.leading, 56)
             toggleRow(
-                title: "Xác thực giao dịch bằng \(label)",
-                subtitle: "Thay cho mật khẩu 6 số khi chuyển tiền",
+                title: "Xác thực giao dịch",
                 systemImage: "faceid",
                 isOn: transferEnabled,
                 kind: .transfer
@@ -97,7 +99,6 @@ struct BiometricSettingsSection: View {
 
     private func toggleRow(
         title: String,
-        subtitle: String,
         systemImage: String,
         isOn: Bool,
         kind: Kind
@@ -110,16 +111,16 @@ struct BiometricSettingsSection: View {
                 .foregroundStyle(AppColor.payInk)
                 .frame(width: 28)
 
-            VStack(alignment: .leading, spacing: 2) {
-                // Cùng cỡ chữ với mọi hàng khác trong màn Cá nhân (trước là 15).
-                Text(title)
-                    .font(AppFont.beVietnamPro(SettingsRowMetrics.titleFontSize))
-                    .foregroundStyle(AppColor.payInk)
-                Text(subtitle)
-                    .font(AppFont.beVietnamPro(12))
-                    .foregroundStyle(AppColor.payMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // Cùng cỡ chữ với mọi hàng khác trong màn Cá nhân.
+            //
+            // `lineLimit(1)` + `minimumScaleFactor`: nếu khung vẫn hẹp (máy nhỏ, người dùng
+            // tăng cỡ chữ hệ thống, hoặc `label` là "Touch ID" dài hơn) thì chữ co lại chút
+            // chứ KHÔNG bị cắt đuôi thành "...".
+            Text(title)
+                .font(AppFont.beVietnamPro(SettingsRowMetrics.titleFontSize))
+                .foregroundStyle(AppColor.payInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             Spacer(minLength: 8)
 
@@ -138,8 +139,7 @@ struct BiometricSettingsSection: View {
             .tint(AppColor.brand)
         }
         .padding(.horizontal, 16)
-        // Cùng chiều cao với mọi hàng khác trong màn Cá nhân. Hàng này có 2 dòng chữ
-        // (~38pt) nên vẫn vừa trong 68pt.
+        // Cùng chiều cao với mọi hàng khác trong màn Cá nhân.
         .frame(height: SettingsRowMetrics.height)
     }
 
