@@ -116,19 +116,49 @@ struct FixEkycFieldsView: View {
                     hasError: showError
                 )
             } else {
-                TextField(
-                    "",
-                    text: Binding(
-                        get: { values[field.key] ?? "" },
-                        set: { values[field.key] = $0 }
-                    ),
-                    prompt: .appPlaceholder("Nhập \(meta.label.lowercased())")
-                )
-                .font(AppFont.beVietnamPro(14))
-                .foregroundStyle(AppColor.payInk)
-                .tint(AppColor.brand)
-                .keyboardType(meta.isNumeric ? .numberPad : .default)
-                .autocorrectionDisabled()
+                HStack(spacing: 8) {
+                    TextField(
+                        "",
+                        text: Binding(
+                            get: { values[field.key] ?? "" },
+                            set: { values[field.key] = $0 }
+                        ),
+                        prompt: .appPlaceholder("Nhập \(meta.label.lowercased())")
+                    )
+                    .font(AppFont.beVietnamPro(14))
+                    .foregroundStyle(AppColor.payInk)
+                    .tint(AppColor.brand)
+                    .keyboardType(meta.isNumeric ? .numberPad : .default)
+                    .autocorrectionDisabled()
+
+                    // Nút "Dán" CHỈ cho ô số (số tài khoản, CCCD, mã BIN): bàn phím số không
+                    // có menu Paste khi long-press nên không có nút thì phải gõ tay cả chuỗi.
+                    // Ô chữ vẫn long-press ra menu Paste bình thường, thêm nút là dư.
+                    //
+                    // Chỉ hiện khi ô còn TRỐNG — đã có giá trị thì việc cần làm là sửa/xoá.
+                    if meta.isNumeric, isEmpty {
+                        Button {
+                            guard let clip = UIPasteboard.general.string else { return }
+                            // Lọc chữ số: nội dung copy về hay kèm khoảng trắng hoặc dấu
+                            // chấm, dán thô vào thì BE từ chối vì sai định dạng.
+                            values[field.key] = clip.filter(\.isNumber)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "doc.on.clipboard")
+                                    .font(.system(size: 13))
+                                Text("Dán")
+                                    .font(AppFont.beVietnamPro(12, .bold))
+                            }
+                            .foregroundStyle(AppColor.brand)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(AppColor.brand.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(Color.white)

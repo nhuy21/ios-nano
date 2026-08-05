@@ -17,6 +17,8 @@
 //
 
 import SwiftUI
+// `UIPasteboard` cho nút Dán ở ô số tài khoản.
+import UIKit
 
 struct KycReviewView: View {
 
@@ -395,30 +397,67 @@ struct KycReviewView: View {
                 .font(AppFont.beVietnamPro(12, .semibold))
                 .foregroundStyle(AppColor.payInk)
 
-            TextField("", text: $accNo, prompt: .appPlaceholder("Nhập số tài khoản"))
-                .font(AppFont.beVietnamPro(14))
-                .foregroundStyle(AppColor.payInk)
-                .tint(AppColor.brand)
-                .keyboardType(.numberPad)
-                .focused($isAccountFocused)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .frame(minHeight: 48)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+            HStack(spacing: 8) {
+                TextField("", text: $accNo, prompt: .appPlaceholder("Nhập số tài khoản"))
+                    .font(AppFont.beVietnamPro(14))
+                    .foregroundStyle(AppColor.payInk)
+                    .tint(AppColor.brand)
+                    .keyboardType(.numberPad)
+                    .focused($isAccountFocused)
+                    .onChangeNewCompat(of: accNo) { newValue in
+                        let digits = newValue.filter(\.isNumber)
+                        if digits != newValue { accNo = digits }
+                        accName = ""
+                        lookupError = nil
+                    }
+                    // Chỉ tra khi đã nhập XONG (rời focus) — gọi theo từng ký tự vừa tốn
+                    // request vừa hiện tên sai lúc số còn gõ dở.
+                    .onChangeCompat(of: isAccountFocused) { wasFocused, focused in
+                        if wasFocused && !focused { runLookup() }
+                    }
+
+                // Nút "Dán" như luồng chuyển khoản: ô này dùng bàn phím SỐ, mà bàn phím số
+                // không có menu Paste khi long-press — không có nút thì chỉ còn cách gõ tay
+                // cả chuỗi số tài khoản.
+                //
+                // Chỉ hiện khi ô còn TRỐNG: đã có số rồi thì việc cần làm là sửa/xoá, mà
+                // nút nằm đè lên chỗ đó chỉ gây bấm nhầm.
+                if accNo.isEmpty {
+                    Button {
+                        guard let clip = UIPasteboard.general.string else { return }
+                        // Lọc chữ số ngay: số tài khoản copy từ app ngân hàng hay kèm khoảng
+                        // trắng ("1234 5678 9012"), dán thô vào là tra cứu trượt.
+                        accNo = clip.filter(\.isNumber)
+                        accName = ""
+                        lookupError = nil
+                        // Xoá để lần tra trước không chặn lần này: dán lại đúng số vừa tra
+                        // lỗi thì vẫn phải cho tra lại.
+                        lastLookedUp = nil
+                        runLookup()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.on.clipboard")
+                                .font(.system(size: 13))
+                            Text("Dán")
+                                .font(AppFont.beVietnamPro(12, .bold))
+                        }
+                        .foregroundStyle(AppColor.brand)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppColor.brand.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .onChangeNewCompat(of: accNo) { newValue in
-                    let digits = newValue.filter(\.isNumber)
-                    if digits != newValue { accNo = digits }
-                    accName = ""
-                    lookupError = nil
-                }
-                // Chỉ tra khi đã nhập XONG (rời focus) — gọi theo từng ký tự vừa tốn
-                // request vừa hiện tên sai lúc số còn gõ dở.
-                .onChangeCompat(of: isAccountFocused) { wasFocused, focused in
-                    if wasFocused && !focused { runLookup() }
-                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(minHeight: 48)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+            }
         }
     }
 
@@ -510,9 +549,15 @@ struct KycReviewView: View {
         Task {
             defer { isLookingUp = false }
             do {
-                accName = try await TransferService.verifyBeneficiary(
-                    VerifyBeneficiaryRequest(accNo: accNo, bankNo: Int(bank.bin), accType: 0)
-                )
+                // `banks/lookup` (VietQR) chứ KHÔNG phải `wallet/verify-beneficiary` (Bảo
+                // Kim) — mirror `EkycApi.lookupAccount` bên Android ở đúng màn này.
+                //
+                // Hai API khác nhau về bản chất: `verify-beneficiary` hỏi Bảo Kim xem tài
+                // khoản có phải người thụ hưởng hợp lệ để CHUYỂN TIỀN, nên nó đòi ví Bảo Kim
+                // của người gửi đã sẵn sàng — mà ở màn onboarding này ví còn CHƯA mở, nên
+                // luôn trả "không tồn tại" dù số tài khoản đúng. `banks/lookup` chỉ tra tên
+                // chủ tài khoản qua VietQR, không cần ví.
+                accName = try await BankService.lookupAccount(bin: bank.bin, accountNumber: accNo)
             } catch let error as APIError {
                 lookupError = error.message
             } catch {
