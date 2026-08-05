@@ -27,7 +27,17 @@ struct RootNavigator: View {
                 NavigationStack {
                     OtpView(
                         phone: phone,
-                        onBack: { appState.route(status: nil, phone: nil) },
+                        // Back ở màn OTP LUÔN về màn đăng nhập (mirror `popBackStack()` bên
+                        // Android), KHÔNG đi qua `route(status:)`: truyền `status: nil` vào đó
+                        // rơi vào nhánh "không rõ status" và mở thẳng Home — tài khoản PENDING
+                        // chưa verify OTP vẫn dùng được các tab.
+                        //
+                        // Vào WelcomeBack hay Login đầy đủ là tuỳ `lastPhone`: `applyAuthData`
+                        // ghi nó ngay ở nhánh `requireOtp` khi login từ màn Login đầy đủ
+                        // (`rememberPhone: true`), nên luồng đăng ký-rồi-login sẽ ra WelcomeBack.
+                        // Cả hai đường đều đi qua `route(status:)` nên PENDING lại bị đẩy về
+                        // đúng màn OTP này — không có lối nào vào Home.
+                        onBack: { appState.forceUnauthenticated(lastPhone: AuthStore.shared.lastPhone) },
                         onVerified: { appState.route(status: UserStatus.kycPending.rawValue, phone: phone) }
                     )
                     .hidesSystemNavigationBar()

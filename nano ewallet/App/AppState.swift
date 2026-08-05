@@ -78,15 +78,22 @@ final class AppState: ObservableObject {
     }
 
     /// Sau khi có `status` xác thực từ server — nguồn duy nhất quyết định điều hướng.
+    ///
+    /// CHỈ `ACTIVE` được vào Home. `nil` (status thiếu, lạ, hoặc gọi từ chỗ không có
+    /// status) phải về Login: gộp `nil` chung với `.active` biến mọi chỗ thiếu status
+    /// thành một đường vào Home không qua xác thực — nút back ở màn OTP từng lọt đúng
+    /// theo cách này (tài khoản `PENDING` chưa verify OTP mà vẫn dùng được các tab).
     func route(status rawStatus: String?, phone: String?) {
         switch UserStatus(raw: rawStatus) {
         case .kycPending:
             if let phone {
                 root = .onboarding(phone: phone)
             } else {
-                root = .authenticated
+                // Không biết SĐT thì không dựng được luồng onboarding. Về Login chứ không
+                // vào Home: tài khoản KYC_PENDING chưa có ví, vào Home là màn hình rỗng.
+                root = .unauthenticated(lastPhone: AuthStore.shared.lastPhone)
             }
-        case .active, .none:
+        case .active:
             root = .authenticated
         case .pending:
             if let phone {
@@ -96,6 +103,8 @@ final class AppState: ObservableObject {
             }
         case .blocked:
             root = .unauthenticated(lastPhone: nil)
+        case .none:
+            root = .unauthenticated(lastPhone: AuthStore.shared.lastPhone)
         }
     }
 
@@ -117,18 +126,26 @@ final class AppState: ObservableObject {
 
     /// Mất mạng lúc refresh — dùng cache đã lưu lúc login/refresh thành công gần nhất
     /// (mirror nhánh `catch IOException` trong SplashScreen.kt).
+    /// Cũng theo quy tắc "chỉ ACTIVE mới vào Home" như `route(status:phone:)`: trước đây
+    /// nhánh này chỉ hỏi `cachedStatus != nil`, nên cache `PENDING`/`BLOCKED` gặp lúc mất
+    /// mạng là vào thẳng Home.
     private func applyOfflineFallback(lastPhone: String?) {
         let store = AuthStore.shared
         let cachedStatus = UserStatus(raw: store.lastKnownStatus)
 
-        if cachedStatus == .kycPending, let phone = store.userPhone ?? lastPhone {
-            root = .onboarding(phone: phone)
-        } else if cachedStatus != nil {
+        switch cachedStatus {
+        case .kycPending:
+            if let phone = store.userPhone ?? lastPhone {
+                root = .onboarding(phone: phone)
+            } else {
+                root = .unauthenticated(lastPhone: lastPhone)
+            }
+        case .active:
             root = .authenticated
-        } else if let lastPhone {
+        case .pending, .blocked, .none:
+            // Không dựng màn OTP ở đây dù cache là PENDING: gửi lại OTP cần mạng, mà nhánh
+            // này chạy đúng lúc không có mạng.
             root = .unauthenticated(lastPhone: lastPhone)
-        } else {
-            root = .unauthenticated(lastPhone: nil)
         }
     }
 }
