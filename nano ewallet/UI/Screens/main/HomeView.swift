@@ -68,6 +68,15 @@ struct HomeView: View {
         // hai màn cùng sống và cùng phát preference; `reduce` gộp bằng `&&` nên nếu tab kia
         // cũng phát thì Home push màn con sẽ ẩn luôn thanh tab của tab Cá nhân.
         .showsTabBar(isActiveTab ? path.isEmpty : true)
+        // Rời tab -> pop hết về màn gốc. `TabView` giữ view sống nên `path` vẫn còn nguyên;
+        // không dọn thì vuốt từ tab Cá nhân về đây sẽ rơi vào ĐÚNG màn con đang treo dở,
+        // chứ không phải Trang chủ. Vuốt qua lại luôn là gốc <-> gốc.
+        //
+        // An toàn với deep link: `openOnHome` set `selectedTab = .home` TRƯỚC khi append,
+        // nên lúc route được đẩy vào thì `isActiveTab` đã là true — nhánh này không chạy.
+        .onChangeNewCompat(of: isActiveTab) { active in
+            if !active { path.removeAll() }
+        }
         // Poll gần realtime khi Home đang hiển thị — dự phòng cho lúc push FCM bị tắt
         // hoặc tới chậm. Không có vòng này thì tiền vào ví lúc đang ngồi ở Home chỉ làm
         // badge chuông nhảy, còn SỐ DƯ trên màn đứng yên cho tới khi mở lại app.

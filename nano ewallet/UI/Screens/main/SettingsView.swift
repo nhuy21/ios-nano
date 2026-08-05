@@ -61,6 +61,12 @@ struct SettingsView: View {
         // hai màn cùng sống và cùng phát preference; `reduce` gộp bằng `&&` nên nếu tab kia
         // cũng phát thì màn con của nó sẽ ẩn luôn thanh tab của tab đang xem.
         .showsTabBar(isActiveTab ? path.isEmpty : true)
+        // Rời tab -> pop hết về màn gốc. `TabView` giữ view sống nên `path` vẫn còn nguyên;
+        // không dọn thì vuốt từ màn con của tab kia sang đây sẽ rơi vào ĐÚNG màn con đang
+        // treo dở, chứ không phải màn Cá nhân. Vuốt qua lại luôn là gốc <-> gốc.
+        .onChangeNewCompat(of: isActiveTab) { active in
+            if !active { path.removeAll() }
+        }
     }
 
     /// Tiêu đề "Cá nhân" cố định, không cuộn — mirror header slim riêng bên Android
