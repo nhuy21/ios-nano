@@ -74,6 +74,11 @@ struct EditNicknameSheet: View {
             .padding(.top, 8)
         }
         .padding(20)
+        // Sheet không set nền sẽ lấy nền hệ thống — dark mode là ĐEN, mà chữ trong đây đều
+        // là màu tối ghim cứng (`payInk`/`payMuted`) nên đen trên đen, không đọc được.
+        // Giãn hết khung trước khi tô để không hở dải dưới (`VStack` chỉ cao bằng nội dung).
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color.white)
         .presentationDragIndicator(.hidden)
     }
 }

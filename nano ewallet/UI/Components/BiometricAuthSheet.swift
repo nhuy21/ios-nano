@@ -97,6 +97,15 @@ struct BiometricAuthSheet: View {
         }
         .padding(.top, 4)
         .presentationDetents([.height(460)])
+        // Sheet không set nền sẽ lấy nền hệ thống — ở dark mode là ĐEN, mà chữ trong đây
+        // đều là màu tối cố định (`payInk`/`payMuted`) nên bị dìm gần như không đọc được.
+        // Ghim nền sáng cho khớp Android (bên đó nền sheet là `Color.White` cứng).
+        //
+        // Phải giãn hết khung TRƯỚC khi tô nền: `VStack` chỉ cao bằng nội dung, mà detent
+        // cố định thường cao hơn — tô nền theo `VStack` sẽ để hở dải dưới lộ lại nền đen.
+        // `alignment: .top` giữ nội dung ở trên, không bị dồn ra giữa khi giãn.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color.white)
         .presentationDragIndicator(.hidden)
         // Không cho kéo xuống đóng lúc đang chờ BE — giao dịch có thể đã thực thi.
         .interactiveDismissDisabled(isAuthenticating)

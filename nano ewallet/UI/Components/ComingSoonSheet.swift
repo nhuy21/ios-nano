@@ -57,6 +57,11 @@ struct ComingSoonSheet: View {
             .padding(.bottom, 24)
         }
         .presentationDetents([.height(320)])
+        // Sheet không set nền sẽ lấy nền hệ thống — ở dark mode là ĐEN, mà chữ trong đây
+        // đều là màu tối cố định (`payInk`/`payMuted`) nên bị dìm gần như không đọc được.
+        // Ghim nền sáng cho khớp Android (bên đó nền sheet là `Color.White` cứng).
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
         .presentationDragIndicator(.hidden)
     }
 }

@@ -92,7 +92,16 @@ struct TransactionDetailSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
+            // Nền phải phủ CẢ vùng cuộn, nên đặt `frame(maxWidth:)` + `background` lên nội
+            // dung bên trong ScrollView: đặt ngoài ScrollView thì nội dung ngắn để hở phần
+            // dưới, lộ lại nền hệ thống.
+            .frame(maxWidth: .infinity)
+            .background(AppColor.bgSoft)
         }
+        // Sheet trước đây KHÔNG set nền nên lấy nền hệ thống — ở dark mode là ĐEN, mà chữ
+        // trong đây đều là màu tối cố định (`payInk`, `payMuted`) nên bị dìm gần như không
+        // đọc được. Ghim nền sáng cho khớp Android (bên đó là `Color.White` cứng).
+        .background(AppColor.bgSoft)
         .presentationDragIndicator(.hidden)
     }
 
@@ -121,7 +130,12 @@ struct TransactionDetailSheet: View {
                     .multilineTextAlignment(.trailing)
             }
             .padding(.vertical, 10)
-            Divider()
+            // Màu cố định thay `Divider()`: `Divider` lấy màu ngăn cách của hệ thống, đổi
+            // theo light/dark mode nên trên nền sáng ghim cứng ở đây nó gần như tàng hình.
+            // Khớp `SheetDivider` bên Android.
+            Rectangle()
+                .fill(Color(hex: 0xE7ECEA))
+                .frame(height: 1)
         }
     }
 

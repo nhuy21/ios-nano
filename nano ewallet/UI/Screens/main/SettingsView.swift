@@ -308,6 +308,11 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
+            // BẮT BUỘC: `Button` + `.buttonStyle(.plain)` chỉ nhận chạm trên vùng VẼ THẬT
+            // (chữ + icon). `Spacer()` ở giữa và phần `padding` là trong suốt nên bấm vào
+            // không ăn — người dùng phải nhắm đúng chữ hoặc mũi tên mới mở được thẻ.
+            // `contentShape` khai cả hàng là vùng bấm.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -445,6 +450,14 @@ private struct SupportSheet: View {
             .padding(.top, 4)
             .padding(.bottom, 24)
         }
+        // Sheet không set nền sẽ lấy nền hệ thống — dark mode là ĐEN, mà chữ trong đây đều
+        // là màu tối ghim cứng (`payInk`/`payMuted`) nên đen trên đen, không đọc được.
+        //
+        // Giãn hết khung TRƯỚC khi tô nền: `VStack` chỉ cao bằng nội dung, sheet thường cao
+        // hơn nên tô theo `VStack` sẽ hở dải dưới lộ lại nền đen. `alignment: .top` giữ nội
+        // dung ở trên, không bị dồn ra giữa khi giãn.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(AppColor.bgSoft)
         .presentationDragIndicator(.hidden)
     }
 

@@ -63,6 +63,9 @@ struct SecurityView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
+            // Không có `contentShape` thì `Spacer()` và phần `padding` (trong suốt) không
+            // nhận chạm — phải bấm đúng chữ hoặc mũi tên mới mở được thẻ.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
