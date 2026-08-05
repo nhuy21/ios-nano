@@ -17,9 +17,11 @@ struct CccdScanView: View {
     let onStartEkyc: () -> Void
 
     @StateObject private var sessionManager = EkycSessionManager.shared
+    @State private var isCheckingPermission = false
+    @State private var showCameraDeniedAlert = false
 
     private var isPreparing: Bool {
-        sessionManager.state == .loading || sessionManager.state == .idle
+        sessionManager.state == .loading || sessionManager.state == .idle || isCheckingPermission
     }
 
     private var isSessionError: Bool {
@@ -29,6 +31,7 @@ struct CccdScanView: View {
 
     private var ctaLabel: String {
         if isSessionError { return "Thử lại kết nối" }
+        if isCheckingPermission { return "Đang kiểm tra quyền camera..." }
         if isPreparing { return "Đang chuẩn bị phiên..." }
         return "Bắt đầu xác thực"
     }
@@ -40,6 +43,15 @@ struct CccdScanView: View {
         }
         .background(Color.white)
         .task { await sessionManager.prepare() }
+        .alert("Cần quyền camera", isPresented: $showCameraDeniedAlert) {
+            Button("Mở Cài đặt") {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(url)
+            }
+            Button("Huỷ", role: .cancel) {}
+        } message: {
+            Text("Ứng dụng cần quyền camera để chụp CCCD và xác thực khuôn mặt. Vui lòng cấp quyền trong Cài đặt.")
+        }
     }
 
     // MARK: - Header
@@ -142,14 +154,24 @@ struct CccdScanView: View {
 
     /// Đang lỗi phiên thì phải LẤY LẠI phiên trước, chỉ mở SDK khi đã sẵn. Bấm "Thử lại
     /// kết nối" mà mở thẳng SDK với phiên rỗng/hết hạn thì không có tác dụng gì.
+    ///
+    /// PHẢI xin quyền camera và ĐỢI XONG (await) trước khi mở SDK CmcEkyc: gọi SDK lúc quyền
+    /// còn `.notDetermined` khiến app crash ngay lần đầu bấm nút (SDK tự mở AVCaptureSession
+    /// mà không đợi dialog xin quyền hệ thống có quyết định) — xem `EkycPermissions.swift`.
     private func handleCta() {
         guard !isPreparing else { return }
-        if isSessionError {
-            Task {
-                guard await sessionManager.prepare(forceRefresh: true) else { return }
-                onStartEkyc()
+        Task {
+            isCheckingPermission = true
+            let granted = await EkycPermissions.ensureCameraAuthorized()
+            isCheckingPermission = false
+            guard granted else {
+                showCameraDeniedAlert = true
+                return
             }
-        } else {
+
+            if isSessionError {
+                guard await sessionManager.prepare(forceRefresh: true) else { return }
+            }
             onStartEkyc()
         }
     }
