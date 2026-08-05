@@ -28,6 +28,9 @@ private let supportEmail = "nhiep9145@gmail.com"
 
 @MainActor
 struct SettingsView: View {
+    /// Tab Cá nhân có đang được chọn không — xem chú thích ở `.showsTabBar` bên dưới.
+    var isActiveTab: Bool = true
+
     @StateObject private var appState = AppState.shared
     @StateObject private var authStore = AuthStore.shared
 
@@ -54,7 +57,10 @@ struct SettingsView: View {
                         .hidesSystemNavigationBar()
                 }
         }
-        .showsTabBar(path.isEmpty)
+        // Chỉ tab ĐANG CHỌN được quyết định thanh tab. `MainTabView` dùng `TabView` nên cả
+        // hai màn cùng sống và cùng phát preference; `reduce` gộp bằng `&&` nên nếu tab kia
+        // cũng phát thì màn con của nó sẽ ẩn luôn thanh tab của tab đang xem.
+        .showsTabBar(isActiveTab ? path.isEmpty : true)
     }
 
     /// Tiêu đề "Cá nhân" cố định, không cuộn — mirror header slim riêng bên Android

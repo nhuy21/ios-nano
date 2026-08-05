@@ -60,26 +60,49 @@ struct MainTabView: View {
         )
     }
 
-    var body: some View {
+    /// Một trang của `TabView`: nội dung + thanh tab nổi đè lên đáy.
+    ///
+    /// `showTabBar` do màn con phát lên qua preference, nên phải đọc ở NGOÀI closure nội
+    /// dung (đọc bên trong thì preference chưa kịp truyền lên lúc dựng).
+    private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .home:
-                    // HomeView tự sở hữu NavigationStack riêng (push History/Contacts).
-                    HomeView(path: $homePath)
-                case .settings:
-                    // SettingsView tự sở hữu NavigationStack riêng (cần push nhiều
-                    // route con: Security -> ChangePassword/Devices...).
-                    SettingsView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if showTabBar {
                 floatingTabBar
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+    }
 
+    var body: some View {
+        Group {
+            // `TabView` kiểu page thay `switch`: cho vuốt ngang qua lại giữa 2 tab.
+            //
+            // Không dùng `DragGesture` tự viết: Home có 2 `ScrollView(.horizontal)` (hàng
+            // danh bạ nhanh, hàng gợi ý) và cả hai tab đều bọc `NavigationStack` có cử chỉ
+            // back cạnh màn. Gesture tự viết sẽ tranh chấp cả hai — vuốt trên hàng danh bạ
+            // thành đổi tab. `TabView` nhường đúng cử chỉ cho scroll view con.
+            TabView(selection: $selectedTab) {
+                // Thanh tab nằm TRONG từng trang (không phải trong ZStack ngoài `TabView`)
+                // để nó trôi ngang cùng nội dung khi vuốt, thay vì đứng yên một chỗ.
+                //
+                // Đổi lại là mỗi trang giữ một BẢN thanh tab riêng — chấp nhận được vì nó
+                // dựng từ cùng `selectedTab` nên hai bản luôn hiện cùng trạng thái.
+                //
+                // HomeView tự sở hữu NavigationStack riêng (push History/Contacts).
+                page { HomeView(path: $homePath, isActiveTab: selectedTab == .home) }
+                    .tag(Tab.home)
+
+                // SettingsView tự sở hữu NavigationStack riêng (cần push nhiều route con:
+                // Security -> ChangePassword/Devices...).
+                page { SettingsView(isActiveTab: selectedTab == .settings) }
+                    .tag(Tab.settings)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            // Vuốt quá trang đầu/cuối không nảy ra dải xám ở đáy.
+            .ignoresSafeArea(.container, edges: .bottom)
         }
         // Theo dõi thông báo khi app foreground (poll + làm mới badge/hộp thư).
         // KHÔNG hiện banner trong app: `willPresent` đã trả `.banner` nên iOS tự hiện
@@ -149,8 +172,9 @@ struct MainTabView: View {
 
     // MARK: - Deep link
 
-    /// Đẩy màn vào ngăn xếp Home. PHẢI chuyển tab trước: `HomeView` chỉ được dựng khi
-    /// `selectedTab == .home`, đẩy route lúc đang ở tab Cá nhân thì không ai hiển thị nó.
+    /// Đẩy màn vào ngăn xếp Home. Vẫn chuyển tab trước dù `TabView` giữ `HomeView` sống ở
+    /// mọi lúc: không chuyển thì màn được đẩy vào đúng ngăn xếp nhưng người dùng đang xem
+    /// tab Cá nhân nên không thấy gì.
     /// Đóng luôn màn quét QR nếu đang mở, tránh nó che mất màn vừa đẩy.
     private func openOnHome(_ route: HomeRoute) {
         showQrScan = false
@@ -269,7 +293,9 @@ struct MainTabView: View {
         let isActive = selectedTab == tab
         let tint = isActive ? Self.activeTint : AppColor.payInk
         return Button {
-            selectedTab = tab
+            // `withAnimation` để bấm nút cũng trượt ngang như khi vuốt — gán thẳng thì
+            // trang nhảy tức thì, lệch hẳn cảm giác so với cử chỉ vuốt.
+            withAnimation(.easeInOut(duration: 0.25)) { selectedTab = tab }
         } label: {
             VStack(spacing: 3) {
                 icon(tint)

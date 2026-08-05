@@ -15,10 +15,14 @@ import PhotosUI
 @MainActor
 struct HomeView: View {
     /// Ngăn xếp điều hướng do `MainTabView` SỞ HỮU, không phải `@State` của màn này.
-    /// Lý do: chuyển sang tab Cá nhân là `HomeView` bị huỷ khỏi cây view (MainTabView
-    /// dùng `switch` chứ không phải `TabView`), state riêng sẽ mất theo. Deep link tới
-    /// lúc đó cần một ngăn xếp còn sống để đẩy màn vào.
+    /// Deep link có thể tới lúc đang ở tab Cá nhân nên ngăn xếp phải sống ngoài view này.
     @Binding var path: [HomeRoute]
+
+    /// Tab Home có đang được chọn không. BẮT BUỘC truyền vào vì `MainTabView` dùng
+    /// `TabView` (để vuốt qua lại được) nên view này VẪN SỐNG khi người dùng sang tab Cá
+    /// nhân — khác `switch` trước đây vốn huỷ hẳn view và mọi `.task` theo nó. Không có cờ
+    /// này thì vòng poll 8s dưới đây chạy mãi ở tab khác, tốn pin và mạng vô ích.
+    var isActiveTab: Bool = true
 
     @StateObject private var wallet = WalletStore.shared
     @StateObject private var transactions = TransactionStore.shared
@@ -42,9 +46,10 @@ struct HomeView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Home đang thật sự trước mắt người dùng: app ở foreground VÀ chưa push màn con nào.
-    /// Rời Home thì ngừng poll cho đỡ tốn pin/mạng — mirror `homeVisible` bên Kotlin.
-    private var isHomeVisible: Bool { scenePhase == .active && path.isEmpty }
+    /// Home đang thật sự trước mắt người dùng: app ở foreground, đang ở tab Home, và chưa
+    /// push màn con nào. Rời Home thì ngừng poll cho đỡ tốn pin/mạng — mirror `homeVisible`
+    /// bên Kotlin.
+    private var isHomeVisible: Bool { scenePhase == .active && isActiveTab && path.isEmpty }
 
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
@@ -59,7 +64,10 @@ struct HomeView: View {
                         .hidesSystemNavigationBar()
                 }
         }
-        .showsTabBar(path.isEmpty)
+        // Chỉ tab ĐANG CHỌN được quyết định thanh tab. `MainTabView` dùng `TabView` nên cả
+        // hai màn cùng sống và cùng phát preference; `reduce` gộp bằng `&&` nên nếu tab kia
+        // cũng phát thì Home push màn con sẽ ẩn luôn thanh tab của tab Cá nhân.
+        .showsTabBar(isActiveTab ? path.isEmpty : true)
         // Poll gần realtime khi Home đang hiển thị — dự phòng cho lúc push FCM bị tắt
         // hoặc tới chậm. Không có vòng này thì tiền vào ví lúc đang ngồi ở Home chỉ làm
         // badge chuông nhảy, còn SỐ DƯ trên màn đứng yên cho tới khi mở lại app.
