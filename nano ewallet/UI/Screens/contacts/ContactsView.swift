@@ -146,8 +146,9 @@ struct ContactsView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14))
                 .foregroundStyle(AppColor.payMuted)
-            TextField("Tìm theo tên, số tài khoản...", text: $searchText)
+            TextField("", text: $searchText, prompt: .appPlaceholder("Tìm theo tên, số tài khoản..."))
                 .font(AppFont.beVietnamPro(14))
+                .foregroundStyle(AppColor.payInk)
             if !searchText.isEmpty {
                 Button {
                     searchText = ""

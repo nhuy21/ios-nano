@@ -116,10 +116,14 @@ struct FixEkycFieldsView: View {
                     hasError: showError
                 )
             } else {
-                TextField("Nhập \(meta.label.lowercased())", text: Binding(
-                    get: { values[field.key] ?? "" },
-                    set: { values[field.key] = $0 }
-                ))
+                TextField(
+                    "",
+                    text: Binding(
+                        get: { values[field.key] ?? "" },
+                        set: { values[field.key] = $0 }
+                    ),
+                    prompt: .appPlaceholder("Nhập \(meta.label.lowercased())")
+                )
                 .font(AppFont.beVietnamPro(14))
                 .foregroundStyle(AppColor.payInk)
                 .tint(AppColor.brand)
@@ -332,8 +336,9 @@ struct KycOptionPickerSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(AppColor.payMuted)
-                    TextField("Tìm nhanh", text: $query)
+                    TextField("", text: $query, prompt: .appPlaceholder("Tìm nhanh"))
                         .font(AppFont.beVietnamPro(14))
+                        .foregroundStyle(AppColor.payInk)
                         .tint(AppColor.brand)
                 }
                 .padding(.horizontal, 14)

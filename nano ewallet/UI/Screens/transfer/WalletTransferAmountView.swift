@@ -695,7 +695,7 @@ struct WalletTransferAmountView: View {
                     .foregroundStyle(AppColor.payMuted)
             }
 
-            TextField("Nhập nội dung chuyển tiền", text: $message, axis: .vertical)
+            TextField("", text: $message, prompt: .appPlaceholder("Nhập nội dung chuyển tiền", size: 17), axis: .vertical)
                 .font(AppFont.beVietnamPro(17, .semibold))
                 .foregroundStyle(AppColor.payInk)
                 .tint(AppColor.brand)

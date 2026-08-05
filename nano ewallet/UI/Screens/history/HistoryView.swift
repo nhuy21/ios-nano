@@ -146,7 +146,7 @@ struct HistoryView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 18))
                 .foregroundStyle(HistoryColor.accent)
-            TextField("Tìm theo tên, nội dung...", text: $searchText)
+            TextField("", text: $searchText, prompt: .appPlaceholder("Tìm theo tên, nội dung..."))
                 .font(AppFont.beVietnamPro(14, .medium))
                 .foregroundStyle(AppColor.payInk)
                 .tint(HistoryColor.accent)

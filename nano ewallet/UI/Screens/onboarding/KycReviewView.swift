@@ -178,7 +178,7 @@ struct KycReviewView: View {
                     .font(AppFont.beVietnamPro(12, .semibold))
                     .foregroundStyle(AppColor.payInk)
 
-                TextField("Nhập địa chỉ tạm trú", text: $temporaryLocation)
+                TextField("", text: $temporaryLocation, prompt: .appPlaceholder("Nhập địa chỉ tạm trú"))
                     .font(AppFont.beVietnamPro(14))
                     .foregroundStyle(AppColor.payInk)
                     .tint(AppColor.brand)
@@ -226,8 +226,9 @@ struct KycReviewView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(AppColor.payMuted)
-                        TextField("Tìm ngân hàng theo tên", text: $searchQuery)
+                        TextField("", text: $searchQuery, prompt: .appPlaceholder("Tìm ngân hàng theo tên"))
                             .font(AppFont.beVietnamPro(14))
+                            .foregroundStyle(AppColor.payInk)
                             .tint(AppColor.brand)
                     }
                     .padding(.horizontal, 14)
@@ -394,7 +395,7 @@ struct KycReviewView: View {
                 .font(AppFont.beVietnamPro(12, .semibold))
                 .foregroundStyle(AppColor.payInk)
 
-            TextField("Nhập số tài khoản", text: $accNo)
+            TextField("", text: $accNo, prompt: .appPlaceholder("Nhập số tài khoản"))
                 .font(AppFont.beVietnamPro(14))
                 .foregroundStyle(AppColor.payInk)
                 .tint(AppColor.brand)

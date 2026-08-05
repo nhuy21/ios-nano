@@ -145,8 +145,9 @@ struct AddContactSheet: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 13))
                     .foregroundStyle(AppColor.payMuted)
-                TextField("Tìm ngân hàng...", text: $bankSearch)
+                TextField("", text: $bankSearch, prompt: .appPlaceholder("Tìm ngân hàng..."))
                     .font(AppFont.beVietnamPro(14))
+                    .foregroundStyle(AppColor.payInk)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)

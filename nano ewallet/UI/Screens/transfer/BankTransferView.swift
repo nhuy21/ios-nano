@@ -483,8 +483,12 @@ struct BankTransferView: View {
     private var accountRow: some View {
         HStack(spacing: 8) {
             TextField(
-                accType == 1 ? "Nhập số thẻ" : "Nhập số tài khoản",
-                text: $accountNumber
+                "",
+                text: $accountNumber,
+                prompt: .appPlaceholder(
+                    accType == 1 ? "Nhập số thẻ" : "Nhập số tài khoản",
+                    size: 17
+                )
             )
             .font(AppFont.beVietnamPro(17, .bold))
             .foregroundStyle(AppColor.payInk)
@@ -643,7 +647,7 @@ struct BankTransferView: View {
             }
 
             if contentEditable {
-                TextField("Nhập nội dung chuyển tiền", text: $content, axis: .vertical)
+                TextField("", text: $content, prompt: .appPlaceholder("Nhập nội dung chuyển tiền", size: 16), axis: .vertical)
                     .font(AppFont.beVietnamPro(16, .medium))
                     .foregroundStyle(AppColor.payInk)
                     .tint(AppColor.brand)
@@ -1103,8 +1107,9 @@ struct BankPickerSheet: View {
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(AppColor.payMuted)
-                TextField("Tìm ngân hàng...", text: $query)
+                TextField("", text: $query, prompt: .appPlaceholder("Tìm ngân hàng..."))
                     .font(AppFont.beVietnamPro(14))
+                    .foregroundStyle(AppColor.payInk)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -1132,6 +1137,9 @@ struct BankPickerSheet: View {
                                     .lineLimit(1)
                             }
                             .padding(.vertical, 12)
+                            // Không có `contentShape` thì `Spacer()` giữa hai nhãn không
+                            // nhận chạm — bấm vào giữa hàng là không chọn được ngân hàng.
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         Rectangle().fill(AppColor.line).frame(height: 1)
