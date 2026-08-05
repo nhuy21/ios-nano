@@ -710,20 +710,58 @@ struct HomeView: View {
 
     // MARK: - Dịch vụ (quick actions)
 
+    /// Nhãn nhỏ nổi trên icon dịch vụ — mirror khối badge trong HomeScreen.kt.
+    private struct ServiceBadge {
+        let text: String
+        let icon: TransactionIconKind
+        /// Bàn tay có nhịp nhấn xuống/thả ra; icon gió để tĩnh (giống Android).
+        var animated = false
+    }
+
     private struct ServiceItem: Identifiable {
         let id = UUID()
         let title: String
         let icon: TransactionIconKind
+        var badge: ServiceBadge?
     }
 
     /// Icon đúng thứ tự + hình dạng bản gốc Android (SERVICES trong HomeScreen.kt):
     /// ic_bank_transfer, ic_transfer_arrows, ic_paste_ck, ic_wallet_topup.
     private let services: [ServiceItem] = [
-        .init(title: "Chuyển tiền ngân hàng", icon: .bankTransfer),
+        .init(
+            title: "Chuyển tiền ngân hàng",
+            icon: .bankTransfer,
+            badge: .init(text: "như gió", icon: .wind)
+        ),
         .init(title: "Chuyển tiền", icon: .transferArrows),
-        .init(title: "OneTouch", icon: .pasteCk),
+        .init(
+            title: "OneTouch",
+            icon: .pasteCk,
+            badge: .init(text: "một chạm", icon: .tapHand, animated: true)
+        ),
         .init(title: "Nạp/Rút ví", icon: .walletTopup),
     ]
+
+    /// Viên nhãn xanh: CHỮ trước, ICON sau (đúng thứ tự bản Android).
+    private func serviceBadge(_ badge: ServiceBadge) -> some View {
+        HStack(spacing: 2) {
+            Text(badge.text)
+                .font(AppFont.beVietnamPro(8, .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            if badge.animated {
+                TapHandBadgeIcon()
+            } else {
+                TransactionIcon(kind: badge.icon, tint: .white)
+                    .frame(width: 9, height: 9)
+            }
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(AppColor.brand, in: Capsule())
+        // Nhãn chỉ để nhìn — không chặn chạm, nếu không nó ăn mất phần trên của nút.
+        .allowsHitTesting(false)
+    }
 
     private var servicesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -754,6 +792,14 @@ struct HomeView: View {
                                 .overlay {
                                     TransactionIcon(kind: service.icon, tint: Color(hex: 0x12A150))
                                         .frame(width: 22, height: 22)
+                                }
+                                // Nhãn nhô LÊN KHỎI ô icon nên phải là overlay không bị
+                                // clip: đặt trong `VStack` sẽ đẩy icon xuống và lệch hàng.
+                                .overlay(alignment: .top) {
+                                    if let badge = service.badge {
+                                        serviceBadge(badge)
+                                            .offset(y: -9)
+                                    }
                                 }
                             Text(service.title)
                                 .font(AppFont.beVietnamPro(11))
@@ -1007,6 +1053,45 @@ struct HomeView: View {
     }
 
     private var initials: String { displayName.nameInitials }
+}
+
+/// Bàn tay trong nhãn "một chạm" — nhấn xuống rồi thả, nghỉ, lặp lại. Mirror `TapHandIcon`
+/// bên Android (chu kỳ 1300ms, thu nhỏ 22% và trôi xuống 3pt lúc nhấn).
+///
+/// Không dùng `KeyframeAnimator` (iOS 17, cao hơn deployment target): tự hẹn nhịp bằng
+/// `Timer` rồi bật/tắt một cờ, mỗi chiều một `withAnimation` riêng — nhấn nhanh, thả chậm
+/// hơn, giống đường keyframe gốc hơn là một animation đối xứng.
+private struct TapHandBadgeIcon: View {
+    @State private var pressed = false
+
+    /// Chu kỳ 1.3s: nghỉ 0.25 -> nhấn (0.18) -> thả (0.23) -> nghỉ phần còn lại.
+    private static let cycle: TimeInterval = 1.3
+    private static let restBeforePress: TimeInterval = 0.25
+    private static let pressDuration: TimeInterval = 0.18
+    private static let releaseDuration: TimeInterval = 0.23
+
+    var body: some View {
+        TransactionIcon(kind: .tapHand, tint: .white)
+            .frame(width: 10, height: 10)
+            .scaleEffect(pressed ? 0.78 : 1)
+            .offset(y: pressed ? 1.25 : 0)
+            .task {
+                // Vòng lặp gắn với `task`: view biến mất là task bị huỷ, không để lại
+                // Timer chạy ngầm như `Timer.scheduledTimer` sẽ làm.
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: UInt64(Self.restBeforePress * 1_000_000_000))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeIn(duration: Self.pressDuration)) { pressed = true }
+
+                    try? await Task.sleep(nanoseconds: UInt64(Self.pressDuration * 1_000_000_000))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: Self.releaseDuration)) { pressed = false }
+
+                    let elapsed = Self.restBeforePress + Self.pressDuration + Self.releaseDuration
+                    try? await Task.sleep(nanoseconds: UInt64((Self.cycle - elapsed) * 1_000_000_000))
+                }
+            }
+    }
 }
 
 #Preview {

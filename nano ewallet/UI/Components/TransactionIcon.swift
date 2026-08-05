@@ -24,6 +24,8 @@ enum TransactionIconKind {
     case requestMoney       // ic_request_money — bàn tay hứng đồng xu $
     case pasteCk            // ic_paste_ck — clipboard đặc
     case notificationBell   // ic_notification_bell — chuông thông báo
+    case wind               // ic_wind — 3 luồng gió, dùng cho badge "như gió"
+    case tapHand            // ic_tap_hand — bàn tay chạm, dùng cho badge "một chạm"
 }
 
 struct TransactionIcon: View {
@@ -192,6 +194,26 @@ private extension TransactionIconKind {
                     "M8.75,16.625C8.75,17.0891 8.93437,17.5342 9.26256,17.8624C9.59075,18.1906 10.0359,18.375 10.5,18.375C10.9641,18.375 11.4092,18.1906 11.7374,17.8624C12.0656,17.5342 12.25,17.0891 12.25,16.625",
                 ],
                 strokeWidth: 1.575
+            )
+
+        // ic_wind — path FILL kiểu evenOdd (3 luồng gió), viewBox 24.
+        case .wind:
+            return IconSpec(
+                viewBox: CGSize(width: 24, height: 24),
+                fills: [
+                    "M6.25 5.5A3.25 3.25 0 1 1 9.5 8.75H3a.75.75 0 0 1 0-1.5h6.5A1.75 1.75 0 1 0 7.75 5.5v.357a.75.75 0 1 1-1.5 0zm8 2a4.25 4.25 0 1 1 4.25 4.25H2a.75.75 0 0 1 0-1.5h16.5a2.75 2.75 0 1 0-2.75-2.75V8a.75.75 0 0 1-1.5 0zm-11 6.5a.75.75 0 0 1 .75-.75h14.5a4.25 4.25 0 1 1-4.25 4.25V17a.75.75 0 0 1 1.5 0v.5a2.75 2.75 0 1 0 2.75-2.75H4a.75.75 0 0 1-.75-.75",
+                ],
+                evenOddFill: true
+            )
+
+        // ic_tap_hand — path STROKE, viewBox 48 (khác các icon khác dùng 24).
+        case .tapHand:
+            return IconSpec(
+                viewBox: CGSize(width: 48, height: 48),
+                strokes: [
+                    "M37 44H17.476a.26.26 0 0 1-.218-.121L7.86 28.727a4.095 4.095 0 1 1 7.011-4.23l2.462 4.194V7.942a3.942 3.942 0 0 1 7.884 0v9.329c0 .585.465 1.066 1.05 1.085l11.621.388A2.185 2.185 0 0 1 40 20.928V41a3 3 0 0 1-3 3",
+                ],
+                strokeWidth: 4
             )
         }
     }
