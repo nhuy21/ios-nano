@@ -23,6 +23,21 @@ private enum SettingsColor {
     static let redLogout = Color(hex: 0xE5484D)
 }
 
+/// Kích thước dùng chung cho các hàng trong màn Cá nhân. `internal` (không `private`) vì
+/// `BiometricSettingsSection` nằm ở file khác nhưng hàng của nó xếp cùng danh sách.
+enum SettingsRowMetrics {
+    /// Mọi hàng cao BẰNG NHAU, lấy mốc là hàng "Ngân hàng liên kết" (chữ 14pt + lề dọc 24
+    /// mỗi bên).
+    ///
+    /// Phải ghim cứng chứ không để `padding` tự quyết: hàng có công tắc chứa `Toggle` cao
+    /// ~31pt và hàng sinh trắc có 2 dòng chữ, còn hàng thường chỉ có chữ + chevron — cùng
+    /// một padding vẫn cho ra ba chiều cao khác nhau.
+    static let height: CGFloat = 68
+
+    /// Cỡ chữ tiêu đề của hàng — dùng chung để 3 loại hàng không lệch nhau.
+    static let titleFontSize: CGFloat = 14
+}
+
 private let supportPhone = "0986995079"
 private let supportEmail = "nhiep9145@gmail.com"
 
@@ -30,6 +45,8 @@ private let supportEmail = "nhiep9145@gmail.com"
 struct SettingsView: View {
     /// Tab Cá nhân có đang được chọn không — xem chú thích ở `.showsTabBar` bên dưới.
     var isActiveTab: Bool = true
+
+    private static let rowHeight = SettingsRowMetrics.height
 
     @StateObject private var appState = AppState.shared
     @StateObject private var authStore = AuthStore.shared
@@ -157,6 +174,11 @@ struct SettingsView: View {
                         // thay vì phải chờ tới lúc có tiền vào mới phát hiện hỏng.
                         if enabled { TtsAnnouncer.shared.announceEnabled() }
                     }
+                    divider
+                    // Hai toggle sinh trắc — chuyển từ màn Bảo mật ra đây, xếp cùng nhóm với
+                    // các công tắc khác. Section tự dựng divider ở giữa hai hàng của nó nên
+                    // ở đây chỉ cần một cái phía trên.
+                    BiometricSettingsSection()
                 }
 
                 Spacer().frame(height: 18)
@@ -311,7 +333,7 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 rowIcon(systemImage)
                 Text(title)
-                    .font(AppFont.beVietnamPro(14))
+                    .font(AppFont.beVietnamPro(SettingsRowMetrics.titleFontSize))
                     .foregroundStyle(AppColor.payInk)
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -319,7 +341,10 @@ struct SettingsView: View {
                     .foregroundStyle(AppColor.payMuted)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 24)
+            // Ghim chiều cao thay vì để padding tự quyết: mọi hàng trong màn phải cao BẰNG
+            // NHAU, mà `toggleRow` có icon 40pt còn hàng này 28pt nên cùng một padding vẫn
+            // ra hai chiều cao khác nhau. Xem `Self.rowHeight`.
+            .frame(height: Self.rowHeight)
             // BẮT BUỘC: `Button` + `.buttonStyle(.plain)` chỉ nhận chạm trên vùng VẼ THẬT
             // (chữ + icon). `Spacer()` ở giữa và phần `padding` là trong suốt nên bấm vào
             // không ăn — người dùng phải nhắm đúng chữ hoặc mũi tên mới mở được thẻ.
@@ -335,7 +360,7 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             toggleRowIcon(systemImage)
             Text(title)
-                .font(AppFont.beVietnamPro(15, .medium))
+                .font(AppFont.beVietnamPro(SettingsRowMetrics.titleFontSize))
                 .foregroundStyle(AppColor.payInk)
             Spacer()
             Toggle("", isOn: isOn)
@@ -343,17 +368,19 @@ struct SettingsView: View {
                 .tint(SettingsColor.accent)
                 .onChangeNewCompat(of: isOn.wrappedValue) { newValue in onChange(newValue) }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
+        // Lề ngang 16 cho khớp `menuRow` (trước là 8, nên icon lệch hẳn so với hàng trên).
+        .padding(.horizontal, 16)
+        .frame(height: Self.rowHeight)
     }
 
-    /// Icon 24pt trong khung 40pt, màu đen (`PayInk`) — mirror `SettingRow` bên Android
-    /// (khác `rowIcon` dùng cho `menuRow`, vốn nhỏ hơn và tô màu accent).
+    /// Icon của hàng có công tắc — giữ cỡ 24pt và màu đen (`PayInk`) như `SettingRow` bên
+    /// Android, nhưng khung rộng 28 BẰNG `rowIcon`: khung 40 cũ đẩy chữ lệch hẳn một cột so
+    /// với các hàng ở khối trên, thấy rõ ngay khi mọi hàng đã cao bằng nhau.
     private func toggleRowIcon(_ systemImage: String) -> some View {
         Image(systemName: systemImage)
             .font(.system(size: 24))
             .foregroundStyle(AppColor.payInk)
-            .frame(width: 40, height: 40)
+            .frame(width: 28)
     }
 
     private func rowIcon(_ systemImage: String) -> some View {

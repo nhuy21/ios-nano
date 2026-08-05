@@ -33,11 +33,8 @@ struct SecurityView: View {
                     .background(Color.white)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)
-
-                    // Sinh trắc đặt ở màn này (không phải Settings gốc) vì nó là thiết lập bảo
-                    // mật, cùng nhóm với đổi mật khẩu và thiết bị đã đăng nhập.
-                    Spacer().frame(height: 24)
-                    BiometricSettingsSection()
+                    // `BiometricSettingsSection` đã chuyển ra khối "Tài khoản" của màn Cá
+                    // nhân — người dùng bật/tắt sinh trắc mà không phải vào sâu một màn nữa.
                 }
                 .padding(20)
             }

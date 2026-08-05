@@ -2,7 +2,7 @@
 //  BiometricSettingsSection.swift
 //  nano ewallet
 //
-//  Hai toggle bật/tắt sinh trắc trong màn Bảo mật:
+//  Hai toggle bật/tắt sinh trắc, xếp trong khối "Cài đặt" của màn Cá nhân:
 //   - Đăng nhập: Face ID mở Keychain lấy token do BE cấp (KHÔNG lưu mật khẩu trên máy).
 //   - Xác thực giao dịch: Face ID mở khoá ký trong Secure Enclave.
 //
@@ -43,41 +43,34 @@ struct BiometricSettingsSection: View {
         }
     }
 
+    /// HAI HÀNG TRẦN, không tự bọc thẻ/tiêu đề: section này nằm trong khối "Cài đặt" của
+    /// màn Cá nhân, nền trắng + bo góc + shadow do `menuSection` bên đó lo. Tự bọc thêm một
+    /// lớp nữa sẽ thành thẻ lồng trong thẻ.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(label)
-                .font(AppFont.beVietnamPro(13, .semibold))
-                .foregroundStyle(AppColor.payMuted)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 8)
-
-            VStack(spacing: 0) {
-                toggleRow(
-                    title: "Đăng nhập bằng \(label)",
-                    subtitle: "Không cần nhập mật khẩu khi mở app",
-                    systemImage: "person.badge.key.fill",
-                    isOn: loginEnabled,
-                    kind: .login
-                )
-                Rectangle().fill(AppColor.line).frame(height: 1).padding(.leading, 56)
-                toggleRow(
-                    title: "Xác thực giao dịch bằng \(label)",
-                    subtitle: "Thay cho mật khẩu 6 số khi chuyển tiền",
-                    systemImage: "faceid",
-                    isOn: transferEnabled,
-                    kind: .transfer
-                )
-            }
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)
+        VStack(spacing: 0) {
+            toggleRow(
+                title: "Đăng nhập bằng \(label)",
+                subtitle: "Không cần nhập mật khẩu khi mở app",
+                systemImage: "person.badge.key.fill",
+                isOn: loginEnabled,
+                kind: .login
+            )
+            Rectangle().fill(AppColor.line).frame(height: 1).padding(.leading, 56)
+            toggleRow(
+                title: "Xác thực giao dịch bằng \(label)",
+                subtitle: "Thay cho mật khẩu 6 số khi chuyển tiền",
+                systemImage: "faceid",
+                isOn: transferEnabled,
+                kind: .transfer
+            )
 
             if let infoMessage {
                 Text(infoMessage)
                     .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
             }
         }
         .sheet(item: $pendingEnable) { kind in
@@ -110,44 +103,44 @@ struct BiometricSettingsSection: View {
         kind: Kind
     ) -> some View {
         HStack(spacing: 12) {
+            // Icon 24pt như hàng "Loa báo nhận tiền" (`toggleRowIcon` bên SettingsView),
+            // không phải 16pt của hàng có chevron — cùng loại hàng thì cùng cỡ icon.
             Image(systemName: systemImage)
-                .font(.system(size: 16))
+                .font(.system(size: 24))
                 .foregroundStyle(AppColor.payInk)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {
+                // Cùng cỡ chữ với mọi hàng khác trong màn Cá nhân (trước là 15).
                 Text(title)
-                    .font(AppFont.beVietnamPro(15))
+                    .font(AppFont.beVietnamPro(SettingsRowMetrics.titleFontSize))
                     .foregroundStyle(AppColor.payInk)
                 Text(subtitle)
                     .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(AppColor.payMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
 
-            // Toggle tự vẽ qua Button: `Toggle` của SwiftUI đổi state NGAY khi chạm, mà ở đây
-            // bật/tắt phải qua mật khẩu + API nên phải chặn rồi tự set lại sau khi xong.
-            Button {
-                handleTap(kind: kind, currentlyOn: isOn)
-            } label: {
-                Capsule()
-                    .fill(isOn ? AppColor.brand : AppColor.line)
-                    .frame(width: 44, height: 26)
-                    .overlay(alignment: isOn ? .trailing : .leading) {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 20, height: 20)
-                            .padding(.horizontal, 3)
-                            .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-                    }
-                    .animation(.easeInOut(duration: 0.18), value: isOn)
-            }
-            .buttonStyle(.plain)
-            .disabled(isWorking)
+            // `Toggle` HỆ THỐNG cho giống hàng "Loa báo nhận tiền" (trước đây là capsule tự
+            // vẽ nên hai khối nhìn lệch nhau).
+            //
+            // Bind qua `Binding` tự dựng chứ không bind thẳng vào `@State`: bật/tắt ở đây
+            // phải qua sheet mật khẩu + API, nên `get` LUÔN trả trạng thái thật còn `set`
+            // chỉ khởi động luồng xử lý. Toggle sẽ tự nhảy về đúng chỗ vì `get` không đổi —
+            // chỉ đổi sau khi `enable`/`disable` chạy xong.
+            Toggle("", isOn: Binding(
+                get: { isOn },
+                set: { _ in handleTap(kind: kind, currentlyOn: isOn) }
+            ))
+            .labelsHidden()
+            .tint(AppColor.brand)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        // Cùng chiều cao với mọi hàng khác trong màn Cá nhân. Hàng này có 2 dòng chữ
+        // (~38pt) nên vẫn vừa trong 68pt.
+        .frame(height: SettingsRowMetrics.height)
     }
 
     // MARK: - Sheet mật khẩu
@@ -206,6 +199,10 @@ struct BiometricSettingsSection: View {
     // MARK: - Hành động
 
     private func handleTap(kind: Kind, currentlyOn: Bool) {
+        // Chặn ngay tại đây thay vì `disabled(isWorking)` trên `Toggle`: `Toggle` hệ thống
+        // khi bị disable sẽ MỜ đi, nhìn như tính năng không dùng được. `enable`/`disable`
+        // cũng tự guard `isWorking` nên đây là lớp chặn thứ hai, không phải duy nhất.
+        guard !isWorking else { return }
         if currentlyOn {
             Task { await disable(kind) }
             return
