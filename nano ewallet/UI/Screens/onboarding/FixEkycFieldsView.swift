@@ -395,15 +395,16 @@ struct KycOptionPickerSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
-                // Đo offset cuộn bằng GeometryReader trong coordinate space của ScrollView
-                // thay `.onScrollGeometryChange` (iOS 18, cao hơn deployment target).
-                // `minY` của nội dung là 0 ở đầu và ÂM khi kéo xuống, nên đổi dấu để ra
-                // contentOffset.y như API kia trả về.
+                // Đo chiều cao + offset cuộn bằng GeometryReader thay `.onGeometryChange`
+                // (iOS 17) / `.onScrollGeometryChange` (iOS 18) — cả hai cao hơn deployment
+                // target 16.0. `minY` của nội dung là 0 ở đầu và ÂM khi kéo xuống, nên đổi
+                // dấu để ra contentOffset.y như API kia trả về.
                 .background {
                     GeometryReader { proxy in
                         let y = -proxy.frame(in: .named(Self.scrollSpace)).minY
-                        Color.clear.onChangeNewCompat(of: y) { scrollOffset = $0 }
+                        Color.clear
+                            .onChangeNewCompat(of: proxy.size.height, initial: true) { listHeight = $0 }
+                            .onChangeNewCompat(of: y) { scrollOffset = $0 }
                     }
                 }
             }

@@ -57,10 +57,10 @@ private struct OnChangeCompatModifier<V: Equatable>: ViewModifier {
                 previous = value
                 if initial { action(value, value) }
             }
-            .onChange(of: value) { newValue in
+            .onChange(of: value, perform: { newValue in
                 let old = previous ?? newValue
                 previous = newValue
                 action(old, newValue)
-            }
+            })
     }
 }

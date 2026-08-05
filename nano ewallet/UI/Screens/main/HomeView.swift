@@ -193,7 +193,7 @@ struct HomeView: View {
         // SAU HomeView trong ZStack của MainTabView nên nó đè lên toast, đặt 30pt từ đáy là
         // bị che kín. Cộng theo hằng số của MainTabView để đổi chiều cao thanh tab không
         // làm lệch chỗ này.
-        .toast(toast, bottomPadding: MainTabView.floatingBarTotalHeight + 30)
+        .toast(toast, bottomPadding: MainTabView.floatingBarTotalHeight + 300)
     }
 
     private var syncErrorBinding: Binding<Bool> {
