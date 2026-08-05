@@ -463,7 +463,9 @@ struct WithdrawView: View {
             isLookingUp = true
             defer { isLookingUp = false }
             do {
-                manualHolderName = try await BankService.lookupAccount(bin: bin, accountNumber: accountNumber)
+                manualHolderName = try await TransferService.verifyBeneficiary(
+                    VerifyBeneficiaryRequest(accNo: accountNumber, bankNo: Int(bin), accType: accType)
+                )
             } catch let error as APIError {
                 manualHolderName = ""
                 lookupError = error.message
