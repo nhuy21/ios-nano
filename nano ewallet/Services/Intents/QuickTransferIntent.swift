@@ -13,6 +13,7 @@ import LocalAuthentication
 
 enum QuickTransferError: Swift.Error, CustomLocalizedStringResourceConvertible {
     case overLimit
+    case needsAppConfirmation
     case biometricNotEnabled
     case biometricFailed
     case transferFailed(String)
@@ -21,8 +22,10 @@ enum QuickTransferError: Swift.Error, CustomLocalizedStringResourceConvertible {
         switch self {
         case .overLimit:
             return "Số tiền vượt hạn mức \(Int(TransferLimits.faceFixed).vndFormatted), không thể chuyển bằng cách nào."
+        case .needsAppConfirmation:
+            return "Số tiền này cần xác nhận trong ứng dụng. Mở Ví nano để hoàn tất."
         case .biometricNotEnabled:
-            return "Bạn cần bật xác thực Face ID cho giao dịch trong mục Cá nhân > Bảo mật trước khi dùng Siri."
+            return "Bạn cần bật xác thực Face ID cho giao dịch trong mục Cá nhân > Bảo mật trước khi dùng trợ lý giọng nói."
         case .biometricFailed:
             return "Không xác thực được Face ID, giao dịch đã huỷ."
         case .transferFailed(let message):
@@ -32,8 +35,8 @@ enum QuickTransferError: Swift.Error, CustomLocalizedStringResourceConvertible {
 }
 
 /// Intent chính, expose ra Siri qua `QuickTransferShortcuts` — LUÔN chạy ngầm
-/// (`openAppWhenRun` mặc định `false`, KHÔNG khai lại ở đây). Tự quyết định có handoff sang
-/// `QuickTransferOpenAppIntent` hay không tuỳ số tiền.
+/// (`openAppWhenRun` mặc định `false`, KHÔNG khai lại ở đây). Tuỳ số tiền, hoặc chuyển ngay
+/// sau khi quét mặt (tầng 1), hoặc đặt cờ để người dùng xác nhận trong app (tầng 2).
 struct QuickTransferIntent: AppIntent {
     static var title: LocalizedStringResource = "Chuyển tiền"
     static var description = IntentDescription("Chuyển tiền cho một người trong danh bạ ví.")
@@ -57,11 +60,24 @@ struct QuickTransferIntent: AppIntent {
 
         let limitPin = WalletStore.shared.limitPin ?? WalletStore.defaultLimitPin
 
-        // Tầng 2: giữa limitPin và limitFace — handoff sang intent MỞ APP, không tự làm gì
-        // thêm ở đây. `openAppWhenRun` là static property theo KIỂU intent nên bắt buộc phải
-        // tách intent thứ 2 thay vì set cờ động (xem mục 4 trong doc thiết kế).
+        // Tầng 2: giữa limitPin và limitFace — số tiền này BẮT BUỘC xác nhận trong app.
+        //
+        // KHÔNG dùng `.result(opensIntent:)`: overload đó trả `IntentResultContainer` với
+        // `Dialog == Never`, không cùng kiểu với `.result(dialog:)` ở nhánh tầng 1, mà kiểu trả
+        // về `some ...` là opaque nên buộc mọi nhánh `return` phải cùng một kiểu cụ thể.
+        //
+        // Thay vào đó: đặt cờ vào `DeepLinkStore` rồi `throw` kèm thông báo. `MainTabView` tiêu
+        // thụ cờ và đẩy vào `Route.walletTransferAmount` ngay khi người dùng mở app — đúng
+        // pattern `pendingWalletTransferShortcut` đã dùng cho Quick Action.
         guard amountValue <= limitPin else {
-            return .result(opensIntent: QuickTransferOpenAppIntent(recipient: recipient, amount: amount))
+            DeepLinkStore.shared.requestQuickTransfer(
+                draft: WalletTransferDraft(
+                    username: recipient.benUsername,
+                    holderName: recipient.name,
+                    prefillAmount: amountValue
+                )
+            )
+            throw QuickTransferError.needsAppConfirmation
         }
 
         // Tầng 1: dưới limitPin.
@@ -77,14 +93,12 @@ struct QuickTransferIntent: AppIntent {
             throw QuickTransferError.biometricNotEnabled
         }
 
-        guard await Self.authenticate(reason: "Xác nhận chuyển \(amount)đ cho \(recipient.name)") else {
+        // Hộp thoại Face ID CHÍNH LÀ bước xác nhận: `localizedReason` hiện đúng số tiền và tên
+        // người nhận, người dùng nhìn thấy trước khi quét mặt. Không gọi thêm
+        // `requestConfirmation` — hỏi hai lần cho cùng một giao dịch là dư thừa.
+        guard await Self.authenticate(reason: "Chuyển \(amount)đ cho \(recipient.name)?") else {
             throw QuickTransferError.biometricFailed
         }
-
-        try await requestConfirmation(
-            actionName: .transfer,
-            dialog: "Xác nhận chuyển \(amount)đ cho \(recipient.name)?"
-        )
 
         let result: TransferResult
         do {
@@ -132,33 +146,6 @@ struct QuickTransferIntent: AppIntent {
     }
 }
 
-/// Intent phụ — KHÔNG khai `phrases`/`AppShortcut` riêng, chỉ được `QuickTransferIntent` gọi
-/// tới qua `opensIntent`. `openAppWhenRun = true` ép hệ thống mở app trước khi `perform()` chạy.
-struct QuickTransferOpenAppIntent: AppIntent {
-    static var title: LocalizedStringResource = "Xác nhận chuyển tiền trong app"
-    static var openAppWhenRun: Bool = true
-
-    @Parameter(title: "Người nhận") var recipient: WalletContactEntity
-    @Parameter(title: "Số tiền") var amount: Int
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        // Cùng pattern `pendingWalletTransferShortcut` đã có ở DeepLinkStore (Quick Action) —
-        // đặt cờ, để MainTabView tự tiêu thụ 1 lần và đẩy vào Route.walletTransferAmount.
-        // KHÔNG tự điều hướng trực tiếp từ đây: intent này không giữ tham chiếu tới cây view
-        // (NavigationStack) đang sống của app, nó chỉ là điểm hạ cánh của hệ thống Siri — phải
-        // đi qua state dùng chung (DeepLinkStore) để UI tự nhận và điều hướng.
-        DeepLinkStore.shared.requestQuickTransfer(
-            draft: WalletTransferDraft(
-                username: recipient.benUsername,
-                holderName: recipient.name,
-                prefillAmount: Int64(amount)
-            )
-        )
-        return .result()
-    }
-}
-
 /// CHỈ đăng ký shortcut từ iOS 18.4 — mốc Apple thêm tiếng Việt cho Siri.
 ///
 /// `phrases` bên dưới là tiếng Việt, nên trên máy 16-18.3 Siri không bao giờ khớp được. Để
@@ -169,9 +156,8 @@ struct QuickTransferOpenAppIntent: AppIntent {
 /// `AppShortcutsProvider` lúc cài app để đăng ký metadata, `@available` ở type là cách duy nhất
 /// khiến nó bỏ qua hẳn trên máy chưa đủ phiên bản.
 ///
-/// KHÔNG bọc `QuickTransferIntent`/`QuickTransferOpenAppIntent` (vẫn iOS 16+): chúng còn được
-/// gọi qua `opensIntent` ở tầng 2 và dùng được trong app Shortcuts nếu người dùng tự tạo
-/// shortcut — chỉ phần Siri đọc `phrases` mới cần 18.4.
+/// KHÔNG bọc `QuickTransferIntent` (vẫn iOS 16+): người dùng vẫn tự tạo được shortcut cho nó
+/// trong app Shortcuts và chạy bằng tay — chỉ phần Siri đọc `phrases` mới cần 18.4.
 @available(iOS 18.4, *)
 struct QuickTransferShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {

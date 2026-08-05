@@ -37,7 +37,7 @@ final class DeepLinkStore: ObservableObject {
 
     /// Siri "chuyển tiền tới ví" ở tầng 2 (limitPin < amount ≤ limitFace) — draft đã điền sẵn
     /// người nhận/số tiền, người dùng tự xem lại rồi xác nhận như luồng thường. Xem
-    /// `QuickTransferOpenAppIntent` và docs/siri-quick-transfer.md mục 1/4.
+    /// `QuickTransferIntent` và docs/siri-quick-transfer.md mục 1/4.
     @Published private(set) var pendingQuickTransferDraft: WalletTransferDraft?
 
     /// Còn deep link nào đang chờ xử lý không — dùng để QR không đè lên link nhận tiền.
@@ -69,7 +69,7 @@ final class DeepLinkStore: ObservableObject {
         pendingDefaultQr = true
     }
 
-    /// Gọi từ `QuickTransferOpenAppIntent.perform()` khi Siri intent quyết định giao dịch cần
+    /// Gọi từ `QuickTransferIntent.perform()` khi intent quyết định giao dịch cần
     /// mở app xác nhận (tầng 2, limitPin < amount ≤ limitFace).
     func requestQuickTransfer(draft: WalletTransferDraft) {
         pendingQuickTransferDraft = draft

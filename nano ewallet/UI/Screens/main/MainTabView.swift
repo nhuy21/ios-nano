@@ -116,7 +116,7 @@ struct MainTabView: View {
             openOnHome(.bankTransfer(draft: nil))
         }
         // Siri "chuyển tiền tới ví" tầng 2 (limitPin < amount ≤ limitFace) — draft đã điền sẵn
-        // người nhận/số tiền từ QuickTransferOpenAppIntent, vào thẳng màn xác nhận số tiền
+        // người nhận/số tiền từ QuickTransferIntent, vào thẳng màn xác nhận số tiền
         // (khác 2 nhánh Quick Action ở trên: draft KHÔNG nil).
         .onChangeCompat(of: deepLinkStore.pendingQuickTransferDraft, initial: true) { _, draft in
             guard let draft else { return }
