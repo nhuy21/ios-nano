@@ -27,6 +27,8 @@ struct AddContactSheet: View {
     @State private var isSaving = false
     @State private var saveError: String?
 
+    @FocusState private var isAccountFocused: Bool
+
     private var filteredBanks: [Bank] {
         let trimmed = bankSearch.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return banks }
@@ -47,13 +49,35 @@ struct AddContactSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     fieldBlock(label: "Số tài khoản") {
-                        AppTextField(
-                            text: $accountNumber,
-                            placeholder: "Nhập số tài khoản...",
-                            keyboardType: .numberPad,
-                            digitsOnly: true
-                        )
-                        .onChangeNewCompat(of: accountNumber) { _ in triggerLookup() }
+                        TextField("", text: $accountNumber, prompt: .appPlaceholder("Nhập số tài khoản..."))
+                            .font(AppFont.beVietnamPro(18, .medium))
+                            .foregroundStyle(AppColor.payInk)
+                            .tint(AppColor.brand)
+                            .keyboardType(.numberPad)
+                            .submitLabel(.done)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 56)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+                            }
+                            .focused($isAccountFocused)
+                            .onSubmit { triggerLookup() }
+                            // Chỉ tra cứu khi RỜI focus (bấm ra ngoài/chuyển ô khác) hoặc bấm
+                            // Done — không gọi API mỗi lần gõ ký tự, mirror BankTransferView.
+                            .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
+                                if wasFocused && !isFocused { triggerLookup() }
+                            }
+                            .onChangeCompat(of: accountNumber) { _, newValue in
+                                let filtered = newValue.filter(\.isNumber)
+                                if filtered != newValue {
+                                    accountNumber = filtered
+                                } else if !filtered.isEmpty {
+                                    holderName = nil; lookupError = nil
+                                }
+                            }
                     }
 
                     fieldBlock(label: "Tên chủ tài khoản") {
@@ -224,8 +248,6 @@ struct AddContactSheet: View {
         guard let bin = selectedBank?.bin, accountNumber.count >= 6 else { return }
         lookupTask = Task {
             isLookingUp = true
-            try? await Task.sleep(nanoseconds: 450_000_000)
-            guard !Task.isCancelled else { return }
             do {
                 let name = try await BankService.lookupAccount(bin: bin, accountNumber: accountNumber)
                 guard !Task.isCancelled else { return }
