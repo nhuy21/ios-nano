@@ -3,8 +3,7 @@
 //  nano ewallet
 //
 //  Mirror NotificationStore.kt — nguồn thông báo dùng chung toàn app. Giữ số chưa
-//  đọc + danh sách để badge chuông và màn Thông báo luôn khớp nhau, đồng thời bắn
-//  `newNotification` khi có thông báo MỚI để hiện banner trong app.
+//  đọc + danh sách để badge chuông và màn Thông báo luôn khớp nhau.
 //
 
 import Foundation
@@ -28,33 +27,12 @@ final class NotificationStore: ObservableObject {
         }
     }
 
-    /// Thông báo vừa đến (chưa từng thấy) — banner trong app lắng nghe cái này.
-    /// Không dùng `@Published` giá trị thường vì banner cần biết từng LẦN đến, kể cả
-    /// khi cùng một thông báo được set lại.
-    let newNotification = PassthroughSubject<AppNotification, Never>()
-
-    private var knownIds: Set<String> = []
-    /// Lần refresh đầu chỉ "gieo" hiện trạng, KHÔNG báo — nếu không thì mở app lên là
-    /// banner bắn thông báo cũ nhất vừa tải về.
-    private var seeded = false
-
     /// Làm mới từ server. Best-effort — lỗi mạng trả `false` và giữ nguyên state cũ.
     @discardableResult
     func refresh() async -> Bool {
         guard let page = try? await NotificationService.list(limit: 50) else { return false }
         items = page.items
         unreadCount = page.unreadCount
-
-        let ids = Set(page.items.map(\.id))
-        if seeded {
-            // items sắp mới→cũ nên phần tử đầu chưa từng thấy chính là cái mới nhất.
-            if let fresh = page.items.first(where: { !knownIds.contains($0.id) }) {
-                newNotification.send(fresh)
-            }
-        } else {
-            seeded = true
-        }
-        knownIds = ids
         return true
     }
 
@@ -78,8 +56,6 @@ final class NotificationStore: ObservableObject {
 
     /// Gọi khi logout — xoá sạch để tài khoản sau không thấy thông báo của tài khoản trước.
     func clear() {
-        knownIds = []
-        seeded = false
         unreadCount = 0
         items = []
     }

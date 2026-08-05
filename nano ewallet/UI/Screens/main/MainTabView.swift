@@ -104,11 +104,6 @@ struct MainTabView: View {
             // Vuốt quá trang đầu/cuối không nảy ra dải xám ở đáy.
             .ignoresSafeArea(.container, edges: .bottom)
         }
-        // Theo dõi thông báo khi app foreground (poll + làm mới badge/hộp thư).
-        // KHÔNG hiện banner trong app: `willPresent` đã trả `.banner` nên iOS tự hiện
-        // banner hệ thống ngay cả lúc app đang mở — thêm banner tự vẽ nữa là hiện TRÙNG
-        // hai cái. Bản Android từng mắc đúng lỗi này rồi gỡ bỏ (xem MainActivity.kt).
-        .notificationWatcher()
         // Mở app hàng ngày -> vào thẳng màn quét QR. CHỈ mở khi không còn deep link nào
         // chờ, nếu không sẽ đè lên link nhận tiền mà người dùng vừa bấm.
         // `initial: true` vì cờ có thể được bật TRƯỚC khi view này xuất hiện (bootstrap

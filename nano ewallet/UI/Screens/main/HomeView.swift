@@ -44,13 +44,6 @@ struct HomeView: View {
     @State private var syncError: String?
     @StateObject private var toast = ToastState()
 
-    @Environment(\.scenePhase) private var scenePhase
-
-    /// Home đang thật sự trước mắt người dùng: app ở foreground, đang ở tab Home, và chưa
-    /// push màn con nào. Rời Home thì ngừng poll cho đỡ tốn pin/mạng — mirror `homeVisible`
-    /// bên Kotlin.
-    private var isHomeVisible: Bool { scenePhase == .active && isActiveTab && path.isEmpty }
-
     private var showingComingSoon: Binding<Bool> {
         Binding(get: { comingSoonFeature != nil }, set: { if !$0 { comingSoonFeature = nil } })
     }
@@ -76,33 +69,6 @@ struct HomeView: View {
         // nên lúc route được đẩy vào thì `isActiveTab` đã là true — nhánh này không chạy.
         .onChangeNewCompat(of: isActiveTab) { active in
             if !active { path.removeAll() }
-        }
-        // Poll gần realtime khi Home đang hiển thị — dự phòng cho lúc push FCM bị tắt
-        // hoặc tới chậm. Không có vòng này thì tiền vào ví lúc đang ngồi ở Home chỉ làm
-        // badge chuông nhảy, còn SỐ DƯ trên màn đứng yên cho tới khi mở lại app.
-        // `.task(id:)` tự huỷ khi `isHomeVisible` đổi -> rời Home là ngừng poll.
-        .task(id: isHomeVisible) {
-            guard isHomeVisible else { return }
-            while !Task.isCancelled {
-                // Chờ TRƯỚC rồi mới gọi: `.task` phía dưới vừa nạp lần đầu xong,
-                // gọi ngay ở đây là bắn trùng 2 request.
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                guard !Task.isCancelled else { return }
-                async let walletTask: Void = wallet.refresh(force: true)
-                async let txTask: Void = transactions.refreshRecent()
-                _ = await (walletTask, txTask)
-            }
-        }
-        // Từ nền quay ra: làm mới NGAY cả 3, không chờ hết nhịp 8s — mirror nhánh
-        // ON_RESUME bên Kotlin.
-        .onChangeCompat(of: scenePhase) { previous, phase in
-            guard phase == .active, previous != .active else { return }
-            Task {
-                async let walletTask: Void = wallet.refresh(force: true)
-                async let txTask: Void = transactions.refreshRecent()
-                async let notifTask: Bool = notifications.refresh()
-                _ = await (walletTask, txTask, notifTask)
-            }
         }
         // Deep link (pay link / push xin tiền) KHÔNG quan sát ở đây — xem MainTabView.
         // Dialog tuỳ biến (không dùng confirmationDialog) để giữ icon + dòng mô tả
@@ -296,6 +262,19 @@ struct HomeView: View {
         }
     }
 
+    /// Check số dư trước; chỉ khi THẬT SỰ đổi (có tiền vào/ra) mới gọi tiếp giao dịch +
+    /// thông báo — tránh 2 request thừa mỗi lần kéo-refresh nếu không có gì mới.
+    /// Không còn poll tự động theo thời gian — chỉ chạy khi user chủ động kéo xuống, hoặc
+    /// lúc Home vừa mở (`.task` ở `homeContent`).
+    private func reloadWalletData() async {
+        let balanceBefore = wallet.balance
+        await wallet.refresh(force: true)
+        guard wallet.balance != balanceBefore else { return }
+        async let txTask: Void = transactions.refreshRecent()
+        async let notifTask: Bool = notifications.refresh()
+        _ = await (txTask, notifTask)
+    }
+
     private var homeContent: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -324,6 +303,10 @@ struct HomeView: View {
                     .padding(.top, -80)
             }
         }
+        // Kéo xuống để làm mới thủ công — không còn poll tự động theo thời gian, chỉ
+        // dựa vào push (APNs/FCM) + hành động chủ động này để cập nhật số dư/giao dịch/
+        // thông báo khi đang ở Home.
+        .refreshable { await reloadWalletData() }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .background(Color(hex: 0xF3F5F7))
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
