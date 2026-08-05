@@ -16,6 +16,18 @@ struct WalletRulesView: View {
     let onStart: () -> Void
     var onAdjustLimit: () -> Void = {}
 
+    /// Chiều cao safe area trên (tai thỏ / Dynamic Island). Đọc qua `connectedScenes` thay
+    /// `UIScreen.main` (deprecated iOS 26); không có scene thì rơi về 47pt (Dynamic Island).
+    private static var topSafeInset: CGFloat {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let inset = scene?.windows.first { $0.isKeyWindow }?.safeAreaInsets.top
+            ?? scene?.windows.first?.safeAreaInsets.top
+        return inset ?? 47
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -89,11 +101,15 @@ struct WalletRulesView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 24)
+                // ScrollView của iOS 26 cho nội dung chạy ngầm dưới thanh trạng thái
+                // (hiệu ứng mép cuộn). Không chặn thì vòng tròn icon đè lên đồng hồ/pin —
+                // mirror `statusBarsPadding()` bên Android.
+                //
+                // `.safeAreaPadding` là iOS 17, cao hơn deployment target, nên chèn đệm
+                // thủ công. Đặt trên NỘI DUNG chứ không trên `ScrollView`: đặt ngoài thì
+                // đệm nằm ngoài vùng cuộn, cuộn lên nội dung vẫn trượt vào status bar.
+                .padding(.top, Self.topSafeInset)
             }
-            // ScrollView của iOS 26 cho nội dung chạy ngầm dưới thanh trạng thái (hiệu
-            // ứng mép cuộn). Không chặn thì vòng tròn icon đè lên đồng hồ/pin — mirror
-            // `statusBarsPadding()` bên Android.
-            .safeAreaPadding(.top)
 
             Button(action: onStart) {
                 Text("Đã hiểu, bắt đầu sử dụng")

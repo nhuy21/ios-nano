@@ -132,7 +132,7 @@ struct WelcomeBackView: View {
                 onDismiss: vm.dismissDeviceConflict,
                 onConfirm: { Task { await vm.confirmDeviceOtp() } }
             )
-            .presentationBackground(.clear)
+            .transparentSheetBackground()
         }
         .sheet(isPresented: $vm.showDeviceOtp) {
             if let ticket = vm.deviceTicket {
@@ -147,7 +147,7 @@ struct WelcomeBackView: View {
                         }
                     }
                 )
-                .presentationBackground(.clear)
+                .transparentSheetBackground()
             }
         }
     }

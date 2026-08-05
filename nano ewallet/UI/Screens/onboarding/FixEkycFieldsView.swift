@@ -264,7 +264,7 @@ struct KycOptionDropdown: View {
                 selectedCode: $selectedCode,
                 onDismiss: { isPresented = false }
             )
-            .presentationBackground(.clear)
+            .transparentSheetBackground()
         }
     }
 }
@@ -280,6 +280,10 @@ struct KycOptionPickerSheet: View {
     /// Chiều cao thật của danh sách — dùng để quyết định có cần thanh cuộn hay không.
     @State private var listHeight: CGFloat = 0
     @State private var scrollOffset: CGFloat = 0
+
+    /// Tên coordinate space của vùng cuộn — nội dung tự đo vị trí mình so với nó để suy ra
+    /// offset đã cuộn (xem `.background { GeometryReader ... }` bên dưới).
+    private static let scrollSpace = "kycOptionList"
 
     /// Ngưỡng hiện ô tìm kiếm — dưới ngưỡng thì lướt mắt nhanh hơn gõ.
     private var showsSearch: Bool { options.count > 8 }
@@ -357,10 +361,18 @@ struct KycOptionPickerSheet: View {
                 .padding(.top, 4)
                 .padding(.bottom, 24)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+                // Đo offset cuộn bằng GeometryReader trong coordinate space của ScrollView
+                // thay `.onScrollGeometryChange` (iOS 18, cao hơn deployment target).
+                // `minY` của nội dung là 0 ở đầu và ÂM khi kéo xuống, nên đổi dấu để ra
+                // contentOffset.y như API kia trả về.
+                .background {
+                    GeometryReader { proxy in
+                        let y = -proxy.frame(in: .named(Self.scrollSpace)).minY
+                        Color.clear.onChangeNewCompat(of: y) { scrollOffset = $0 }
+                    }
+                }
             }
-            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in
-                scrollOffset = y
-            }
+            .coordinateSpace(name: Self.scrollSpace)
             // Thanh cuộn TỰ VẼ, chỉ hiện khi danh sách thực sự dài hơn khung. Thanh cuộn
             // của hệ thống chỉ nhá lên lúc đang kéo (`.scrollIndicators(.visible)` cũng
             // không ghim lại được), nên người dùng không biết còn mục bên dưới.

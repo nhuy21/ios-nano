@@ -109,7 +109,7 @@ struct HomeView: View {
                 ],
                 onDismiss: { showTopupWithdrawChooser = false }
             )
-            .presentationBackground(.clear)
+            .transparentSheetBackground()
         }
         // OneTouch — chọn nguồn nội dung, mirror dialog PasteSourceRow bên Kotlin.
         .fullScreenCover(isPresented: $showOneTouchChooser) {
@@ -132,7 +132,7 @@ struct HomeView: View {
                 ],
                 onDismiss: { showOneTouchChooser = false }
             )
-            .presentationBackground(.clear)
+            .transparentSheetBackground()
         }
         .photosPicker(isPresented: $showOneTouchPhotoPicker, selection: $oneTouchPhoto, matching: .images)
         .onChangeNewCompat(of: oneTouchPhoto) { item in
@@ -159,7 +159,7 @@ struct HomeView: View {
                     path.append(.walletTransferAmount(draft))
                 }
             )
-            .presentationBackground(.clear)
+            .transparentSheetBackground()
         }
         .alert("Không nhận diện được", isPresented: oneTouchErrorBinding) {
             Button("Đóng", role: .cancel) {}

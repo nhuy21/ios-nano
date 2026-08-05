@@ -15,7 +15,7 @@ extension View {
     /// Gắn vào ô nhập tiền: mỗi lần text đổi thì lọc lấy chữ số, cắt theo `maxDigits`
     /// rồi ghi lại dạng "1.234.567".
     func thousandsSeparated(_ text: Binding<String>, maxDigits: Int = 9) -> some View {
-        onChange(of: text.wrappedValue) { _, newValue in
+        onChangeCompat(of: text.wrappedValue) { _, newValue in
             let digits = String(newValue.filter(\.isNumber).prefix(maxDigits))
             let formatted = digits.isEmpty ? "" : (Int(digits) ?? 0).vndGrouped
             if formatted != newValue { text.wrappedValue = formatted }

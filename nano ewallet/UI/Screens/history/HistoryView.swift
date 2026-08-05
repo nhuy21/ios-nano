@@ -69,7 +69,7 @@ struct HistoryView: View {
                 onApply: { triggerSearchOrReload() },
                 onDismiss: { showDateFilter = false }
             )
-            .presentationBackground(.clear)
+            .transparentSheetBackground()
         }
         .sheet(item: $detailTransaction) { tx in
             TransactionDetailSheet(tx: tx, onDismiss: { detailTransaction = nil })

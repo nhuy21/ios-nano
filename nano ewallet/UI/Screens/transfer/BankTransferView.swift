@@ -1146,7 +1146,11 @@ struct BankPickerSheet: View {
         .presentationDetents([.fraction(0.92)])
         // iOS 26 để nền sheet là kính mờ, nhìn xuyên thấy màn phía dưới. Phần sheet che
         // tới đâu thì phải đục tới đó.
-        .presentationBackground(Color.white)
+        //
+        // `.presentationBackground` là iOS 16.4, cao hơn deployment target. Ở đây chỉ cần
+        // nền TRẮNG ĐỤC nên `.background` thường là đủ — khác các sheet dialog cần nền
+        // TRONG SUỐT, chỗ đó phải dùng `transparentSheetBackground()`.
+        .background(Color.white)
     }
 }
 

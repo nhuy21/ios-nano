@@ -68,7 +68,7 @@ struct ReceiveQrView: View {
         // màn QR phía sau. Cùng cách Login dựng DeviceConflictDialog/DeviceOtpDialog.
         .fullScreenCover(isPresented: $showAmountSheet) {
             amountSheet
-                .presentationBackground(.clear)
+                .transparentSheetBackground()
         }
         .sheet(item: $shareItem) { item in
             ActivityShareSheet(items: [item.image])
@@ -79,7 +79,7 @@ struct ReceiveQrView: View {
         // Cùng kiểu dialog phủ toàn màn như "Thêm số tiền".
         .fullScreenCover(isPresented: $showPayLinkSheet) {
             payLinkSheet
-                .presentationBackground(.clear)
+                .transparentSheetBackground()
         }
         .overlay(alignment: .bottom) {
             if let toastMessage {
