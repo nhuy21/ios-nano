@@ -515,6 +515,39 @@ struct BankTransferView: View {
                         .foregroundStyle(Color(hex: 0xBFC4CC))
                 }
                 .buttonStyle(.plain)
+            } else {
+                // Nút "Dán" như ô nhập số ví: `keyboardType(.numberPad)` KHÔNG có menu
+                // Paste khi long-press (bàn phím số không kèm thanh chỉnh sửa), nên không
+                // có nút này thì người dùng chỉ còn cách gõ tay cả 19 chữ số.
+                //
+                // Chỉ hiện khi ô đang TRỐNG, dùng chung chỗ với nút xoá: hàng này còn nút
+                // danh bạ nữa, nhồi ba nút cạnh nhau sẽ hết chỗ cho số tài khoản dài.
+                Button {
+                    guard let clip = UIPasteboard.general.string else { return }
+                    // Lọc lấy chữ số ngay tại đây: số tài khoản copy từ app ngân hàng hay
+                    // kèm khoảng trắng/dấu gạch ("1234 5678 9012"), dán thô vào thì
+                    // `onChange` cắt 19 KÝ TỰ trước khi lọc nên mất mấy số cuối.
+                    accountNumber = String(clip.filter(\.isNumber).prefix(19))
+                    // `onChange` của ô đã tự dọn `holderName`/`lookupError`. Chỉ cần xoá
+                    // `lastLookedUp` để lần tra trước không chặn lần này (dán lại đúng số
+                    // vừa tra xong mà tra lỗi thì vẫn phải cho tra lại).
+                    lastLookedUp = nil
+                    runLookupIfNeeded()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 15))
+                        Text("Dán")
+                            .font(AppFont.beVietnamPro(12.5, .bold))
+                    }
+                    .foregroundStyle(AppColor.brand)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(AppColor.brand.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
 
             Button {
