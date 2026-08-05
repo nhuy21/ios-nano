@@ -176,6 +176,7 @@ struct WalletTransferAmountView: View {
         amountText.removeLast()
     }
 
+
     // MARK: - Giọng nói
 
     /// Mic CHỈ điền số tiền, không thu lời nhắn. Số điền xong vẫn sửa được bằng bàn
@@ -304,6 +305,15 @@ struct WalletTransferAmountView: View {
             await speech.start()
         }
         .onDisappear { speech.stop() }
+        // Có số tiền rồi thì mọi lời nhắc của mic đều VÔ NGHĨA — xoá ngay.
+        //
+        // Đặt ở `onChange` của `amountText` chứ không rải vào từng chỗ điền số: bàn phím số,
+        // mệnh giá gợi ý, mic, prefill từ QR/OneTouch đều đi qua đây, nên không sót đường
+        // nào. Không xoá thì hint "Chưa nghe được gì, thử lại nhé" vẫn treo dưới ô tiền
+        // trong khi người dùng đã tự gõ xong số — như đang báo lỗi việc họ không làm sai.
+        .onChangeNewCompat(of: amountText) { newValue in
+            if !newValue.isEmpty { voiceHint = nil }
+        }
         .sheet(isPresented: pendingTransactionIdBinding) {
             if useBiometric {
                 BiometricAuthSheet(

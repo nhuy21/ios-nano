@@ -207,6 +207,15 @@ struct BankTransferView: View {
         }
         .onAppear { speech.onResult = { candidates in handleSpeech(candidates) } }
         .onDisappear { speech.stop() }
+        // Có số tiền rồi thì mọi lời nhắc của mic đều VÔ NGHĨA — xoá ngay.
+        //
+        // Đặt ở `onChange` của `amount` chứ không rải vào từng chỗ điền số: bàn phím số,
+        // mệnh giá gợi ý, mic, prefill từ QR/pay link đều đi qua đây, nên không sót đường
+        // nào. Không xoá thì hint "Chưa nghe được gì, thử lại nhé" vẫn treo dưới ô tiền
+        // trong khi người dùng đã tự gõ xong số — như đang báo lỗi việc họ không làm sai.
+        .onChangeNewCompat(of: amount) { newValue in
+            if newValue > 0 { voiceHint = nil }
+        }
         .onAppear {
             if initialDraft?.prefillContent == nil { content = defaultContent }
         }
