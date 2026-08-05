@@ -33,10 +33,18 @@ private let amountBiasingStrings = [
     "chuyển", "đồng",
 ]
 
-/// 0.8s — mirror `EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS` bên Android, đã kiểm chứng
-/// ổn với câu chuyển tiền tiếng Việt (ngắn, kiểu "chuyển hai trăm nghìn"). Chờ lâu hơn không chỉ
-/// chậm mà còn dễ lẫn tạp âm vào ngay trước lúc chốt kết quả.
+/// Khoảng lặng SAU KHI ĐÃ NÓI thì coi là dứt câu — 0.8s, mirror
+/// `EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS` bên Android, đã kiểm chứng ổn với câu
+/// chuyển tiền tiếng Việt (ngắn, kiểu "chuyển hai trăm nghìn"). Chờ lâu hơn không chỉ chậm mà
+/// còn dễ lẫn tạp âm vào ngay trước lúc chốt kết quả.
 private let silenceInterval: TimeInterval = 0.8
+
+/// Thời gian chờ người dùng BẮT ĐẦU nói, tính từ lúc mic mở — dài hơn hẳn `silenceInterval`.
+///
+/// Hai mốc này KHÁC BẢN CHẤT, dùng chung một giá trị là sai: 0.8s tính từ lúc bật mic thì
+/// người dùng chưa kịp đưa máy lên miệng đã bị ngắt. Android cũng tách riêng
+/// (`EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS`), không dùng lại mốc lặng cuối câu.
+private let initialSpeechTimeout: TimeInterval = 6.0
 
 private let speechLocale = Locale(identifier: "vi-VN")
 
@@ -107,7 +115,10 @@ final class SpeechRecognizerService: ObservableObject {
                 try startLegacy()
             }
             isListening = true
-            restartSilenceTimer()
+            // Mốc DÀI cho lần hẹn đầu: đây là "chờ bắt đầu nói", không phải "khoảng lặng cuối
+            // câu". Dùng `silenceInterval` ở đây thì mic tự tắt sau 0.8s dù người dùng chưa
+            // kịp mở miệng.
+            restartSilenceTimer(timeout: initialSpeechTimeout)
         } catch {
             if #available(iOS 26.0, *) { isModernAvailable = false }
             errorMessage = Self.message(for: error)
@@ -174,7 +185,12 @@ final class SpeechRecognizerService: ObservableObject {
             onPartial: { [weak self] text in
                 guard let self, !self.hasDelivered else { return }
                 self.partialText = text
-                self.restartSilenceTimer()
+                // Chỉ hạ về mốc "lặng cuối câu" khi THẬT SỰ nghe được chữ. Engine hay gửi
+                // partial RỖNG lúc mới khởi động — nhận nó là hạ mốc chờ từ 6s xuống 0.8s
+                // ngay khi mic vừa mở, tức mất luôn thời gian chờ người dùng bắt đầu nói.
+                if !text.trimmingCharacters(in: .whitespaces).isEmpty {
+                    self.restartSilenceTimer()
+                }
             },
             onFinal: { [weak self] text in
                 guard let self, !self.hasDelivered else { return }
@@ -213,7 +229,11 @@ final class SpeechRecognizerService: ObservableObject {
                 guard !self.hasDelivered else { return }
                 if let result {
                     self.partialText = result.bestTranscription.formattedString
-                    self.restartSilenceTimer()
+                    // Xem chú thích cùng chỗ trong `startModern`: partial rỗng KHÔNG được hạ
+                    // mốc chờ xuống `silenceInterval`.
+                    if !self.partialText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        self.restartSilenceTimer()
+                    }
                     if result.isFinal {
                         // Nhiều phương án giúp `SpeechAmountParser` chọn số tiền chính xác hơn.
                         var candidates = result.transcriptions.map(\.formattedString)
@@ -259,9 +279,12 @@ final class SpeechRecognizerService: ObservableObject {
 
     // MARK: - Chốt kết quả
 
-    private func restartSilenceTimer() {
+    /// - Parameter timeout: `initialSpeechTimeout` cho lần hẹn ĐẦU (chờ người dùng bắt đầu
+    ///   nói), `silenceInterval` cho các lần sau (đã nghe được chữ, đang đo khoảng lặng cuối
+    ///   câu). Mặc định là mốc ngắn vì đa số lời gọi là từ callback nhận chữ.
+    private func restartSilenceTimer(timeout: TimeInterval = silenceInterval) {
         silenceTimer?.invalidate()
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceInterval, repeats: false) { [weak self] _ in
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
             let service = self
             Task { @MainActor in await service?.finishWithPartial() }
         }
