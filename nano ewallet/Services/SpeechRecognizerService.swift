@@ -115,6 +115,21 @@ final class SpeechRecognizerService: ObservableObject {
         }
     }
 
+    /// Tải trước model nhận diện on-device (chỉ iOS 26+), gọi lúc app đã vào Home.
+    ///
+    /// Engine mới cần model `vi-VN` có sẵn trên máy mới nghe được. Lần đầu tải có thể mất vài
+    /// giây tới vài chục giây tuỳ mạng — nếu để tới lúc người dùng bấm mic mới tải thì họ thấy
+    /// mic "không phản hồi" mà không hiểu vì sao. Gọi trước ở nền để tới lúc cần đã sẵn.
+    ///
+    /// An toàn gọi nhiều lần: `ensureModelReady` cache bằng `Task` tĩnh nên chỉ tải đúng 1 lần.
+    /// Không throw, không set `errorMessage` — thất bại thì im lặng, `start()` sẽ tự báo lỗi
+    /// lúc người dùng thật sự dùng mic.
+    static func prewarmModel() async {
+        if #available(iOS 26.0, *) {
+            await ModernSpeechSession.prewarm()
+        }
+    }
+
     /// Dừng do NGƯỜI DÙNG (chạm mic) hoặc do màn hình biến mất — không phát kết quả.
     func stop() {
         hasDelivered = true
@@ -170,8 +185,10 @@ final class SpeechRecognizerService: ObservableObject {
             }
         )
         modernSession = session
-        try startAudioTap { [weak self] buffer in
-            guard let self, let session = self.modernSession as? ModernSpeechSession else { return }
+        // Bắt `session` ra hằng local RỒI mới vào closure: closure của `installTap` chạy trên
+        // audio thread (không phải MainActor), đọc `self.modernSession` trong đó là truy cập
+        // state MainActor từ ngoài actor — lỗi biên dịch. `append` là `nonisolated` nên gọi được.
+        try startAudioTap { buffer in
             session.append(buffer)
         }
     }
@@ -209,14 +226,23 @@ final class SpeechRecognizerService: ObservableObject {
             }
         }
 
-        try startAudioTap { [weak self] buffer in
-            self?.legacyRequest?.append(buffer)
+        // Bắt `request` ra hằng local, KHÔNG đọc `self.legacyRequest` trong closure — closure
+        // chạy trên audio thread, đọc state MainActor ở đó là lỗi biên dịch.
+        // `SFSpeechAudioBufferRecognitionRequest.append` an toàn gọi từ thread khác.
+        try startAudioTap { buffer in
+            request.append(buffer)
         }
     }
 
     // MARK: - Audio dùng chung
 
-    /// Mở session + gắn tap lên micro. `onBuffer` chạy trên audio thread, KHÔNG phải main.
+    /// Mở session + gắn tap lên micro. `onBuffer` chạy trên AUDIO THREAD, không phải MainActor —
+    /// nơi gọi phải bắt sẵn thứ mình cần ra hằng local, tuyệt đối không đọc `self.<property>`
+    /// bên trong closure.
+    ///
+    /// KHÔNG đánh dấu `@Sendable`: nhánh legacy cần bắt `SFSpeechAudioBufferRecognitionRequest`
+    /// vào closure, mà class Objective-C đó chưa được Apple audit `Sendable` — thêm `@Sendable`
+    /// sẽ sinh cảnh báo/lỗi ở chỗ đó dù việc gọi `append` từ thread khác là an toàn theo tài liệu.
     private func startAudioTap(_ onBuffer: @escaping (AVAudioPCMBuffer) -> Void) throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -297,8 +323,12 @@ private enum SpeechSetupError: Error {
 
 /// Bọc `SpeechAnalyzer` + `DictationTranscriber` (iOS 26+) — tách class riêng để phần
 /// `SpeechRecognizerService` không phải rải `@available` khắp nơi.
+/// `@unchecked Sendable`: `append` là `nonisolated` và chạy trên audio thread nên `self` phải
+/// vượt biên actor được. An toàn vì mọi thứ `append` đọc đều là `let` (`analyzerFormat`,
+/// `inputBuilder`, `converter`) và `converter` tự khoá state mutable của nó. `resultsTask` là
+/// biến duy nhất mutable, chỉ được đụng tới từ MainActor (`make`/`finish`).
 @available(iOS 26.0, *)
-private final class ModernSpeechSession {
+private final class ModernSpeechSession: @unchecked Sendable {
     private let analyzer: SpeechAnalyzer
     private let analyzerFormat: AVAudioFormat?
     private let inputBuilder: AsyncStream<AnalyzerInput>.Continuation
@@ -349,8 +379,10 @@ private final class ModernSpeechSession {
         return session
     }
 
-    /// Đẩy buffer micro vào analyzer. Gọi từ audio thread.
-    func append(_ buffer: AVAudioPCMBuffer) {
+    /// Đẩy buffer micro vào analyzer. `nonisolated` vì được gọi từ AUDIO THREAD (closure của
+    /// `installTap`), không phải MainActor. Chỉ đọc `let` property nên an toàn; `converter` tự
+    /// bảo vệ state mutable bên trong bằng khoá riêng.
+    nonisolated func append(_ buffer: AVAudioPCMBuffer) {
         guard let analyzerFormat,
               let converted = try? converter.convert(buffer, to: analyzerFormat) else { return }
         inputBuilder.yield(AnalyzerInput(buffer: converted))
@@ -364,6 +396,12 @@ private final class ModernSpeechSession {
         Task { try? await analyzer.finalizeAndFinishThroughEndOfInput() }
         resultsTask?.cancel()
         resultsTask = nil
+    }
+
+    /// Tải trước model, bỏ qua kết quả — dùng cho `SpeechRecognizerService.prewarmModel()`.
+    /// Không throw: thất bại thì để `start()` báo lỗi lúc người dùng thật sự bấm mic.
+    static func prewarm() async {
+        try? await ensureModelReady()
     }
 
     /// Kiểm tra `vi-VN` được hỗ trợ + đã cài on-device chưa, tải nếu thiếu. Cache bằng `Task`
@@ -410,11 +448,19 @@ private final class ModernSpeechSession {
 /// Chuyển `AVAudioPCMBuffer` từ format của input node (hardware, thường 48kHz) sang format mà
 /// `SpeechAnalyzer` yêu cầu. BẮT BUỘC phải có — feed thẳng buffer sai format khiến analyzer chạy
 /// nhưng không bao giờ trả kết quả, không có lỗi nào để biết vì sao.
-private final class BufferConverter {
+///
+/// `nonisolated` + `@unchecked Sendable`: được gọi từ audio thread (qua
+/// `ModernSpeechSession.append`), không phải MainActor. `AVAudioConverter` được cache lại giữa
+/// các frame nên là state mutable — bảo vệ bằng `NSLock` thay vì dựa vào actor.
+private final class BufferConverter: @unchecked Sendable {
+    private let lock = NSLock()
     private var converter: AVAudioConverter?
 
-    func convert(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) throws -> AVAudioPCMBuffer {
+    nonisolated func convert(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         if buffer.format == format { return buffer }
+
+        lock.lock()
+        defer { lock.unlock() }
 
         let converter: AVAudioConverter
         if let existing = self.converter,

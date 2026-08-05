@@ -159,8 +159,20 @@ struct QuickTransferOpenAppIntent: AppIntent {
     }
 }
 
-/// Không cần `@available`: `AppShortcutsProvider` là iOS 16+, đúng bằng deployment target
-/// của app (16.0).
+/// CHỈ đăng ký shortcut từ iOS 18.4 — mốc Apple thêm tiếng Việt cho Siri.
+///
+/// `phrases` bên dưới là tiếng Việt, nên trên máy 16-18.3 Siri không bao giờ khớp được. Để
+/// shortcut xuất hiện trong app Shortcuts ở những bản đó chỉ gây rối: người dùng thấy mục
+/// "Chuyển tiền nhanh" nhưng ra lệnh bằng giọng nói thì Siri báo không hiểu.
+///
+/// Đánh dấu ở CẤP TYPE (không phải cấp property `appShortcuts`): hệ thống quét
+/// `AppShortcutsProvider` lúc cài app để đăng ký metadata, `@available` ở type là cách duy nhất
+/// khiến nó bỏ qua hẳn trên máy chưa đủ phiên bản.
+///
+/// KHÔNG bọc `QuickTransferIntent`/`QuickTransferOpenAppIntent` (vẫn iOS 16+): chúng còn được
+/// gọi qua `opensIntent` ở tầng 2 và dùng được trong app Shortcuts nếu người dùng tự tạo
+/// shortcut — chỉ phần Siri đọc `phrases` mới cần 18.4.
+@available(iOS 18.4, *)
 struct QuickTransferShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(

@@ -319,6 +319,12 @@ struct HomeView: View {
             async let notifTask: Bool = notifications.refresh()
             _ = await (walletTask, txTask, contactsTask, notifTask)
         }
+        // Tải trước model nhận diện giọng nói on-device (chỉ iOS 26+). `.task` RIÊNG, không gộp
+        // vào khối trên: lần đầu tải mất vài giây tới vài chục giây tuỳ mạng, gộp chung sẽ giữ
+        // các request mà UI cần ngay (số dư, giao dịch) chờ theo.
+        .task {
+            await SpeechRecognizerService.prewarmModel()
+        }
     }
 
     /// Nền trắng liền chứa 3 khối dưới — padding ngang 22, top 40 để chừa chỗ cho
