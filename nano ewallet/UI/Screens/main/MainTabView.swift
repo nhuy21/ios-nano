@@ -42,6 +42,12 @@ struct MainTabView: View {
     private static let qrSize: CGFloat = 62
     /// Chỉ nhô ~1/3 nút lên khỏi mép card, phần còn lại chìm trong card.
     private static let qrOverhang: CGFloat = 62 / 3
+    private static let barBottomPadding: CGFloat = 12
+
+    /// Tổng chiều cao thanh tab nổi tính từ đáy vùng an toàn — dùng cho các lớp nổi trong
+    /// tab (toast, banner) tự chừa chỗ. Phơi ra `internal` vì `barHeight`/`qrOverhang` là
+    /// `private`; nếu để mỗi màn tự cộng tay thì sửa chiều cao ở đây là lệch hết bên kia.
+    static let floatingBarTotalHeight: CGFloat = barHeight + qrOverhang + barBottomPadding
 
     private static let activeTint = Color(hex: 0x00A85E)
 
@@ -198,7 +204,7 @@ struct MainTabView: View {
         }
         .frame(height: Self.barHeight + Self.qrOverhang)
         .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.bottom, Self.barBottomPadding)
     }
 
     private var pill: some View {

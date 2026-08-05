@@ -38,6 +38,7 @@ struct HomeView: View {
     @State private var showVoiceCommand = false
     @State private var isSyncing = false
     @State private var syncError: String?
+    @StateObject private var toast = ToastState()
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -171,6 +172,11 @@ struct HomeView: View {
         } message: {
             Text(syncError ?? "")
         }
+        // 30pt tính từ MÉP TRÊN của thanh tab, không phải từ đáy màn: thanh tab nổi được vẽ
+        // SAU HomeView trong ZStack của MainTabView nên nó đè lên toast, đặt 30pt từ đáy là
+        // bị che kín. Cộng theo hằng số của MainTabView để đổi chiều cao thanh tab không
+        // làm lệch chỗ này.
+        .toast(toast, bottomPadding: MainTabView.floatingBarTotalHeight + 30)
     }
 
     private var syncErrorBinding: Binding<Bool> {
@@ -448,6 +454,9 @@ struct HomeView: View {
                     if wallet.bkUsername != nil {
                         Button {
                             UIPasteboard.general.string = wallet.bkUsername
+                            // Không có phản hồi thì người dùng không biết đã copy được chưa
+                            // nên bấm lại nhiều lần. Chuỗi khớp Android ("Đã sao chép số ví").
+                            toast.show("Đã sao chép số ví")
                         } label: {
                             Image(systemName: "doc.on.doc")
                                 .font(.system(size: 13))
