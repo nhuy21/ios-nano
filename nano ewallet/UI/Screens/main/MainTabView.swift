@@ -164,7 +164,14 @@ struct MainTabView: View {
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showQrScan) {
             QrScanNavigationView(
-                onDismiss: { showQrScan = false },
+                // Đóng màn quét thì về Trang chủ, kể cả khi mở nó từ tab Cá nhân: nút QR
+                // nằm giữa thanh tab nên người dùng không coi nó thuộc tab nào, đóng ra mà
+                // rơi lại vào Cá nhân thì khó hiểu. `homePath` dọn luôn để ra đúng màn gốc.
+                onDismiss: {
+                    showQrScan = false
+                    selectedTab = .home
+                    homePath.removeAll()
+                },
                 onEmergency: { openOnHome(.contacts) }
             )
         }

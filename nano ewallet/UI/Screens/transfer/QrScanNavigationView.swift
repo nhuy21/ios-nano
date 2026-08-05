@@ -26,6 +26,14 @@ struct QrScanNavigationView: View {
 
     @State private var path: [QrFlowRoute] = []
 
+    /// Màn QR đã kéo xuống bao nhiêu trong lúc đang vuốt — chỉ để phản hồi thị giác, buông
+    /// tay là về 0 hoặc đóng hẳn.
+    @State private var dragOffset: CGFloat = 0
+
+    /// Kéo quá mốc này thì đóng, chưa tới thì bật về. 120pt đủ xa để không đóng oan khi
+    /// người dùng chỉ chạm trượt tay trên khung ngắm.
+    private static let dismissThreshold: CGFloat = 120
+
     var body: some View {
         NavigationStack(path: $path) {
             QrScanView(
@@ -41,6 +49,36 @@ struct QrScanNavigationView: View {
                     .hidesSystemNavigationBar()
             }
         }
+        .offset(y: dragOffset)
+        // Kéo từ trên xuống để đóng — modal này mở bằng `fullScreenCover` nên KHÔNG có cử
+        // chỉ đóng sẵn như `sheet`.
+        //
+        // Chỉ gắn khi `path.isEmpty`, tức đang ở đúng màn quét: các màn con là nhập số tiền
+        // / nội dung, kéo tay một cái mà đóng cả luồng thì mất hết những gì vừa gõ.
+        .gesture(path.isEmpty ? dismissDragGesture : nil)
+    }
+
+    /// Chỉ nhận kéo XUỐNG, và chỉ khi quãng dọc lớn hơn quãng ngang — bỏ qua kéo lên/ngang
+    /// để không ăn tranh thao tác khác trên màn quét (chạm lấy nét, hai lần chạm về Home).
+    private var dismissDragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                guard value.translation.height > 0,
+                      abs(value.translation.height) > abs(value.translation.width) else { return }
+                dragOffset = value.translation.height
+            }
+            .onEnded { value in
+                if value.translation.height > Self.dismissThreshold {
+                    onDismiss()
+                    // Trả offset về 0 sau khi đóng, nếu không lần mở lại sẽ hiện màn đã bị
+                    // đẩy lệch xuống.
+                    dragOffset = 0
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        dragOffset = 0
+                    }
+                }
+            }
     }
 
     @ViewBuilder
