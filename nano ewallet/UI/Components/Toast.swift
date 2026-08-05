@@ -7,6 +7,8 @@
 //
 
 import SwiftUI
+// `@Published`/`ObservableObject` là của Combine — `import SwiftUI` KHÔNG tự kéo nó vào.
+import Combine
 
 /// Trạng thái + hẹn giờ tự tắt của một toast. Giữ trong `@StateObject` ở màn cần dùng.
 ///
