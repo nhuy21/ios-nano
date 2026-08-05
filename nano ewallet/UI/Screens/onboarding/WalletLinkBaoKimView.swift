@@ -126,7 +126,7 @@ struct WalletLinkBaoKimView: View {
                 .foregroundStyle(AppColor.payInk)
                 .tint(AppColor.brand)
                 .keyboardType(keyboard)
-                .textInputAutocapitalization(field == .fullName ? .characters : .never)
+                .textInputAutocapitalization(field == .fullName ? .words : .never)
                 .autocorrectionDisabled()
                 .focused($focusedField, equals: field)
                 .frame(height: 56)
