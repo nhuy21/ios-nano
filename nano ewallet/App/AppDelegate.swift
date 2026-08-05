@@ -25,33 +25,27 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
         PushRegistrar.shared.registerForPushNotifications(application: application)
-
-        // App bị TERMINATE, mở lại bằng Home Screen Quick Action (long-press icon) — launchOptions
-        // mang shortcutItem thay vì gọi `performActionFor` (chỉ chạy khi app đã sống sẵn).
-        // Không xử lý ở đây thì bấm Quick Action lúc app đã tắt hẳn sẽ mở app lên Trang chủ
-        // trơ, bỏ qua ý định của người dùng.
-        if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
-            DeepLinkStore.shared.handleShortcut(type: shortcutItem.type)
-        }
         return true
     }
 
-    /// App ĐANG SỐNG (foreground/background) — mirror MainActivity.handleDeepLink nhánh
-    /// App Shortcut. Vẫn hoạt động dù app dùng scene-based `WindowGroup` vì project không khai
-    /// `UISceneDelegateClassName` riêng (`UIApplicationSupportsMultipleScenes = false` trong
-    /// Info.plist) — UIKit fallback callback Quick Action về app-level thay vì scene-level.
+    /// Đăng ký `SceneDelegate` — app khai `UIApplicationSceneManifest` (scene-based) nên Quick
+    /// Action (long-press icon) PHẢI xử lý ở tầng `UIWindowSceneDelegate`
+    /// (`scene(_:willConnectTo:options:)` + `windowScene(_:performActionFor:)` trong
+    /// SceneDelegate.swift), KHÔNG rơi về `application(_:performActionFor:)`/
+    /// `launchOptions[.shortcutItem]` ở đây — đã thử và xác nhận trên máy thật là KHÔNG được
+    /// gọi (bấm Quick Action chỉ mở app lên Trang chủ trơ, bỏ qua ý định người dùng).
     func application(
         _ application: UIApplication,
-        performActionFor shortcutItem: UIApplicationShortcutItem,
-        completionHandler: @escaping (Bool) -> Void
-    ) {
-        let handled = DeepLinkStore.shared.handleShortcut(type: shortcutItem.type)
-        completionHandler(handled)
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        config.delegateClass = SceneDelegate.self
+        return config
     }
 
-    // Deep link (Universal Link + nanowallet://) KHÔNG xử lý ở đây. App dùng
-    // WindowGroup nên là scene-based, UIKit không gọi `application(_:open:options:)`
-    // hay `application(_:continue:_:)` nữa — đặt ở đây là code chết. Xem
+    // Deep link (Universal Link + nanowallet://) KHÔNG xử lý ở đây, dù ở app delegate hay
+    // scene delegate. App dùng WindowGroup nên SwiftUI đã có đường riêng — xem
     // `.onOpenURL` / `.onContinueUserActivity` trong nano_ewalletApp.swift.
 
     /// APNs token -> giao cho Firebase để nó cấp FCM token tương ứng.
