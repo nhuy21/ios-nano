@@ -19,6 +19,7 @@ struct CccdScanView: View {
     @StateObject private var sessionManager = EkycSessionManager.shared
     @State private var isCheckingPermission = false
     @State private var showCameraDeniedAlert = false
+    @State private var showNfcUnavailableAlert = false
 
     private var isPreparing: Bool {
         sessionManager.state == .loading || sessionManager.state == .idle || isCheckingPermission
@@ -51,6 +52,11 @@ struct CccdScanView: View {
             Button("Huỷ", role: .cancel) {}
         } message: {
             Text("Ứng dụng cần quyền camera để chụp CCCD và xác thực khuôn mặt. Vui lòng cấp quyền trong Cài đặt.")
+        }
+        .alert("Thiết bị không đọc được chip", isPresented: $showNfcUnavailableAlert) {
+            Button("Đã hiểu", role: .cancel) {}
+        } message: {
+            Text("Máy của bạn không hỗ trợ đọc chip NFC trên CCCD nên chưa mở ví được bằng cách này. Vui lòng dùng thiết bị khác hoặc liên hệ hỗ trợ.")
         }
     }
 
@@ -155,9 +161,13 @@ struct CccdScanView: View {
     /// Đang lỗi phiên thì phải LẤY LẠI phiên trước, chỉ mở SDK khi đã sẵn. Bấm "Thử lại
     /// kết nối" mà mở thẳng SDK với phiên rỗng/hết hạn thì không có tác dụng gì.
     ///
-    /// PHẢI xin quyền camera và ĐỢI XONG (await) trước khi mở SDK CmcEkyc: gọi SDK lúc quyền
-    /// còn `.notDetermined` khiến app crash ngay lần đầu bấm nút (SDK tự mở AVCaptureSession
-    /// mà không đợi dialog xin quyền hệ thống có quyết định) — xem `EkycPermissions.swift`.
+    /// Kiểm ĐỦ quyền/khả năng rồi mới mở SDK, đúng thứ tự người dùng gặp trong luồng:
+    ///  1. Camera — PHẢI `await` xong: gọi SDK lúc quyền còn `.notDetermined` khiến app crash
+    ///     ngay lần đầu bấm nút (SDK tự mở AVCaptureSession mà không đợi dialog hệ thống có
+    ///     quyết định). Xem `EkycPermissions.swift`.
+    ///  2. NFC — chặn sớm nếu phần cứng không đọc được chip.
+    ///
+    /// Không xin micro/thư viện ảnh: SDK không dùng tới (xem `EkycPermissions.swift`).
     private func handleCta() {
         guard !isPreparing else { return }
         Task {
@@ -166,6 +176,13 @@ struct CccdScanView: View {
             isCheckingPermission = false
             guard granted else {
                 showCameraDeniedAlert = true
+                return
+            }
+
+            // Chặn TRƯỚC khi mở SDK: luồng này bắt buộc đọc chip, để người dùng chụp xong
+            // CCCD và quét mặt rồi mới báo "máy không đọc được chip" là bắt họ làm không.
+            guard EkycPermissions.isNfcAvailable else {
+                showNfcUnavailableAlert = true
                 return
             }
 

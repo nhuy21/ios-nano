@@ -21,5 +21,21 @@
     <array>
         <string>TAG</string>
     </array>
+
+    <!-- AID của chip CCCD, BẮT BUỘC phải khai khi đọc chip qua ISO7816.
+         KalapaSDK (bên trong CmcEkycSDK) dùng NFCTagReaderSession + NFCISO7816 để đọc chip
+         — iOS chỉ cho phép `SELECT` những AID được liệt kê ở đây, KHÔNG khai thì
+         NFCTagReaderSession lỗi ngay lúc khởi tạo, không phải lúc chạm thẻ.
+         Khai `formats: TAG` ở trên là chưa đủ: TAG mở quyền đọc tag, còn danh sách này
+         mới quyết định được nói chuyện với applet nào.
+
+         A0000002471001 = ICAO 9303 eMRTD (hộ chiếu điện tử) — CCCD gắn chip Việt Nam dùng
+         đúng applet chuẩn này.
+         Android không cần khai gì tương ứng (chỉ cần quyền NFC), nên đây là ràng buộc
+         riêng của iOS, không đối chiếu được từ AndroidManifest. -->
+    <key>com.apple.developer.nfc.readersession.iso7816.select-identifiers</key>
+    <array>
+        <string>A0000002471001</string>
+    </array>
 </dict>
 </plist>

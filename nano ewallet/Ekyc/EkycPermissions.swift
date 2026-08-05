@@ -2,8 +2,12 @@
 //  EkycPermissions.swift
 //  nano ewallet
 //
-//  Xin quyền camera TRƯỚC khi mở SDK CmcEkyc — bắt buộc phải làm ở tầng app, SDK không
-//  tự xử lý đúng khi quyền còn ở trạng thái .notDetermined.
+//  Kiểm tra quyền/khả năng TRƯỚC khi mở SDK CmcEkyc — bắt buộc phải làm ở tầng app, SDK
+//  không tự xử lý đúng khi quyền còn ở trạng thái .notDetermined.
+//
+//  Chỉ camera và NFC: SDK không dùng micro (liveness của iProov là passive, không ghi âm)
+//  cũng không đọc thư viện ảnh (luồng này chỉ chụp mới), nên KHÔNG xin hai quyền đó —
+//  hỏi quyền không dùng tới chỉ làm người dùng nghi ngại.
 //
 //  Bối cảnh: lần đầu bấm "Bắt đầu xác thực" (chưa từng cấp quyền camera), app CRASH ngay
 //  khi SDK cố mở camera. Mở lại app lần sau (quyền đã Allow/Deny từ dialog hệ thống) thì
@@ -16,6 +20,7 @@
 //
 
 import AVFoundation
+import CoreNFC
 
 enum EkycPermissions {
     /// Đảm bảo quyền camera đã được QUYẾT ĐỊNH (không còn `.notDetermined`) trước khi mở SDK.
@@ -35,5 +40,17 @@ enum EkycPermissions {
         @unknown default:
             return false
         }
+    }
+
+    /// Máy có đọc được chip NFC không.
+    ///
+    /// KHÔNG có API xin quyền NFC lúc chạy — iOS tự hiện tấm che khi session mở, người dùng
+    /// không bật/tắt được như camera. Thứ duy nhất kiểm được trước là PHẦN CỨNG có hỗ trợ
+    /// hay không (iPhone 6 và cũ hơn, hoặc iPad, đều không đọc được).
+    ///
+    /// Kiểm để báo sớm ở màn hướng dẫn: luồng `.nfcEkyc` bắt buộc đọc chip, vào tới bước áp
+    /// thẻ mới phát hiện máy không hỗ trợ thì người dùng đã chụp xong CCCD và quét mặt.
+    static var isNfcAvailable: Bool {
+        NFCTagReaderSession.readingAvailable
     }
 }
