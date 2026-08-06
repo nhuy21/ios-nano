@@ -28,6 +28,8 @@ struct nano_ewalletApp: App {
                     guard let url = activity.webpageURL else { return }
                     _ = DeepLinkStore.shared.handle(url: url)
                 }
+                // Che số dư/giao dịch khỏi thẻ preview App Switcher — xem PrivacyScreenOverlay.
+                .overlay { PrivacyScreenOverlay() }
         }
     }
 }
