@@ -145,6 +145,12 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     /// `id` dùng luôn `txId` của server nên lần refresh sau KHÔNG tạo bản ghi trùng.
     @MainActor
     private static func applyTransactionPush(_ info: [AnyHashable: Any]) {
+        // User đang tự kéo-refresh (hoặc 1 lượt refresh khác đang chạy dở) — nhường cho lượt
+        // đó, tránh set balance/prepend transaction chồng lên nhau gây UI vẽ lại 2 lần liên
+        // tiếp. Lượt refresh đang chạy tự lấy đủ số dư + giao dịch mới nhất từ BE, không mất
+        // dữ liệu của push này.
+        guard !WalletStore.shared.isRefreshing else { return }
+
         // Thiếu balanceAfter thì không đoán — gọi API lấy số dư đúng.
         if let balanceAfter = int64(info["balanceAfter"]) {
             WalletStore.shared.setBalance(balanceAfter)

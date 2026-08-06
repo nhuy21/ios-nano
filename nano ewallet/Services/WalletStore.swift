@@ -33,6 +33,11 @@ final class WalletStore: ObservableObject {
 
     private var isLoading = false
 
+    /// Đang có 1 lượt `refresh(force:)` chạy dở (vd user tự kéo-refresh). Push tới đúng lúc
+    /// này nên NHƯỜNG cho lượt đang chạy, tránh set balance/prepend transaction chồng chéo
+    /// gây UI vẽ lại 2 lần liên tiếp — xem `applyTransactionPush` trong AppDelegate.
+    var isRefreshing: Bool { isLoading }
+
     private init() {
         load()
     }
