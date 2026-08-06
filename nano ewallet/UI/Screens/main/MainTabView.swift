@@ -214,7 +214,10 @@ struct MainTabView: View {
                     username: benUsername,
                     holderName: info.accName ?? benUsername,
                     payLinkToken: token,
-                    prefillAmount: info.amountValue
+                    // Hai draft khai kiểu khác nhau: `BankTransferDraft.prefillAmount` là
+                    // `Int?` còn `WalletTransferDraft.prefillAmount` là `Int64?`, nên nhánh
+                    // ngân hàng ngay trên truyền thẳng được mà nhánh ví thì phải đổi kiểu.
+                    prefillAmount: info.amountValue.map(Int64.init)
                 )))
             }
         } catch let error as APIError {
