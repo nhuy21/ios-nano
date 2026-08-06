@@ -161,7 +161,7 @@ gọi API, không giữ state.
 | `RECORD_AUDIO` | `NSMicrophoneUsageDescription` |
 | `RecognitionService` query | `NSSpeechRecognitionUsageDescription` |
 | `USE_BIOMETRIC` | `NSFaceIDUsageDescription` |
-| `NFC` / `uses-feature nfc` | `NFCReaderUsageDescription` + `com.apple.developer.nfc.readersession.formats` **và** `...iso7816.select-identifiers` (entitlements) — đọc chip CCCD qua ISO7816 nên phải khai cả AID, xem `.entitlements` |
+| `NFC` / `uses-feature nfc` | `NFCReaderUsageDescription` + `com.apple.developer.nfc.readersession.formats` (**entitlements**) **và** `...iso7816.select-identifiers` (**Info.plist**, KHÔNG phải entitlements — xem ghi chú trong `.entitlements`) — đọc chip CCCD qua ISO7816 nên phải khai cả AID |
 | `POST_NOTIFICATIONS` | `UNUserNotificationCenter.requestAuthorization` (`PushRegistrar`) + `UIBackgroundModes: remote-notification` + `aps-environment` |
 | `INTERNET` / `ACCESS_NETWORK_STATE` | Không cần khai — theo dõi qua `NWPathMonitor` (`NetworkMonitor`) |
 | App Links (`nano.casso.dev/pay`) | Universal Links qua `com.apple.developer.associated-domains` |

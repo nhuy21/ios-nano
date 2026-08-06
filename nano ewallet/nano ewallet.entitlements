@@ -2,40 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Universal Links: https://nano.casso.dev/pay -> mở app.
-         Cần host file /.well-known/apple-app-site-association trên domain (tương tự assetlinks.json bên Android). -->
-    <key>com.apple.developer.associated-domains</key>
-    <array>
-        <string>applinks:nano.casso.dev</string>
-    </array>
-
-    <!-- Push Notifications (APNs) — tương ứng POST_NOTIFICATIONS.
-         Lấy theo build setting APS_ENVIRONMENT: Debug = development (APNs sandbox),
-         Release = production. KHÔNG ghi cứng "production" ở đây — profile Development
-         chỉ cho phép "development", ghi cứng sẽ làm bản Debug ký lỗi. -->
-    <key>aps-environment</key>
-    <string>$(APS_ENVIRONMENT)</string>
-
-    <!-- NFC Tag Reading — tương ứng android.hardware.nfc -->
-    <key>com.apple.developer.nfc.readersession.formats</key>
-    <array>
-        <string>TAG</string>
-    </array>
-
-    <!-- AID của chip CCCD, BẮT BUỘC phải khai khi đọc chip qua ISO7816.
-         KalapaSDK (bên trong CmcEkycSDK) dùng NFCTagReaderSession + NFCISO7816 để đọc chip
-         — iOS chỉ cho phép `SELECT` những AID được liệt kê ở đây, KHÔNG khai thì
-         NFCTagReaderSession lỗi ngay lúc khởi tạo, không phải lúc chạm thẻ.
-         Khai `formats: TAG` ở trên là chưa đủ: TAG mở quyền đọc tag, còn danh sách này
-         mới quyết định được nói chuyện với applet nào.
-
-         A0000002471001 = ICAO 9303 eMRTD (hộ chiếu điện tử) — CCCD gắn chip Việt Nam dùng
-         đúng applet chuẩn này.
-         Android không cần khai gì tương ứng (chỉ cần quyền NFC), nên đây là ràng buộc
-         riêng của iOS, không đối chiếu được từ AndroidManifest. -->
-    <key>com.apple.developer.nfc.readersession.iso7816.select-identifiers</key>
-    <array>
-        <string>A0000002471001</string>
-    </array>
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:nano.casso.dev</string>
+	</array>
+	<key>com.apple.developer.nfc.readersession.formats</key>
+	<array>
+		<string>TAG</string>
+	</array>
+	<!-- KHÔNG khai `com.apple.developer.nfc.readersession.iso7816.select-identifiers` ở đây.
+	     Dù tên bắt đầu bằng `com.apple.developer.`, Apple xếp nó là key của Info.plist
+	     (nhóm Information Property List), KHÔNG phải entitlement — capability "NFC Tag
+	     Reading" trên App ID chỉ cấp `...readersession.formats`. Khai ở entitlements làm
+	     automatic signing fail cứng ("not found and could not be included in profile"),
+	     không phải do App ID thiếu quyền. Danh sách AID nằm ở `Info.plist`. -->
 </dict>
 </plist>
