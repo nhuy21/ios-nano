@@ -213,7 +213,8 @@ struct MainTabView: View {
                 openOnHome(.walletTransferAmount(WalletTransferDraft(
                     username: benUsername,
                     holderName: info.accName ?? benUsername,
-                    payLinkToken: token
+                    payLinkToken: token,
+                    prefillAmount: info.amountValue
                 )))
             }
         } catch let error as APIError {
