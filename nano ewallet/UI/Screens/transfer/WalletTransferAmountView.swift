@@ -500,7 +500,16 @@ struct WalletTransferAmountView: View {
                     }
 
                 Button {
-                    if let clip = UIPasteboard.general.string { username = clip }
+                    guard let clip = UIPasteboard.general.string else { return }
+                    // Lọc lấy chữ số: số ví copy từ tin nhắn/chat hay kèm khoảng trắng hoặc
+                    // ký tự thừa, dán thô vào là tra cứu trượt.
+                    username = clip.filter(\.isNumber)
+                    // Xoá mốc tra trước để `runVerifyIfNeeded` không bỏ qua lần này (dán lại
+                    // đúng số vừa tra mà lần đó lỗi thì vẫn phải cho tra lại).
+                    lastVerified = nil
+                    // Dán xong tra cứu luôn, khỏi bắt người dùng bấm ra ngoài mới thấy tên —
+                    // mirror nút Dán ở BankTransferView.
+                    runVerifyIfNeeded()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.on.clipboard")
