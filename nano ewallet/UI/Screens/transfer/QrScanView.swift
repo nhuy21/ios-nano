@@ -104,11 +104,12 @@ struct QrScanView: View {
                 .transition(.opacity)
             }
         }
-        // `ignoresSafeArea` là phần BẮT BUỘC: không có nó, nền đen dừng đúng ở safe area và
-        // hở hai dải sáng ở khu status bar / home indicator. Camera preview đã tràn viền
-        // (`.ignoresSafeArea()` riêng của nó) nhưng preview theo tỉ lệ 4:3/16:9 nên không
-        // phủ kín mọi kích thước máy — nền này là lớp bịt phần còn lại.
-        .background(Color.black.ignoresSafeArea())
+        // Nền đen là lớp bịt phần camera preview không phủ tới: preview tràn viền bằng
+        // `.ignoresSafeArea()` riêng nhưng theo tỉ lệ 4:3/16:9 nên không kín mọi kích thước
+        // máy. Dùng `screenBackground` (ép giãn hết khung TRƯỚC khi tô) thay vì tự
+        // `.background(...ignoresSafeArea())` — thiếu bước ép giãn thì nền không có gì để
+        // tràn ra, vẫn hở hai dải sáng ở status bar / home indicator.
+        .screenBackground(Color.black, alignment: .center)
         .task {
             await scanner.requestPermissionAndStart()
         }
