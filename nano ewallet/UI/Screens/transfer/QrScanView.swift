@@ -261,6 +261,23 @@ struct QrScanView: View {
 
                 gatewayLogos
                     .position(x: center.x, y: center.y + half + 44)
+
+                // Hai cử chỉ thoát màn đều KHÔNG có dấu hiệu nào trên UI (nút back nằm tít
+                // trên cùng), không nói ra thì gần như không ai tự phát hiện.
+                // Mờ hơn dòng hướng dẫn quét ở trên vì đây chỉ là mẹo phụ, không phải việc
+                // chính người dùng đang làm.
+                //
+                // Bật VoiceOver thì chạm hai lần là cử chỉ KÍCH HOẠT của hệ thống nên lớp
+                // `doubleTapToHomeLayer` tự tắt — chỉ còn kéo xuống, nhắc y nguyên là sai.
+                Text(
+                    voiceOverEnabled
+                        ? "Kéo xuống để về Trang chủ"
+                        : "Chạm hai lần hoặc kéo xuống để về Trang chủ"
+                )
+                .font(AppFont.beVietnamPro(12))
+                .foregroundStyle(.white.opacity(0.65))
+                .multilineTextAlignment(.center)
+                .position(x: center.x, y: center.y + half + 84)
             }
         }
         .allowsHitTesting(false)
