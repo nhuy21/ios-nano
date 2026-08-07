@@ -108,7 +108,7 @@ struct WithdrawView: View {
             continueBar
         }
         // Kotlin để nền TRẮNG cho màn này (khác các màn chuyển tiền dùng xám nhạt).
-        .background(Color.white)
+        .screenBackground(Color.white)
         .task {
             await wallet.refresh()
             _ = await bankCache.get()

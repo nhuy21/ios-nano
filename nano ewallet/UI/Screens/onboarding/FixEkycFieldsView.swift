@@ -62,7 +62,7 @@ struct FixEkycFieldsView: View {
             .padding(.bottom, 16)
         }
         .padding(.horizontal, 24)
-        .background(Color.white)
+        .screenBackground(Color.white)
         .onAppear {
             // Điền sẵn giá trị Bảo Kim đang giữ để người dùng sửa chứ không gõ lại từ đầu.
             for field in fields where values[field.key] == nil {

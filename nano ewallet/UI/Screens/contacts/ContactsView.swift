@@ -52,7 +52,7 @@ struct ContactsView: View {
             searchBar
             content
         }
-        .background(Color(hex: 0xF7F8FA))
+        .screenBackground(Color(hex: 0xF7F8FA))
         .task { _ = await store.get() }
         .sheet(isPresented: $showAdd) {
             AddContactSheet(onSaved: {

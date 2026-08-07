@@ -67,7 +67,7 @@ struct ForgotPasswordView: View {
                 .padding(.horizontal, 24)
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-            .background(Color.white)
+            .screenBackground(Color.white)
             .scrollDismissesKeyboard(.interactively)
 
             Button(action: onBack) {

@@ -65,7 +65,7 @@ struct WalletLinkErrorView: View {
             Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color.white)
+        .screenBackground(Color.white)
     }
 
     private var header: some View {

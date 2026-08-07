@@ -115,7 +115,7 @@ struct TermsOfUseView: View {
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
-        .background(Color(hex: 0xF5F7F6))
+        .screenBackground(Color(hex: 0xF5F7F6))
     }
 }
 

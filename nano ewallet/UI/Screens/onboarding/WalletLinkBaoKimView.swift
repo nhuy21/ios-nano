@@ -91,7 +91,7 @@ struct WalletLinkBaoKimView: View {
             .padding(.bottom, 12)
         }
         .padding(.horizontal, 20)
-        .background(Color.white)
+        .screenBackground(Color.white)
         // Số ví dùng bàn phím số của hệ thống nên không có nút Done — chạm ra ngoài để
         // đóng (cử chỉ ở tầng UIWindow, xem DismissKeyboardOnTap).
         .contentShape(Rectangle())

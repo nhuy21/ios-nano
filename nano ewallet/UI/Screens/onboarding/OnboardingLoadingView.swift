@@ -61,8 +61,7 @@ struct OnboardingLoadingView: View {
                 .padding(.bottom, 24)
         }
         .padding(.horizontal, 32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.white)
+        .screenBackground(Color.white, alignment: .center)
         .task { await runFrameLoop() }
         .task { await runProgress() }
     }

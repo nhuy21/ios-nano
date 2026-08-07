@@ -136,7 +136,7 @@ struct RegisterView: View {
             }
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .scrollDismissesKeyboard(.interactively)
     }
 

@@ -56,7 +56,7 @@ struct ConversationView: View {
             content
             composer
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .task { await reload() }
         .sheet(isPresented: pendingTransactionIdBinding) {
             PinEntrySheet(

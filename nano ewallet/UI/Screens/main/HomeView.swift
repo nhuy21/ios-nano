@@ -308,7 +308,7 @@ struct HomeView: View {
         // thông báo khi đang ở Home.
         .refreshable { await reloadWalletData() }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-        .background(Color(hex: 0xF3F5F7))
+        .screenBackground(Color(hex: 0xF3F5F7))
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .sheet(item: $detailTransaction) { tx in
             TransactionDetailSheet(tx: tx, onDismiss: { detailTransaction = nil })

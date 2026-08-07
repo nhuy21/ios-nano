@@ -277,7 +277,7 @@ struct WalletTransferAmountView: View {
             }
         }
         // Nền xám nhạt `WtPageBg` — khác màn chuyển khoản ngân hàng (nền trắng).
-        .background(Color(hex: 0xF1F3F5))
+        .screenBackground(Color(hex: 0xF1F3F5))
         // Bàn phím HỆ THỐNG đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow (xem
         // DismissKeyboardOnTap). Ở đây chỉ cần lo bàn phím số tự vẽ.
         .contentShape(Rectangle())

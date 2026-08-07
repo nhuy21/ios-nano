@@ -42,7 +42,7 @@ struct CccdScanView: View {
             header
             sheet
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .task { await sessionManager.prepare() }
         .alert("Cần quyền camera", isPresented: $showCameraDeniedAlert) {
             Button("Mở Cài đặt") {

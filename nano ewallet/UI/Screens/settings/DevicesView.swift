@@ -20,7 +20,7 @@ struct DevicesView: View {
 
             content
         }
-        .background(Color(hex: 0xF7F8FA))
+        .screenBackground(Color(hex: 0xF7F8FA))
         .task { await vm.load() }
         .alert("Xoá thiết bị", isPresented: Binding(
             get: { confirmRemove != nil },

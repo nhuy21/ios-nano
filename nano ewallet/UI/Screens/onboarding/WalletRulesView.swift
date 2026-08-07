@@ -123,7 +123,7 @@ struct WalletRulesView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         // Chặn quay lại: luồng onboarding đã xong, không có đường lùi.
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled()

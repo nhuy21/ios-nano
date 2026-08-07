@@ -58,7 +58,7 @@ struct HistoryView: View {
 
             content
         }
-        .background(HistoryColor.screenBg)
+        .screenBackground(HistoryColor.screenBg)
         // `fullScreenCover` nền trong suốt rồi tự vẽ lớp mờ + thẻ, thay cho `sheet` nhiều
         // nấc: sheet co theo nấc nên thẻ dính đáy màn, nền kính mờ của iOS 26 lại để lộ
         // màn phía sau, và vùng mờ của nó không nhận chạm để đóng.

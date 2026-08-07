@@ -40,7 +40,7 @@ struct SecurityView: View {
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
-        .background(Color(hex: 0xF7F8FA))
+        .screenBackground(Color(hex: 0xF7F8FA))
     }
 
     private func row(title: String, systemImage: String, action: @escaping () -> Void) -> some View {

@@ -90,7 +90,7 @@ struct KycReviewView: View {
                 verifyingOverlay
             }
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .task { await verifyC06() }
         .task { _ = await bankCache.get() }
         .alert(

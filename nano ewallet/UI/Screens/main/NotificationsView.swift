@@ -65,7 +65,7 @@ struct NotificationsView: View {
 
             content
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .task { await load() }
         .sheet(item: $billTransaction) { tx in
             TransactionDetailSheet(tx: tx, onDismiss: { billTransaction = nil })

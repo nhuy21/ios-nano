@@ -61,7 +61,7 @@ struct LinkedBanksView: View {
                 .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
             }
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .task {
             await wallet.refresh()
             _ = await bankCache.get()

@@ -24,7 +24,7 @@ struct OtpView: View {
             header
             sheetContent
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .onAppear {
             isFocused = true
             vm.startCountdown()

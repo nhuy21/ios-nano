@@ -25,9 +25,8 @@ struct SplashView: View {
                 .tint(AppColor.brand)
                 .padding(.top, 40)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 48)
-        .background(Color.white)
+        .screenBackground(Color.white, alignment: .center)
         .task {
             await appState.bootstrap()
         }

@@ -192,7 +192,7 @@ struct BankTransferView: View {
             }
             footer
         }
-        .background(Color.white)
+        .screenBackground(Color.white)
         // Bàn phím HỆ THỐNG (ô số TK / nội dung) đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow
         // (xem DismissKeyboardOnTap) — nó cũng nhả @FocusState nên tra cứu tên chủ TK
         // vẫn chạy qua onChange sẵn có. Ở đây chỉ cần lo bàn phím số tự vẽ.

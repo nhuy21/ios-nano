@@ -65,7 +65,7 @@ struct WalletOnboardingChoiceView: View {
             .padding(.horizontal, 24)
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-        .background(Color.white)
+        .screenBackground(Color.white)
     }
 
     private var baoKimCard: some View {

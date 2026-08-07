@@ -86,21 +86,11 @@ struct SettingsView: View {
         }
     }
 
-    /// Tiêu đề "Cá nhân" cố định, không cuộn — mirror header slim riêng bên Android
-    /// (`SettingsScreen.kt`: title nằm ngoài `verticalScroll` Column).
+    /// Banner + card + avatar cuộn CÙNG nội dung, không có tiêu đề rời cố
+    /// định — khác bản cũ (tiêu đề "Cá nhân" đứng yên ngoài ScrollView).
     private var settingsContent: some View {
-        VStack(spacing: 0) {
-            Text("Cá nhân")
-                .font(AppFont.beVietnamPro(20, .bold))
-                .foregroundStyle(AppColor.payInk)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-
-            settingsScrollContent
-        }
-        .background(SettingsColor.screenBg)
+        settingsScrollContent
+        .screenBackground(SettingsColor.screenBg)
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
             Button("Huỷ", role: .cancel) {}
@@ -127,7 +117,7 @@ struct SettingsView: View {
     private var settingsScrollContent: some View {
         ScrollView {
             VStack(spacing: 0) {
-                profileBlock
+                profileHeader
 
                 Spacer().frame(height: 24)
 
@@ -235,25 +225,94 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Profile block
+    // MARK: - Profile header (banner + card + avatar)
 
-    private var profileBlock: some View {
-        VStack(spacing: 8) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-                .frame(width: 80, height: 80)
+    /// Kích thước dùng chung cho phần banner/card/avatar — mirror hằng số bên
+    /// `SettingsScreen.kt` (BANNER_H/CARD_RADIUS/CARD_OVERLAP/AVATAR_SIZE).
+    private enum ProfileHeaderMetrics {
+        static let bannerHeight: CGFloat = 170
+        static let cardRadius: CGFloat = 34
+        static let cardOverlap: CGFloat = 34
+        static let avatarSize: CGFloat = 88
+        static let avatarRing: CGFloat = 4
+    }
+
+    /// Banner tràn lên status bar + card trắng bo góc trên đè lên banner + avatar tròn đè
+    /// đúng đường nối banner/card. Avatar phải là SIBLING của card (không phải con) vì card
+    /// có `.clipShape` sẽ cắt mất nửa trên avatar — mirror đúng cảnh báo trong
+    /// `SettingsScreen.kt` (Box "avatar phải SIBLING, không phải con của ô trắng").
+    private var profileHeader: some View {
+        ZStack(alignment: .top) {
+            // `Color.clear` là view quyết định kích thước (tự co theo khung chứa, KHÔNG có
+            // kích thước riêng); ảnh chỉ VẼ ĐÈ qua `.overlay` + `.clipped()` nên không tham
+            // gia tính layout. Để `Image` làm con trực tiếp của ZStack thì ảnh gốc 1600px
+            // với `.aspectRatio(.fill)` sẽ kéo giãn ZStack, đẩy cả màn tràn ra 2 bên (chữ
+            // "Tài khoản"/"Cài đặt" và icon/toggle hai mép đều bị cắt).
+            Color.clear
+                .frame(height: ProfileHeaderMetrics.bannerHeight)
                 .overlay {
-                    Text(initials)
-                        .font(AppFont.beVietnamPro(28, .heavy))
-                        .foregroundStyle(.white)
+                    Image("banner_home")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
                 }
-                .shadow(color: SettingsColor.accent.opacity(0.25), radius: 10, x: 0, y: 4)
+                .clipped()
+                // Tràn lên cả status bar, không né safe area trên — mirror Android (không có
+                // `statusBarsPadding()` ở banner).
+                .ignoresSafeArea(edges: .top)
 
+            VStack(spacing: 0) {
+                nameSection
+                    .padding(.top, ProfileHeaderMetrics.avatarSize / 2 + 14)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+            }
+            .frame(maxWidth: .infinity)
+            .background(Color.white)
+            .clipShape(
+                .rect(
+                    topLeadingRadius: ProfileHeaderMetrics.cardRadius,
+                    topTrailingRadius: ProfileHeaderMetrics.cardRadius
+                )
+            )
+            .padding(.top, ProfileHeaderMetrics.bannerHeight - ProfileHeaderMetrics.cardOverlap)
+
+            avatar
+                .padding(
+                    .top,
+                    ProfileHeaderMetrics.bannerHeight - ProfileHeaderMetrics.cardOverlap
+                        - ProfileHeaderMetrics.avatarSize / 2
+                )
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var avatar: some View {
+        Circle()
+            .fill(Color.white)
+            .frame(
+                width: ProfileHeaderMetrics.avatarSize + ProfileHeaderMetrics.avatarRing * 2,
+                height: ProfileHeaderMetrics.avatarSize + ProfileHeaderMetrics.avatarRing * 2
+            )
+            .overlay {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    )
+                    .frame(width: ProfileHeaderMetrics.avatarSize, height: ProfileHeaderMetrics.avatarSize)
+                    .overlay {
+                        Text(initials)
+                            .font(AppFont.beVietnamPro(28, .heavy))
+                            .foregroundStyle(.white)
+                    }
+            }
+            .shadow(color: SettingsColor.accent.opacity(0.25), radius: 10, x: 0, y: 4)
+    }
+
+    private var nameSection: some View {
+        VStack(spacing: 8) {
             Text(displayName)
                 .font(AppFont.beVietnamPro(18, .bold))
                 .foregroundStyle(AppColor.payInk)

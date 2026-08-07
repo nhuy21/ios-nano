@@ -101,8 +101,11 @@ struct MainTabView: View {
                     .tag(Tab.settings)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            // Vuốt quá trang đầu/cuối không nảy ra dải xám ở đáy.
-            .ignoresSafeArea(.container, edges: .bottom)
+            // Vuốt quá trang đầu/cuối không nảy ra dải xám ở đáy. Mở CẢ `.top`: `TabView`
+            // clip từng trang theo bounds của nó, chỉ mở đáy thì nền của Home/Cá nhân bị
+            // chặn đúng mép trên safe area — hở dải trắng ở status bar (các màn ngoài
+            // TabView như Login không dính vì không bị clip như vậy).
+            .ignoresSafeArea(.container, edges: [.top, .bottom])
         }
         // Mở app hàng ngày -> vào thẳng màn quét QR. CHỈ mở khi không còn deep link nào
         // chờ, nếu không sẽ đè lên link nhận tiền mà người dùng vừa bấm.

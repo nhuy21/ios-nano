@@ -124,7 +124,7 @@ struct WelcomeBackView: View {
             .padding(.horizontal, 24)
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-        .background(Color.white)
+        .screenBackground(Color.white)
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $vm.showDeviceConflict) {
             DeviceConflictDialog(

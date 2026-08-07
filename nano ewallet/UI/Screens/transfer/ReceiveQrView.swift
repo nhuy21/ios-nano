@@ -44,25 +44,58 @@ struct ReceiveQrView: View {
     private var displayName: String { wallet.accName ?? "Ví Nano" }
     private var displayNo: String { wallet.bkUsername ?? "—" }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            ScrollView {
-                VStack(spacing: 16) {
-                    billCard
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-            }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-            actionRow
-        }
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x17A06B), Color(hex: 0x00754A)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
+    /// Gradient thương hiệu làm nền dự phòng (mép hở khi tỉ lệ màn khác ảnh
+    /// thì vẫn ra xanh thương hiệu chứ không hở nền trắng) + ảnh `background_nano` phủ toàn
+    /// màn — ảnh đã có sẵn hoạ tiết nên không cần vẽ thêm lớp trang trí nào khác.
+    /// `.ignoresSafeArea()` đặt NGAY TRÊN layer này (không phải ở ZStack cha) — theo đúng
+    /// pattern chuẩn: nền/ảnh trang trí ignore safe area, nội dung tương tác (header/nút)
+    /// vẫn tôn trọng safe area như bình thường.
+    private var brandBackground: some View {
+        // Gradient là view GỐC quyết định kích thước (tự co giãn theo khung chứa, không có
+        // kích thước riêng); ảnh đưa vào `.overlay` + `.clipped()` nên nó chỉ VẼ ĐÈ lên,
+        // KHÔNG tham gia tính layout. Để ảnh là con trực tiếp của ZStack thì ảnh gốc
+        // 1600px với `.scaledToFill()` sẽ kéo giãn ZStack, đẩy cả màn hình tràn ra 2 bên.
+        LinearGradient(
+            colors: [Color(hex: 0x00A85E), Color(hex: 0x007E47)],
+            startPoint: .top, endPoint: .bottom
         )
+        .overlay {
+            Image("background_nano")
+                .resizable()
+                .scaledToFill()
+        }
+        // KHÔNG dùng `.clipped()` ở đây: nó cắt ảnh theo bounds TẠI THỜI ĐIỂM gọi, nên đặt
+        // trước `.ignoresSafeArea()` thì vùng status bar mở thêm ra chỉ còn gradient trơn
+        // (mất hoạ tiết ảnh), còn đặt sau thì cắt lại đúng phần vừa mở. Không cần nó nữa —
+        // `.overlay` vốn đã không cho ảnh tham gia tính layout, đó mới là thứ chống tràn.
+        .ignoresSafeArea()
+    }
+
+    var body: some View {
+        ZStack {
+            // Đặt RIÊNG ở layer đáy, tự giãn hết bounds nhờ `.ignoresSafeArea()` của chính
+            // nó — `VStack` nội dung bên dưới KHÔNG ignoresSafeArea nên vẫn tôn trọng safe
+            // area như bình thường (header không đè lên đồng hồ/pin), trong khi nền vẫn
+            // tràn hết lên status bar/home indicator.
+            brandBackground
+
+            VStack(spacing: 0) {
+                header
+                ScrollView {
+                    VStack(spacing: 16) {
+                        billCard
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
+                }
+                .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
+                actionRow
+            }
+        }
+        // Màn tự vẽ header/nút back riêng (nút "arrow.left" ở trên) — thiếu modifier này thì
+        // navigation bar hệ thống (dù ẩn UI) vẫn chừa khoảng trên, khiến `brandBackground`
+        // dù đã `.ignoresSafeArea()` cũng không tràn hết lên được status bar.
+        .hidesSystemNavigationBar()
         .task { await wallet.refresh() }
         // Dialog phủ TOÀN màn (nền tối riêng) thay vì sheet 240pt — sheet thấp vẫn để lộ
         // màn QR phía sau. Cùng cách Login dựng DeviceConflictDialog/DeviceOtpDialog.

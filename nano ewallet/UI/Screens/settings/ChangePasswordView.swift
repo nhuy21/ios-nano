@@ -54,7 +54,7 @@ struct ChangePasswordView: View {
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
-        .background(Color(hex: 0xF7F8FA))
+        .screenBackground(Color(hex: 0xF7F8FA))
         .alert("Đổi mật khẩu thành công", isPresented: $vm.showSuccess) {
             Button("Xong") { onBack() }
         } message: {
