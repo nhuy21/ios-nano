@@ -79,14 +79,25 @@ final class BankCache: ObservableObject {
     private init() {}
 
     @Published private(set) var banks: [Bank] = []
-    private var isLoading = false
+    /// Lượt tải đang chạy — lời gọi trùng CHỜ nó thay vì tự gọi API lần nữa.
+    ///
+    /// Trước đây chỉ có cờ `isLoading` và lời gọi trúng lúc đang tải sẽ nhận về mảng RỖNG
+    /// ngay lập tức. Màn nào copy kết quả đó vào `@State` trong `.task` (chạy đúng một lần)
+    /// là ôm danh sách rỗng vĩnh viễn — đúng lỗi "bấm chọn ngân hàng mà danh sách trống".
+    private var loadTask: Task<[Bank], Never>?
 
     func get() async -> [Bank] {
-        if !banks.isEmpty || isLoading { return banks }
-        isLoading = true
-        defer { isLoading = false }
-        banks = (try? await BankService.list()) ?? []
-        return banks
+        if !banks.isEmpty { return banks }
+        if let loadTask { return await loadTask.value }
+
+        let task = Task<[Bank], Never> { [weak self] in
+            let fetched = (try? await BankService.list()) ?? []
+            self?.banks = fetched
+            self?.loadTask = nil
+            return fetched
+        }
+        loadTask = task
+        return await task.value
     }
 
     func bank(bin: String?) -> Bank? {

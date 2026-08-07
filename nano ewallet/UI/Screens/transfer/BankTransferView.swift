@@ -38,6 +38,7 @@ struct BankTransferView: View {
     @StateObject private var bankCache = BankCache.shared
     @StateObject private var wallet = WalletStore.shared
     @StateObject private var authStore = AuthStore.shared
+    @StateObject private var beneficiaryStore = BeneficiaryStore.shared
 
     private let recipientLocked: Bool
     private let amountEditable: Bool
@@ -61,6 +62,10 @@ struct BankTransferView: View {
     @State private var amount: Int64
     @State private var content: String
     @FocusState private var isContentFocused: Bool
+
+    /// Mirror `saveRecipient` bên `WalletTransferAmountView` — mặc định bật, người dùng tắt
+    /// được nếu không muốn lưu.
+    @State private var saveRecipient = true
 
     @StateObject private var speech = SpeechRecognizerService()
     /// Báo ngắn khi nghe không ra số / mic không dùng được.
@@ -120,6 +125,15 @@ struct BankTransferView: View {
     }
 
     private var selectedBank: Bank? { bankCache.banks.first { $0.bin == selectedBin } }
+
+    /// Người nhận đã nằm trong danh bạ -> ẩn luôn toggle "Lưu vào danh bạ".
+    /// Khớp theo CẢ số tài khoản LẪN ngân hàng: cùng một dãy số vẫn là hai người khác nhau
+    /// ở hai nhà băng khác nhau.
+    private var alreadySaved: Bool {
+        beneficiaryStore.beneficiaries.contains {
+            $0.type == .bankAccount && $0.accNo == accountNumber && $0.bankNo == selectedBin
+        }
+    }
 
     private var bankNameForSubmit: String { selectedBank?.shortName ?? initialDraft?.bankName ?? "Ngân hàng" }
 
@@ -187,6 +201,11 @@ struct BankTransferView: View {
                     recipientCard
                     amountSection
                     contentSection
+                    // Chỉ hiện khi đã chọn đủ ngân hàng + số TK và người nhận CHƯA có trong
+                    // danh bạ — bật sẵn toggle lúc chưa biết lưu ai thì vô nghĩa.
+                    if recipientReady, !alreadySaved {
+                        saveToggle
+                    }
                 }
                 .padding(16)
             }
@@ -674,6 +693,17 @@ struct BankTransferView: View {
         .buttonStyle(.plain)
     }
 
+    /// Mirror `saveToggle` bên `WalletTransferAmountView` để hai luồng chuyển tiền nhìn
+    /// như một.
+    private var saveToggle: some View {
+        Toggle(isOn: $saveRecipient) {
+            Text("Lưu vào danh bạ")
+                .font(AppFont.beVietnamPro(14))
+                .foregroundStyle(AppColor.payInk)
+        }
+        .tint(AppColor.brand)
+    }
+
     // MARK: - Nội dung
 
     private var contentSection: some View {
@@ -1026,6 +1056,16 @@ struct BankTransferView: View {
         }
         pendingTransactionId = nil
         let elapsed = submitStartedAt.map { Date().timeIntervalSince($0) }
+        // `alreadySaved` phải kiểm lại ở đây: khi người nhận đã có trong danh bạ thì toggle
+        // bị ẩn nhưng `saveRecipient` vẫn còn true -> tạo trùng bản ghi. Mirror đúng cách
+        // `WalletTransferAmountView.handleResult` đang làm.
+        if saveRecipient, !alreadySaved, let bankNo = selectedBin, !accountNumber.isEmpty {
+            _ = try? await BeneficiaryStore.shared.create(
+                CreateBeneficiaryRequest(
+                    type: .bankAccount, bankNo: bankNo, accNo: accountNumber, accName: holderName
+                )
+            )
+        }
         if let payLinkToken {
             await PayLinkService.consume(reqToken: payLinkToken, txId: result.transId)
         }

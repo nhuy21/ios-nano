@@ -2,22 +2,30 @@
 //  AddContactSheet.swift
 //  nano ewallet
 //
-//  Mirror AddContactSheet.kt — CHỈ hỗ trợ thêm contact loại Ngân hàng (BANK_ACCOUNT),
-//  đúng bản gốc Android (createWallet có sẵn ở service nhưng không có UI gọi).
+//  Mirror AddContactSheet.kt — thêm contact ngân hàng (BANK_ACCOUNT) hoặc ví (WALLET).
+//  Loại do MÀN GỌI quyết định (`type`), không có nút đổi trong form: người dùng luôn vào
+//  đây từ một tab/luồng đã xác định loại rồi, hỏi lại là thừa một bước.
 //
 
 import SwiftUI
 
 struct AddContactSheet: View {
+    /// Loại người nhận cần thêm — quyết định toàn bộ form (ô nhập, cách tra cứu tên).
+    let type: BeneficiaryType
     let onSaved: () -> Void
     let onCancel: () -> Void
 
+    /// Số tài khoản ngân hàng (nhánh `.bankAccount`) hoặc số ví (nhánh `.wallet`).
     @State private var accountNumber = ""
     @State private var nickname = ""
     @State private var selectedBank: Bank?
-    @State private var bankSearch = ""
-    @State private var banks: [Bank] = []
-    @State private var isLoadingBanks = true
+    @State private var showBankSheet = false
+
+    /// Quan sát THẲNG cache thay vì copy vào `@State` riêng: `BankCache.get()` trả về mảng
+    /// RỖNG ngay nếu đang có lượt tải khác chạy dở (`isLoading`), mà `.task` chỉ chạy một
+    /// lần — copy trúng lúc đó là danh sách rỗng vĩnh viễn.
+    @StateObject private var bankCache = BankCache.shared
+    private var banks: [Bank] { bankCache.banks }
 
     @State private var holderName: String?
     @State private var lookupError: String?
@@ -29,17 +37,23 @@ struct AddContactSheet: View {
 
     @FocusState private var isAccountFocused: Bool
 
-    private var filteredBanks: [Bank] {
-        let trimmed = bankSearch.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return banks }
-        return banks.filter {
-            $0.shortName.localizedCaseInsensitiveContains(trimmed)
-                || $0.name.localizedCaseInsensitiveContains(trimmed)
-        }
+    /// `BankPickerSheet` nhận `Binding<String?>` theo BIN, còn form này giữ cả `Bank` để
+    /// hiện logo/tên — cầu nối hai chiều, đồng thời tra lại tên chủ TK ngay khi đổi bank.
+    private var bankBinBinding: Binding<String?> {
+        Binding(
+            get: { selectedBank?.bin },
+            set: { newBin in
+                guard let newBin, newBin != selectedBank?.bin else { return }
+                selectedBank = banks.first { $0.bin == newBin }
+                triggerLookup()
+            }
+        )
     }
 
     private var canSave: Bool {
-        selectedBank != nil && !accountNumber.isEmpty && !(holderName ?? "").isEmpty && !isSaving
+        guard !accountNumber.isEmpty, !(holderName ?? "").isEmpty, !isSaving else { return false }
+        // Ví không có ngân hàng để chọn nên bỏ điều kiện đó, còn lại giống hệt.
+        return type == .wallet || selectedBank != nil
     }
 
     var body: some View {
@@ -48,39 +62,53 @@ struct AddContactSheet: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    fieldBlock(label: "Số tài khoản") {
-                        TextField("", text: $accountNumber, prompt: .appPlaceholder("Nhập số tài khoản..."))
-                            .font(AppFont.beVietnamPro(18, .medium))
-                            .foregroundStyle(AppColor.payInk)
-                            .tint(AppColor.brand)
-                            .keyboardType(.numberPad)
-                            .submitLabel(.done)
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 56)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
-                            }
-                            .focused($isAccountFocused)
-                            .onSubmit { triggerLookup() }
-                            // Chỉ tra cứu khi RỜI focus (bấm ra ngoài/chuyển ô khác) hoặc bấm
-                            // Done — không gọi API mỗi lần gõ ký tự, mirror BankTransferView.
-                            .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
-                                if wasFocused && !isFocused { triggerLookup() }
-                            }
-                            .onChangeCompat(of: accountNumber) { _, newValue in
-                                let filtered = newValue.filter(\.isNumber)
-                                if filtered != newValue {
-                                    accountNumber = filtered
-                                } else if !filtered.isEmpty {
-                                    holderName = nil; lookupError = nil
-                                }
-                            }
+                    // Ngân hàng đứng TRƯỚC số tài khoản: tra cứu tên chủ TK cần cả hai, mà
+                    // chọn ngân hàng sau khi gõ xong số thì phải quay lại sửa — mirror thứ tự
+                    // ở BankTransferView. Ví nội bộ không có bước này.
+                    if type == .bankAccount {
+                        fieldBlock(label: "Ngân hàng") {
+                            bankSelectButton
+                        }
                     }
 
-                    fieldBlock(label: "Tên chủ tài khoản") {
+                    fieldBlock(label: type == .wallet ? "Số ví" : "Số tài khoản") {
+                        TextField(
+                            "", text: $accountNumber,
+                            prompt: .appPlaceholder(
+                                type == .wallet ? "Nhập số ví..." : "Nhập số tài khoản..."
+                            )
+                        )
+                        .font(AppFont.beVietnamPro(18, .medium))
+                        .foregroundStyle(AppColor.payInk)
+                        .tint(AppColor.brand)
+                        .keyboardType(.numberPad)
+                        .submitLabel(.done)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 56)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+                        }
+                        .focused($isAccountFocused)
+                        .onSubmit { triggerLookup() }
+                        // Chỉ tra cứu khi RỜI focus (bấm ra ngoài/chuyển ô khác) hoặc bấm
+                        // Done — không gọi API mỗi lần gõ ký tự, mirror BankTransferView.
+                        .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
+                            if wasFocused && !isFocused { triggerLookup() }
+                        }
+                        .onChangeCompat(of: accountNumber) { _, newValue in
+                            let filtered = newValue.filter(\.isNumber)
+                            if filtered != newValue {
+                                accountNumber = filtered
+                            } else if !filtered.isEmpty {
+                                holderName = nil; lookupError = nil
+                            }
+                        }
+                    }
+
+                    fieldBlock(label: type == .wallet ? "Tên chủ ví" : "Tên chủ tài khoản") {
                         Text(holderNameDisplay)
                             .font(AppFont.beVietnamPro(15, .semibold))
                             .foregroundStyle(holderName != nil ? AppColor.payInk : AppColor.payMuted)
@@ -93,10 +121,6 @@ struct AddContactSheet: View {
 
                     fieldBlock(label: "Tên gợi nhớ (tuỳ chọn)") {
                         AppTextField(text: $nickname, placeholder: "Vd: Mẹ, Tiền nhà...", maxLength: 100)
-                    }
-
-                    fieldBlock(label: "Ngân hàng") {
-                        bankPicker
                     }
 
                     if let saveError {
@@ -117,15 +141,41 @@ struct AddContactSheet: View {
             .padding(20)
         }
         .background(Color(hex: 0xF7F8FA))
+        // `fullScreenCover` chứ KHÔNG phải `.sheet`: màn này bản thân đã là một sheet
+        // (mở từ ContactsView), mà iOS không hiện sheet lồng trong sheet — bấm nút chọn
+        // ngân hàng sẽ không thấy gì.
+        //
+        // `BankPickerSheet` vốn dựng cho `.sheet` (chỉ có thanh kéo, không có nút đóng) nên
+        // phải tự thêm nút Đóng, không thì kẹt trong đó không thoát ra được.
+        .fullScreenCover(isPresented: $showBankSheet) {
+            VStack(spacing: 0) {
+                BankPickerSheet(
+                    banks: banks,
+                    selectedBin: bankBinBinding,
+                    onDismiss: { showBankSheet = false }
+                )
+
+                Button("Đóng") { showBankSheet = false }
+                    .buttonStyle(.plain)
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(AppColor.brand)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .contentShape(Rectangle())
+            }
+            .background(Color.white)
+        }
         .task {
-            banks = await BankCache.shared.get()
-            isLoadingBanks = false
+            // Nhánh ví không chọn ngân hàng nên khỏi tải danh sách. Kết quả tự về qua
+            // `@Published banks` của cache, không cần gán lại vào state.
+            guard type == .bankAccount else { return }
+            _ = await bankCache.get()
         }
     }
 
     private var header: some View {
         HStack {
-            Text("Thêm người nhận")
+            Text(type == .wallet ? "Thêm người nhận ví" : "Thêm người nhận ngân hàng")
                 .font(AppFont.beVietnamPro(18, .bold))
                 .foregroundStyle(AppColor.payInk)
             Spacer()
@@ -159,73 +209,56 @@ struct AddContactSheet: View {
         if isLookingUp { return "Đang tra cứu..." }
         if let holderName { return holderName.uppercased() }
         if let lookupError { return lookupError }
+        if type == .wallet { return "Nhập số ví để tra cứu" }
         if selectedBank == nil { return "Chọn ngân hàng bên dưới" }
         return "Nhập số tài khoản để tra cứu"
     }
 
-    private var bankPicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColor.payMuted)
-                TextField("", text: $bankSearch, prompt: .appPlaceholder("Tìm ngân hàng..."))
-                    .font(AppFont.beVietnamPro(14))
-                    .foregroundStyle(AppColor.payInk)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
-            }
-
-            if isLoadingBanks {
-                Text("Đang tải danh sách ngân hàng...")
-                    .font(AppFont.beVietnamPro(13))
-                    .foregroundStyle(AppColor.payMuted)
-                    .padding(.top, 8)
-            } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
-                    ForEach(filteredBanks) { bank in
-                        bankCell(bank)
-                    }
-                }
-            }
-        }
-    }
-
-    private func bankCell(_ bank: Bank) -> some View {
-        let isSelected = selectedBank?.id == bank.id
-        return Button {
-            selectedBank = bank
-            triggerLookup()
+    /// Ô bấm mở `BankPickerSheet` (sheet dùng chung với màn chuyển khoản) thay cho lưới
+    /// logo 4 cột trước đây: danh sách ngân hàng dài, nhét cả lưới vào form làm ô nhập số
+    /// tài khoản bị đẩy khuất tận đáy.
+    private var bankSelectButton: some View {
+        Button {
+            isAccountFocused = false
+            showBankSheet = true
         } label: {
-            VStack(spacing: 4) {
-                Group {
-                    if let logoUrl = bank.logoUrl, let url = URL(string: logoUrl) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().aspectRatio(contentMode: .fit)
-                        } placeholder: {
+            HStack(spacing: 12) {
+                if let bank = selectedBank {
+                    Group {
+                        if let logoUrl = bank.logoUrl, let url = URL(string: logoUrl) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().aspectRatio(contentMode: .fit)
+                            } placeholder: {
+                                bankFallback(bank)
+                            }
+                        } else {
                             bankFallback(bank)
                         }
-                    } else {
-                        bankFallback(bank)
                     }
-                }
-                .frame(width: 48, height: 48)
-                .clipShape(Circle())
-                .overlay {
-                    Circle().strokeBorder(isSelected ? AppColor.brand : Color.clear, lineWidth: 2)
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
                 }
 
-                Text(bank.shortName)
-                    .font(AppFont.beVietnamPro(10))
-                    .foregroundStyle(AppColor.payInk)
+                Text(selectedBank?.shortName ?? "Chọn ngân hàng")
+                    .font(AppFont.beVietnamPro(16, .medium))
+                    .foregroundStyle(selectedBank == nil ? AppColor.payPlaceholder : AppColor.payInk)
                     .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(AppColor.payMuted)
             }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 56)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -245,11 +278,25 @@ struct AddContactSheet: View {
         lookupTask?.cancel()
         holderName = nil
         lookupError = nil
-        guard let bin = selectedBank?.bin, accountNumber.count >= 6 else { return }
+        guard accountNumber.count >= 6 else { return }
+        // Ví tra qua wallet/verify-beneficiary (chỉ cần số ví), ngân hàng vẫn cần bin đã chọn.
+        var bin: String?
+        if type == .bankAccount {
+            guard let selected = selectedBank?.bin else { return }
+            bin = selected
+        }
+        let username = accountNumber
         lookupTask = Task {
             isLookingUp = true
             do {
-                let name = try await BankService.lookupAccount(bin: bin, accountNumber: accountNumber)
+                let name: String
+                if let bin {
+                    name = try await BankService.lookupAccount(bin: bin, accountNumber: username)
+                } else {
+                    name = try await TransferService.verifyBeneficiary(
+                        VerifyBeneficiaryRequest(benUsername: username)
+                    )
+                }
                 guard !Task.isCancelled else { return }
                 holderName = name
             } catch {
@@ -261,19 +308,35 @@ struct AddContactSheet: View {
     }
 
     private func save() {
-        guard let bank = selectedBank, let holderName else { return }
+        guard let holderName else { return }
+        let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
+        // Hai loại gửi hai bộ field khác nhau: BE bật forbidNonWhitelisted nên gửi thừa
+        // field của loại kia sẽ bị từ chối.
+        let request: CreateBeneficiaryRequest
+        switch type {
+        case .bankAccount:
+            guard let bank = selectedBank else { return }
+            request = CreateBeneficiaryRequest(
+                type: .bankAccount,
+                bankNo: bank.bin,
+                accNo: accountNumber,
+                accName: holderName,
+                nickname: trimmedNickname.isEmpty ? nil : trimmedNickname
+            )
+        case .wallet:
+            // Thứ tự tham số phải khớp thứ tự khai báo trong `CreateBeneficiaryRequest`
+            // (accName đứng trước benUsername) — memberwise init không cho đảo.
+            request = CreateBeneficiaryRequest(
+                type: .wallet,
+                accName: holderName,
+                benUsername: accountNumber,
+                nickname: trimmedNickname.isEmpty ? nil : trimmedNickname
+            )
+        }
         isSaving = true
         saveError = nil
         Task {
             do {
-                let request = CreateBeneficiaryRequest(
-                    type: .bankAccount,
-                    bankNo: bank.bin,
-                    accNo: accountNumber,
-                    accName: holderName,
-                    nickname: nickname.trimmingCharacters(in: .whitespaces).isEmpty
-                        ? nil : nickname.trimmingCharacters(in: .whitespaces)
-                )
                 _ = try await BeneficiaryStore.shared.create(request)
                 isSaving = false
                 onSaved()
@@ -286,5 +349,5 @@ struct AddContactSheet: View {
 }
 
 #Preview {
-    AddContactSheet(onSaved: {}, onCancel: {})
+    AddContactSheet(type: .bankAccount, onSaved: {}, onCancel: {})
 }

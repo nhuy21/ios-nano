@@ -12,7 +12,8 @@ import Combine
 
 struct ContactsView: View {
     let onBack: () -> Void
-    /// Lọc theo loại khi mở từ 1 luồng cụ thể — nil = hiện cả 2 loại.
+    /// Khoá theo loại khi mở từ 1 luồng cụ thể — nil = mở từ Trang chủ, hiện tab cho user
+    /// tự chọn loại. Danh sách LUÔN chỉ hiện một loại tại một thời điểm.
     var filterType: BeneficiaryType?
     var onPickForTransfer: (Beneficiary) -> Void = { _ in }
     var onPickForWalletTransfer: (_ name: String, _ sub: String) -> Void = { _, _ in }
@@ -23,6 +24,12 @@ struct ContactsView: View {
     @State private var showAdd = false
     @State private var actionTarget: Beneficiary?
     @State private var editTarget: Beneficiary?
+    /// Tab đang chọn khi mở từ Trang chủ (`filterType == nil`). Mặc định ví vì đây là
+    /// loại chuyển tiền chính của app, ngân hàng chỉ là kênh phụ.
+    @State private var selectedType: BeneficiaryType = .wallet
+
+    /// Loại đang hiển thị thật sự: luồng chuyển tiền khoá cứng, còn lại theo tab.
+    private var activeType: BeneficiaryType { filterType ?? selectedType }
 
     private var title: String {
         switch filterType {
@@ -33,8 +40,7 @@ struct ContactsView: View {
     }
 
     private var typedContacts: [Beneficiary] {
-        guard let filterType else { return store.beneficiaries }
-        return store.beneficiaries.filter { $0.type == filterType }
+        store.beneficiaries.filter { $0.type == activeType }
     }
 
     private var filtered: [Beneficiary] {
@@ -43,19 +49,27 @@ struct ContactsView: View {
         return typedContacts.filter {
             $0.displayName.localizedCaseInsensitiveContains(trimmed)
                 || ($0.accNo?.contains(trimmed) ?? false)
+                // Liên hệ ví không có accNo — thiếu vế này thì gõ số ví không ra kết quả nào.
+                || ($0.benUsername?.localizedCaseInsensitiveContains(trimmed) ?? false)
         }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             header
+            // Chỉ mở từ Trang chủ mới cho đổi loại; vào từ luồng chuyển tiền thì loại đã
+            // do luồng quyết định, hiện tab ở đây chỉ tạo cơ hội chọn nhầm.
+            if filterType == nil {
+                typePicker
+            }
             searchBar
             content
         }
         .screenBackground(Color(hex: 0xF7F8FA))
         .task { _ = await store.get() }
         .sheet(isPresented: $showAdd) {
-            AddContactSheet(onSaved: {
+            // Truyền thẳng loại đang xem để form mở đúng chế độ, khỏi hỏi lại người dùng.
+            AddContactSheet(type: activeType, onSaved: {
                 showAdd = false
                 Task { await store.refresh() }
             }, onCancel: { showAdd = false })
@@ -141,12 +155,51 @@ struct ContactsView: View {
         )
     }
 
+    /// Tab Ví / Ngân hàng — hai loại người nhận dùng API và màn chuyển tiền khác hẳn nhau
+    /// nên tách hẳn danh sách thay vì trộn chung rồi phân biệt bằng dòng phụ đề.
+    ///
+    /// Tự vẽ thay `Picker(.segmented)`: segmented control của hệ thống ghim cứng chiều cao
+    /// ~32pt, không nới ra được, nhìn chật so với phần còn lại của màn.
+    private var typePicker: some View {
+        HStack(spacing: 6) {
+            typeTab(.wallet, title: "Ví")
+            typeTab(.bankAccount, title: "Ngân hàng")
+        }
+        .padding(4)
+        .background(Color(hex: 0xEDEFF2))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+    }
+
+    private func typeTab(_ type: BeneficiaryType, title: String) -> some View {
+        let isSelected = selectedType == type
+        return Button {
+            selectedType = type
+        } label: {
+            Text(title)
+                .font(AppFont.beVietnamPro(14, isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? AppColor.payInk : AppColor.payMuted)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(isSelected ? Color.white : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14))
                 .foregroundStyle(AppColor.payMuted)
-            TextField("", text: $searchText, prompt: .appPlaceholder("Tìm theo tên, số tài khoản..."))
+            TextField(
+                "", text: $searchText,
+                prompt: .appPlaceholder(
+                    activeType == .wallet ? "Tìm theo tên, số ví..." : "Tìm theo tên, số tài khoản..."
+                )
+            )
                 .font(AppFont.beVietnamPro(14))
                 .foregroundStyle(AppColor.payInk)
             if !searchText.isEmpty {
@@ -184,8 +237,10 @@ struct ContactsView: View {
                 actionTitle: "Thử lại", action: { Task { await store.refresh() } }
             )
         } else if typedContacts.isEmpty {
+            // Nói rõ đang trống loại NÀO: user có thể đã lưu liên hệ ở tab kia và tưởng
+            // danh bạ mất sạch.
             message(
-                title: "Danh bạ trống",
+                title: activeType == .wallet ? "Chưa có liên hệ ví nào" : "Chưa có liên hệ ngân hàng nào",
                 subtitle: "Thêm người nhận để chuyển tiền nhanh hơn lần sau",
                 actionTitle: "Thêm người nhận", action: { showAdd = true }
             )

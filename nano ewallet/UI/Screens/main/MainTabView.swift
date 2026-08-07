@@ -170,7 +170,8 @@ struct MainTabView: View {
                     selectedTab = .home
                     homePath.removeAll()
                 },
-                onEmergency: { openOnHome(.contacts) }
+                // "Cấp cứu" = xin tiền, chỉ chạy được giữa hai ví nội bộ nên khoá danh bạ ví.
+                onEmergency: { openOnHome(.contacts(filter: .wallet)) }
             )
         }
     }

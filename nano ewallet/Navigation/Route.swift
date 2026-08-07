@@ -34,7 +34,10 @@ enum SettingsRoute: Hashable {
 /// Route con của tab Home.
 enum HomeRoute: Hashable {
     case history
-    case contacts
+    /// Danh bạ. `filter == nil`: mở từ Trang chủ — hiện tab Ví/Ngân hàng để user tự chọn.
+    /// `filter != nil`: mở từ một luồng chuyển tiền cụ thể — khoá cứng đúng loại đó, vì
+    /// chọn nhầm loại người nhận sẽ đưa vào màn chuyển tiền sai.
+    case contacts(filter: BeneficiaryType?)
     /// Hộp thư thông báo — mirror NotificationScreen.kt.
     case notifications
     /// Nút "Liên kết" trên balance card — Android mở thẳng màn ngân hàng liên kết

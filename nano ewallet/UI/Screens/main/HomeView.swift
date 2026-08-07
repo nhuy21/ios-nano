@@ -200,9 +200,10 @@ struct HomeView: View {
             )
         case .linkedBanks:
             LinkedBanksView(onBack: { if !path.isEmpty { path.removeLast() } })
-        case .contacts:
+        case .contacts(let filter):
             ContactsView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
+                filterType: filter,
                 // Chọn từ danh bạ = người nhận đã xác thực -> vào THẲNG màn nhập số tiền.
                 onPickForTransfer: { beneficiary in
                     path.append(.bankTransfer(draft: BankTransferDraft(
@@ -226,7 +227,7 @@ struct HomeView: View {
                 onHome: { path.removeAll() },
                 initialDraft: draft,
                 onSuccess: { info in path.append(.transferSuccess(info)) },
-                onOpenContacts: { path.append(.contacts) }
+                onOpenContacts: { path.append(.contacts(filter: .bankAccount)) }
             )
         // Hai route, MỘT màn: luồng chuyển ví giờ gộp số ví + số tiền + lời nhắn vào cùng
         // màn. `.walletTransfer(nil)` = nhập tay, có draft = người nhận đã khoá.
@@ -235,7 +236,7 @@ struct HomeView: View {
                 draft: draft,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onSuccess: { info in path.append(.transferSuccess(info)) },
-                onOpenContacts: { path.append(.contacts) },
+                onOpenContacts: { path.append(.contacts(filter: .wallet)) },
                 onHome: { path.removeAll() }
             )
         case .walletTransferAmount(let draft):
@@ -510,7 +511,7 @@ struct HomeView: View {
                     // "Cấp cứu": mở danh bạ ví ở chế độ xin tiền -> chọn 1 người là vào
                     // thẳng Cuộc thoại để nhập số tiền cần xin.
                     pillButton(icon: .requestMoney, title: "Cấp cứu") {
-                        path.append(.contacts)
+                        path.append(.contacts(filter: .wallet))
                     }
                 }
                 .padding(.leading, 16)
@@ -818,6 +819,21 @@ struct HomeView: View {
 
     // MARK: - Chuyển tiền nhanh
 
+    /// 10 người nhận hay dùng nhất: ưu tiên SỐ LẦN chuyển, hoà thì lấy người chuyển GẦN ĐÂY
+    /// hơn. Trước đây lấy thẳng thứ tự BE trả (theo ngày tạo) nên người mới thêm mà chưa
+    /// chuyển bao giờ vẫn đứng trên người chuyển hàng tuần.
+    private var quickContacts: [Beneficiary] {
+        beneficiaryStore.beneficiaries
+            .sorted { lhs, rhs in
+                if lhs.useCount != rhs.useCount { return lhs.useCount > rhs.useCount }
+                // `lastUsedAt` là ISO-8601 nên so chuỗi cũng ra đúng thứ tự thời gian.
+                // Chưa dùng lần nào (`nil`) xếp sau cùng.
+                return (lhs.lastUsedAt ?? "") > (rhs.lastUsedAt ?? "")
+            }
+            .prefix(10)
+            .map { $0 }
+    }
+
     private var quickContactsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -826,7 +842,7 @@ struct HomeView: View {
                     .foregroundStyle(AppColor.payInk)
                 Spacer()
                 Button("Xem tất cả") {
-                    path.append(.contacts)
+                    path.append(.contacts(filter: nil))
                 }
                 .buttonStyle(.plain)
                 .font(AppFont.beVietnamPro(13, .semibold))
@@ -839,11 +855,10 @@ struct HomeView: View {
                     // Android dùng Icons.Default.Contacts — thẻ danh bạ có hình người bên
                     // trong, không phải icon 2 người.
                     contactItem(title: "Danh bạ", systemImage: "person.crop.rectangle.fill", isPlain: true) {
-                        path.append(.contacts)
+                        path.append(.contacts(filter: nil))
                     }
 
-                    // Mirror `quickContacts.take(10)` bên Android.
-                    ForEach(beneficiaryStore.beneficiaries.prefix(10)) { beneficiary in
+                    ForEach(quickContacts) { beneficiary in
                         contactAvatarItem(beneficiary)
                     }
                 }
