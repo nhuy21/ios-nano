@@ -116,6 +116,10 @@ struct MainTabView: View {
         // chạy ở Splash) — thiếu nó thì onChange không bao giờ khớp và QR không mở.
         .onChangeCompat(of: deepLinkStore.pendingDefaultQr, initial: true) { _, pending in
             guard pending, !deepLinkStore.hasPendingDeepLink else { return }
+            // Có ảnh vừa chia sẻ đang chờ -> KHÔNG mở QR: người dùng chia sẻ ảnh là đã chọn
+            // xong người nhận rồi, bắt quét thêm một mã nữa là sai ý. Ảnh xử ở nhánh
+            // `scenePhase` bên dưới, chỉ cần nhường chỗ chứ không đụng vào.
+            guard !SharedImageStore.hasPending else { return }
             deepLinkStore.consumeDefaultQr()
             showQrScan = true
         }
