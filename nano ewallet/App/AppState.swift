@@ -113,6 +113,11 @@ final class AppState: ObservableObject {
         // Xoá hộp thư trong bộ nhớ — không xoá thì tài khoản đăng nhập sau sẽ thấy
         // thông báo của tài khoản trước cho tới lần refresh kế tiếp.
         NotificationStore.shared.clear()
+        // Token sinh trắc + khoá ký giao dịch gắn với TÀI KHOẢN vừa đăng xuất. Không xoá
+        // thì mở app lại vẫn quét Face ID chui thẳng vào đúng tài khoản đó — đăng xuất
+        // coi như vô nghĩa. Cùng cách "Đăng nhập bằng tài khoản khác" ở WelcomeBack đang làm.
+        BiometricTokenStore.remove()
+        BiometricKeyStore.deleteKey()
         root = .unauthenticated(lastPhone: nil)
     }
 

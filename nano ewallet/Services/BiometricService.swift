@@ -111,8 +111,12 @@ enum BiometricService {
 
     // MARK: - Đăng nhập
 
-    /// Bật đăng nhập bằng sinh trắc: BE cấp token dài hạn, lưu vào Keychain có ACL sinh trắc.
-    /// Token GỐC chỉ nhận được một lần nên phải ghi ngay.
+    /// Bật đăng nhập bằng sinh trắc: BE cấp token dài hạn, lưu vào Keychain có ACL sinh trắc,
+    /// rồi BẮT QUÉT một lần để xác nhận. Token GỐC chỉ nhận được một lần nên phải ghi ngay.
+    ///
+    /// Bước quét là bắt buộc: `SecItemAdd` (ghi) KHÔNG kích hoạt Face ID, chỉ đọc mới có —
+    /// không đọc thử thì người dùng bật xong chẳng thấy quét gì, và máy hỏng cảm biến vẫn
+    /// bật được để rồi lần đăng nhập sau mới phát hiện.
     static func enableForLogin(password: String) async throws {
         let result = try await client.request(
             .post, "auth/biometric/register",
@@ -125,6 +129,11 @@ enum BiometricService {
             // (BE nghĩ đã bật, máy thì không có token nên không đăng nhập được).
             try? await disableForLogin()
             throw BiometricKeyError.failed("Không lưu được thông tin đăng nhập sinh trắc")
+        }
+        // Đọc lại chính token vừa ghi — iOS tự hiện Face ID vì mục có ACL sinh trắc.
+        guard BiometricTokenStore.read(reason: "Xác nhận bật đăng nhập sinh trắc") != nil else {
+            try? await disableForLogin()
+            throw BiometricKeyError.userCancelled
         }
     }
 
