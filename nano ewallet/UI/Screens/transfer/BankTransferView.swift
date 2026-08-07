@@ -63,9 +63,10 @@ struct BankTransferView: View {
     @State private var content: String
     @FocusState private var isContentFocused: Bool
 
-    /// Mirror `saveRecipient` bên `WalletTransferAmountView` — mặc định bật, người dùng tắt
-    /// được nếu không muốn lưu.
-    @State private var saveRecipient = true
+    /// Mặc định TẮT: chuyển khoản ngân hàng phần lớn là chuyển một lần cho người lạ (trả
+    /// tiền hàng, chia hoá đơn), bật sẵn thì danh bạ đầy những tài khoản không bao giờ dùng
+    /// lại. Muốn lưu thì bật — chủ động một chạm, hơn là phải nhớ tắt mỗi lần.
+    @State private var saveRecipient = false
 
     @StateObject private var speech = SpeechRecognizerService()
     /// Báo ngắn khi nghe không ra số / mic không dùng được.
@@ -773,11 +774,15 @@ struct BankTransferView: View {
     private var footer: some View {
         Group {
             if amountEditable && isAmountFocused {
+                // Nút trên bàn phím gửi giao dịch LUÔN, không chỉ ẩn bàn phím — giống màn
+                // chuyển ví. Chỉ ẩn bàn phím thì người dùng phải bấm thêm "TIẾP TỤC" ngay
+                // bên dưới, thành hai bước cho cùng một ý định.
                 NumericKeypad(
                     onDigit: pushDigit,
                     onBackspace: backspaceDigit,
-                    onNext: { isAmountFocused = false },
-                    nextTitle: "Xong"
+                    onNext: { startTransfer() },
+                    nextTitle: "Tiếp",
+                    nextEnabled: canContinue && !isSubmitting
                 )
             } else {
                 continueButton
