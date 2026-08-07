@@ -6,10 +6,13 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct TransactionDetailSheet: View {
     let tx: TransactionEntity
     let onDismiss: () -> Void
+
+    @StateObject private var toast = ToastState()
 
     var body: some View {
         ScrollView {
@@ -48,7 +51,11 @@ struct TransactionDetailSheet: View {
                     }
 
                     if let accNo = tx.benAccNo {
-                        detailRow(label: tx.benBankName != nil ? "Số tài khoản" : "Số ví", value: accNo)
+                        detailRow(
+                            label: tx.benBankName != nil ? "Số tài khoản" : "Số ví",
+                            value: accNo,
+                            copyable: true
+                        )
                     }
 
                     if let bankName = tx.benBankName {
@@ -103,6 +110,9 @@ struct TransactionDetailSheet: View {
         // đọc được. Ghim nền sáng cho khớp Android (bên đó là `Color.White` cứng).
         .background(AppColor.bgSoft)
         .presentationDragIndicator(.hidden)
+        // Toast nổi trong CHÍNH sheet này, không phải ở màn phía sau — sheet che gần hết
+        // màn nên toast của màn dưới sẽ bị khuất.
+        .toast(toast, bottomPadding: 24)
     }
 
     private var statusBadge: some View {
@@ -116,9 +126,15 @@ struct TransactionDetailSheet: View {
             .clipShape(Capsule())
     }
 
-    private func detailRow(label: String, value: String) -> some View {
+    /// - Parameter copyable: có nút sao chép ở cuối hàng không. Chỉ bật cho những giá trị
+    ///   người dùng thật sự cần chép lại (số ví, số tài khoản) — bật tràn lan thì hàng nào
+    ///   cũng có icon, rối mà chẳng ai dùng.
+    private func detailRow(label: String, value: String, copyable: Bool = false) -> some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top) {
+            // Hàng có nút copy canh GIỮA: nút cao 32pt còn chữ chỉ ~16pt, canh `.top` sẽ
+            // kéo nhãn/giá trị dính lên mép trên trong khi nút chiếm hết chiều cao hàng.
+            // Hàng thường vẫn `.top` để nội dung dài nhiều dòng canh đúng mép trên như cũ.
+            HStack(alignment: copyable ? .center : .top) {
                 Text(label)
                     .font(AppFont.beVietnamPro(13))
                     .foregroundStyle(AppColor.payMuted)
@@ -128,6 +144,25 @@ struct TransactionDetailSheet: View {
                     .foregroundStyle(AppColor.payInk)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .multilineTextAlignment(.trailing)
+
+                if copyable {
+                    Button {
+                        UIPasteboard.general.string = value
+                        toast.show("Đã sao chép \(label.lowercased())")
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppColor.brand)
+                            // Rộng ngang để dễ bấm, nhưng KHÔNG cao hơn chữ (20pt) — để
+                            // 32pt thì riêng hàng này cao vống lên, lệch nhịp với các hàng
+                            // còn lại. Phần chạm hụt bù bằng `padding(.vertical, 10)` của
+                            // cả hàng, tổng vùng chạm vẫn ~40pt.
+                            .frame(width: 32, height: 20)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Sao chép \(label.lowercased())")
+                }
             }
             .padding(.vertical, 10)
             // Màu cố định thay `Divider()`: `Divider` lấy màu ngăn cách của hệ thống, đổi
