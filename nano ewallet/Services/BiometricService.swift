@@ -21,13 +21,24 @@ enum BiometricService {
 
     // MARK: - Xác thực giao dịch
 
-    /// Bật xác thực giao dịch bằng sinh trắc: sinh khoá trong Secure Enclave rồi đăng ký public
-    /// key. Cần mật khẩu để chứng minh là chủ tài khoản (BE bắt buộc).
+    /// Bật xác thực giao dịch bằng sinh trắc: sinh khoá trong Secure Enclave, BẮT quét sinh
+    /// trắc 1 lần để xác nhận máy quét được (khoá vừa tạo chưa từng dùng để ký nên KHÔNG tự
+    /// biết cảm biến hoạt động đúng cho tới lần ký thật đầu tiên), rồi mới đăng ký public key.
+    /// Cần mật khẩu để chứng minh là chủ tài khoản (BE bắt buộc).
     ///
-    /// Sinh khoá TRƯỚC khi gọi API nhưng chỉ giữ lại nếu API thành công — sai mật khẩu thì xoá
-    /// khoá vừa sinh, không để lại khoá mồ côi mà BE không biết.
+    /// Sinh khoá TRƯỚC khi gọi API nhưng chỉ giữ lại nếu cả bước quét xác nhận LẪN API đều
+    /// thành công — sai mật khẩu, huỷ quét, hoặc cảm biến lỗi thì xoá khoá vừa sinh, không để
+    /// lại khoá mồ côi mà BE không biết.
     static func enableForTransfer(password: String) async throws -> RegisterBiometricResult {
         let publicKey = try BiometricKeyStore.createKey()
+        do {
+            // Ký thử payload rỗng — chỉ để trigger Face ID/Touch ID xác nhận cảm biến hoạt
+            // động đúng NGAY lúc bật, không đợi tới lần ký giao dịch thật đầu tiên mới biết.
+            _ = try BiometricKeyStore.sign(payload: "", reason: "Xác nhận bật xác thực sinh trắc")
+        } catch {
+            BiometricKeyStore.deleteKey()
+            throw error
+        }
         do {
             return try await client.request(
                 .post, "wallet/biometric/register",
