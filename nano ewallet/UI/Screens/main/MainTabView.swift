@@ -128,6 +128,14 @@ struct MainTabView: View {
             _ = deepLinkStore.consumePayToken()
             Task { await resolvePayLink(token: token) }
         }
+        // Ảnh chia sẻ từ app khác (chụp màn hình tin nhắn CK, ảnh QR) — Share Extension đã
+        // ghi vào App Group rồi mở app. Bóc tách bằng ĐÚNG `OneTouchResolver.resolve(image:)`
+        // mà nút "Chọn ảnh trong thư viện" đang dùng, nên kết quả giống hệt.
+        .onChangeCompat(of: deepLinkStore.pendingSharedImage, initial: true) { _, pending in
+            guard pending else { return }
+            deepLinkStore.consumeSharedImage()
+            Task { await resolveSharedImage() }
+        }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
         // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
         // Cả 2 draft đều nil vì đây là mở màn NHẬP TAY, không phải "Chuyển cho <tên>" có sẵn
@@ -186,6 +194,21 @@ struct MainTabView: View {
         showQrScan = false
         selectedTab = .home
         homePath.append(route)
+    }
+
+    /// Bóc tách ảnh vừa chia sẻ từ app khác. Dùng lại `payLinkError` để báo lỗi thay vì
+    /// thêm alert riêng: hai luồng đều là "mở app từ ngoài rồi vào thẳng màn chuyển tiền",
+    /// lỗi hiện cùng một chỗ cho nhất quán.
+    private func resolveSharedImage() async {
+        guard let image = SharedImageStore.consumePending() else { return }
+        switch await OneTouchResolver.resolve(image: image) {
+        case .bank(let draft):
+            openOnHome(.bankTransfer(draft: draft))
+        case .wallet(let draft):
+            openOnHome(.walletTransferAmount(draft))
+        case .failure(let message):
+            payLinkError = message
+        }
     }
 
     /// App tự điền sẵn vào màn chuyển tiền sau khi resolve — mirror MainActivity.kt:

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CFBundleDisplayName</key>
+		<string>Nano Ewallet</string>
+		<key>NSExtension</key>
+		<dict>
+			<key>NSExtensionAttributes</key>
+			<dict>
+				<!-- Chỉ nhận ẢNH, đúng 1 tấm: luồng OneTouch bóc tách một mã QR/một tin nhắn
+			     chuyển khoản, nhận nhiều ảnh cũng chỉ dùng được tấm đầu. -->
+				<key>NSExtensionActivationRule</key>
+				<dict>
+					<key>NSExtensionActivationSupportsImageWithMaxCount</key>
+					<integer>1</integer>
+				</dict>
+			</dict>
+			<!-- Dựng bằng code, không qua storyboard: extension này không có giao diện,
+		     thêm một file .storyboard rỗng chỉ để khai báo là thừa. -->
+			<key>NSExtensionPrincipalClass</key>
+			<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+			<key>NSExtensionPointIdentifier</key>
+			<string>com.apple.share-services</string>
+		</dict>
+	</dict>
+</plist>
