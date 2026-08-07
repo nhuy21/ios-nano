@@ -14,7 +14,9 @@ import Combine
 @MainActor
 struct VoiceCommandOverlay: View {
     let onDismiss: () -> Void
-    let onResolved: (WalletTransferDraft) -> Void
+    /// Trả thẳng route đích thay vì `WalletTransferDraft`: người nhận có thể là ví HOẶC
+    /// ngân hàng, hai màn nhập tiền khác nhau nên nơi gọi không tự suy ra được.
+    let onResolved: (HomeRoute) -> Void
 
     @StateObject private var speech = SpeechRecognizerService()
     @StateObject private var beneficiaryStore = BeneficiaryStore.shared
@@ -26,9 +28,14 @@ struct VoiceCommandOverlay: View {
     /// (0.65s đảo chiều so với 1.8s một hướng), dùng chung một biến thì lệch nhịp.
     @State private var rippleAnimating = false
 
-    private var walletContacts: [Beneficiary] {
+    /// Cả ví lẫn ngân hàng: nói tên người nhận trong danh bạ nào cũng phải ra, chứ không
+    /// chỉ danh bạ ví. Lọc bỏ bản ghi thiếu số đích vì có khớp tên cũng không chuyển được.
+    private var transferContacts: [Beneficiary] {
         beneficiaryStore.beneficiaries.filter {
-            $0.type == .wallet && !($0.benUsername ?? "").isEmpty
+            switch $0.type {
+            case .wallet: return !($0.benUsername ?? "").isEmpty
+            case .bankAccount: return !($0.accNo ?? "").isEmpty
+            }
         }
     }
 
@@ -221,10 +228,18 @@ struct VoiceCommandOverlay: View {
     // MARK: - Xử lý
 
     private func handleResult(_ candidates: [String]) {
-        switch VoiceCommandResolver.resolve(candidates: candidates, contacts: walletContacts) {
+        let result = VoiceCommandResolver.resolve(
+            candidates: candidates,
+            contacts: transferContacts,
+            bankName: { BankCache.shared.bank(bin: $0)?.shortName ?? "Ngân hàng" }
+        )
+        switch result {
         case .wallet(let draft):
             speech.stop()
-            onResolved(draft)
+            onResolved(.walletTransferAmount(draft))
+        case .bank(let draft):
+            speech.stop()
+            onResolved(.bankTransfer(draft: draft))
         case .failure(let message):
             statusMessage = message
         }

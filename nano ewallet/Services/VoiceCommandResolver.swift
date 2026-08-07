@@ -3,7 +3,7 @@
 //  nano ewallet
 //
 //  Bóc "chuyển 200 nghìn cho Mẹ" thành người nhận + số tiền — mirror
-//  `matchWalletRecipient` + `voiceAmount` trong VoiceCommandOverlay.kt.
+//  `matchRecipient` + `voiceAmount` trong VoiceCommandOverlay.kt.
 //
 //  KHÔNG tự chuyển tiền: chỉ điền sẵn rồi đưa sang màn nhập tiền, người dùng vẫn
 //  phải xác nhận và nhập PIN.
@@ -13,36 +13,62 @@ import Foundation
 
 enum VoiceCommandResult {
     case wallet(WalletTransferDraft)
+    case bank(BankTransferDraft)
     case failure(String)
 }
 
 enum VoiceCommandResolver {
 
-    /// Khớp người nhận theo TÊN trong danh bạ ví. Chỉ danh bạ, giống bản Android —
-    /// không dò số tài khoản đọc thành chữ số, vì recognizer nghe nhầm một chữ số là
-    /// ra người khác mà tên hiển thị vẫn trông hợp lệ.
+    /// Khớp người nhận theo TÊN trong danh bạ (cả ví lẫn ngân hàng). Chỉ danh bạ, giống bản
+    /// Android — không dò số tài khoản đọc thành chữ số, vì recognizer nghe nhầm một chữ số
+    /// là ra người khác mà tên hiển thị vẫn trông hợp lệ.
+    ///
+    /// - Parameter bankName: tra tên ngân hàng theo BIN (`BankCache`) — resolver không tự
+    ///   đụng cache được vì nó `nonisolated`, để nơi gọi truyền vào.
     static func resolve(
         candidates: [String],
-        contacts: [Beneficiary]
+        contacts: [Beneficiary],
+        bankName: (String?) -> String = { _ in "Ngân hàng" }
     ) -> VoiceCommandResult {
         guard !candidates.isEmpty else {
             return .failure("Chưa nghe được gì. Thử nói lại xem.")
         }
 
-        guard let match = matchWalletRecipient(candidates: candidates, contacts: contacts),
-              let username = match.benUsername, !username.isEmpty else {
+        guard let match = matchRecipient(candidates: candidates, contacts: contacts) else {
             return .failure(
-                "Chưa nhận ra người nhận trong danh bạ ví. Thử nói: \"chuyển 200 nghìn cho Mẹ\"."
+                "Chưa nhận ra người nhận trong danh bạ. Thử nói: \"chuyển 200 nghìn cho Mẹ\"."
             )
         }
 
-        return .wallet(
-            WalletTransferDraft(
-                username: username,
-                holderName: match.accName ?? match.displayName,
-                prefillAmount: voiceAmount(from: candidates)
+        let amount = voiceAmount(from: candidates)
+        switch match.type {
+        case .wallet:
+            guard let username = match.benUsername, !username.isEmpty else {
+                return .failure("Người nhận này thiếu số ví, thử chọn từ danh bạ.")
+            }
+            return .wallet(
+                WalletTransferDraft(
+                    username: username,
+                    holderName: match.accName ?? match.displayName,
+                    prefillAmount: amount
+                )
             )
-        )
+        case .bankAccount:
+            guard let accNo = match.accNo, !accNo.isEmpty else {
+                return .failure("Người nhận này thiếu số tài khoản, thử chọn từ danh bạ.")
+            }
+            return .bank(
+                BankTransferDraft(
+                    bin: match.bankNo ?? "",
+                    bankName: bankName(match.bankNo),
+                    accNo: accNo,
+                    accType: 0,
+                    holderName: match.accName ?? match.displayName,
+                    // `BankTransferDraft.prefillAmount` là `Int?`, khác `Int64?` bên ví.
+                    prefillAmount: amount.map(Int.init)
+                )
+            )
+        }
     }
 
     /// Số tiền từ câu NÓI. Quy ước riêng của lời nói: số trơn NHỎ (<1000) hiểu là
@@ -61,7 +87,7 @@ enum VoiceCommandResolver {
     /// So cả nickname LẪN từng từ của accName: nói "Đức" khớp contact tên "Nguyen Van Duc"
     /// dù chưa đặt nickname. Chọn contact có từ khớp DÀI nhất — tên riêng ("duc") thắng
     /// họ/đệm chung ("van", "nguyen").
-    nonisolated static func matchWalletRecipient(
+    nonisolated static func matchRecipient(
         candidates: [String],
         contacts: [Beneficiary]
     ) -> Beneficiary? {

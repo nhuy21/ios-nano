@@ -136,11 +136,12 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showVoiceCommand) {
             VoiceCommandOverlay(
                 onDismiss: { showVoiceCommand = false },
-                onResolved: { draft in
+                onResolved: { route in
                     showVoiceCommand = false
-                    // Nghe ra người nhận -> vào THẲNG màn nhập tiền, số tiền điền sẵn
-                    // nếu bóc được. Vẫn phải xác nhận + PIN nên không tự chuyển tiền.
-                    path.append(.walletTransferAmount(draft))
+                    // Nghe ra người nhận -> vào THẲNG màn nhập tiền (ví hay ngân hàng do
+                    // overlay quyết định theo loại danh bạ), số tiền điền sẵn nếu bóc được.
+                    // Vẫn phải xác nhận + PIN nên không tự chuyển tiền.
+                    path.append(route)
                 }
             )
             .transparentSheetBackground()
