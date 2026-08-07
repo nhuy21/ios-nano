@@ -25,8 +25,16 @@ final class AppState: ObservableObject {
         // Chỉ ĐẶT CỜ, không mở thẳng: deep link có thể tới sau vài nhịp, mở ngay sẽ đua
         // và đè lên link nhận tiền. MainTabView quyết định sau khi chắc chắn không còn
         // deep link nào chờ. `defer` để nhánh nào kết thúc ở `.authenticated` cũng chạy.
+        //
+        // Có ảnh vừa chia sẻ từ app khác đang chờ thì KHÔNG đặt cờ: người dùng chia sẻ ảnh
+        // là đã chọn xong người nhận, mở QR bắt quét thêm mã nữa là sai ý. Phải chặn ngay
+        // TỪ ĐÂY chứ không chặn ở `MainTabView`: việc bóc tách ảnh là bất đồng bộ (OCR/gọi
+        // API mất vài giây) nên nhánh QR luôn chạy xong trước, người dùng thấy màn quét mở
+        // ra rồi mới bị đẩy sang màn chuyển tiền.
         defer {
-            if root == .authenticated { DeepLinkStore.shared.requestDefaultQr() }
+            if root == .authenticated, !SharedImageStore.hasPending {
+                DeepLinkStore.shared.requestDefaultQr()
+            }
         }
 
         let store = AuthStore.shared

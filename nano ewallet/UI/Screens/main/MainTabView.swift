@@ -28,6 +28,9 @@ struct MainTabView: View {
     /// Dò ảnh chia sẻ đang chờ mỗi lần app trở lại foreground — xem `.onChangeCompat` bên dưới.
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Đang bóc tách ảnh vừa chia sẻ — che Home để không lộ ra rồi bị đẩy đi.
+    @State private var isResolvingSharedImage = false
+
     /// Ngăn xếp của tab Home sống ở ĐÂY chứ không phải trong `HomeView`: view đó bị huỷ
     /// mỗi khi sang tab Cá nhân (dùng `switch`, không phải `TabView`), nên deep link tới
     /// lúc đó sẽ không có chỗ nào để đẩy màn vào.
@@ -116,10 +119,8 @@ struct MainTabView: View {
         // chạy ở Splash) — thiếu nó thì onChange không bao giờ khớp và QR không mở.
         .onChangeCompat(of: deepLinkStore.pendingDefaultQr, initial: true) { _, pending in
             guard pending, !deepLinkStore.hasPendingDeepLink else { return }
-            // Có ảnh vừa chia sẻ đang chờ -> KHÔNG mở QR: người dùng chia sẻ ảnh là đã chọn
-            // xong người nhận rồi, bắt quét thêm một mã nữa là sai ý. Ảnh xử ở nhánh
-            // `scenePhase` bên dưới, chỉ cần nhường chỗ chứ không đụng vào.
-            guard !SharedImageStore.hasPending else { return }
+            // Ảnh chia sẻ đang chờ đã được chặn từ `AppState.bootstrap` (cờ không bao giờ
+            // được đặt), khỏi kiểm lại ở đây.
             deepLinkStore.consumeDefaultQr()
             showQrScan = true
         }
@@ -145,6 +146,9 @@ struct MainTabView: View {
             guard phase == .active else { return }
             Task { await resolveSharedImage() }
         }
+        // Che Home trong lúc bóc tách: nhận diện QR/OCR + gọi API mất vài giây, không che thì
+        // người dùng thấy Home hiện ra rồi bị đẩy sang màn chuyển tiền, nhìn như app tự nhảy.
+        .overlay { if isResolvingSharedImage { ProcessingOverlay(message: "Đang nhận diện...") } }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
         // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
         // Cả 2 draft đều nil vì đây là mở màn NHẬP TAY, không phải "Chuyển cho <tên>" có sẵn
@@ -209,7 +213,9 @@ struct MainTabView: View {
     /// thêm alert riêng: hai luồng đều là "mở app từ ngoài rồi vào thẳng màn chuyển tiền",
     /// lỗi hiện cùng một chỗ cho nhất quán.
     private func resolveSharedImage() async {
-        guard let image = SharedImageStore.consumePending() else { return }
+        guard !isResolvingSharedImage, let image = SharedImageStore.consumePending() else { return }
+        isResolvingSharedImage = true
+        defer { isResolvingSharedImage = false }
         switch await OneTouchResolver.resolve(image: image) {
         case .bank(let draft):
             openOnHome(.bankTransfer(draft: draft))
