@@ -68,8 +68,9 @@ struct ContactsView: View {
         .screenBackground(Color(hex: 0xF7F8FA))
         .task { _ = await store.get() }
         .sheet(isPresented: $showAdd) {
-            // Truyền thẳng loại đang xem để form mở đúng chế độ, khỏi hỏi lại người dùng.
-            AddContactSheet(type: activeType, onSaved: {
+            // Chọn loại nằm NGAY trong form, không tách thành một sheet hỏi trước: bớt
+            // một lớp bấm, và đổi ý giữa chừng thì đổi tại chỗ chứ không phải thoát ra.
+            AddContactSheet(initialType: activeType, isTypeLocked: filterType != nil, onSaved: {
                 showAdd = false
                 Task { await store.refresh() }
             }, onCancel: { showAdd = false })
@@ -172,6 +173,8 @@ struct ContactsView: View {
         .padding(.top, 12)
     }
 
+    /// Mở từ một luồng chuyển tiền cụ thể thì loại đã bị khoá — hỏi lại là thừa, mà chọn
+    /// nhầm loại còn dẫn người dùng vào màn chuyển tiền sai. Chỉ hỏi khi vào từ Trang chủ.
     private func typeTab(_ type: BeneficiaryType, title: String) -> some View {
         let isSelected = selectedType == type
         return Button {

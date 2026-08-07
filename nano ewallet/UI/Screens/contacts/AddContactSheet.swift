@@ -10,10 +10,30 @@
 import SwiftUI
 
 struct AddContactSheet: View {
-    /// Loại người nhận cần thêm — quyết định toàn bộ form (ô nhập, cách tra cứu tên).
-    let type: BeneficiaryType
+    /// Loại mở form lần đầu. Mở từ Trang chủ thì chỉ là gợi ý — người dùng đổi ngay trong
+    /// form; mở từ một luồng chuyển tiền thì `isTypeLocked` khoá lại.
+    let initialType: BeneficiaryType
+    /// Vào từ một luồng chuyển tiền cụ thể -> loại do luồng quyết định, ẩn phần chọn.
+    /// Chọn nhầm loại ở đây sẽ đưa người dùng vào màn chuyển tiền sai.
+    var isTypeLocked: Bool = false
     let onSaved: () -> Void
     let onCancel: () -> Void
+
+    /// Loại người nhận — quyết định toàn bộ form (ô nhập, cách tra cứu tên).
+    @State private var type: BeneficiaryType
+
+    init(
+        initialType: BeneficiaryType,
+        isTypeLocked: Bool = false,
+        onSaved: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.initialType = initialType
+        self.isTypeLocked = isTypeLocked
+        self.onSaved = onSaved
+        self.onCancel = onCancel
+        _type = State(initialValue: initialType)
+    }
 
     /// Số tài khoản ngân hàng (nhánh `.bankAccount`) hoặc số ví (nhánh `.wallet`).
     @State private var accountNumber = ""
@@ -56,12 +76,66 @@ struct AddContactSheet: View {
         return type == .wallet || selectedBank != nil
     }
 
+    /// Hai ô chọn loại — đổi loại là xoá sạch dữ liệu đã nhập: số ví và số tài khoản ngân
+    /// hàng không dùng chung định dạng, giữ lại sẽ tra cứu ra kết quả vô nghĩa hoặc lưu nhầm.
+    private var typeSelector: some View {
+        HStack(spacing: 10) {
+            typeOption(.wallet, title: "Ví nano", systemImage: "wallet.pass")
+            typeOption(.bankAccount, title: "Ngân hàng", systemImage: "building.columns")
+        }
+    }
+
+    private func typeOption(
+        _ value: BeneficiaryType, title: String, systemImage: String
+    ) -> some View {
+        let isActive = type == value
+        return Button {
+            guard type != value else { return }
+            type = value
+            resetEnteredData()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15))
+                Text(title)
+                    .font(AppFont.beVietnamPro(14, .semibold))
+            }
+            .foregroundStyle(isActive ? AppColor.brand : AppColor.payMuted)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(isActive ? AppColor.brandSoft : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        isActive ? AppColor.brand : AppColor.payInputBorder,
+                        lineWidth: isActive ? 1.5 : 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func resetEnteredData() {
+        lookupTask?.cancel()
+        accountNumber = ""
+        selectedBank = nil
+        holderName = nil
+        lookupError = nil
+        isLookingUp = false
+        saveError = nil
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if !isTypeLocked {
+                        fieldBlock(label: "Loại người nhận") { typeSelector }
+                    }
+
                     // Ngân hàng đứng TRƯỚC số tài khoản: tra cứu tên chủ TK cần cả hai, mà
                     // chọn ngân hàng sau khi gõ xong số thì phải quay lại sửa — mirror thứ tự
                     // ở BankTransferView. Ví nội bộ không có bước này.
@@ -348,6 +422,10 @@ struct AddContactSheet: View {
     }
 }
 
-#Preview {
-    AddContactSheet(type: .bankAccount, onSaved: {}, onCancel: {})
+#Preview("Chọn được loại") {
+    AddContactSheet(initialType: .wallet, onSaved: {}, onCancel: {})
+}
+
+#Preview("Khoá loại (vào từ luồng chuyển tiền)") {
+    AddContactSheet(initialType: .bankAccount, isTypeLocked: true, onSaved: {}, onCancel: {})
 }
