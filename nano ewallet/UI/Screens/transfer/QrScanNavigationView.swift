@@ -87,20 +87,27 @@ struct QrScanNavigationView: View {
     @ViewBuilder
     private func qrDestination(for route: QrFlowRoute) -> some View {
         switch route {
+        // Back ở hai màn chuyển tiền ĐÓNG HẲN luồng QR thay vì lùi về màn quét: quét xong là
+        // đã có người nhận rồi, quay lại quét tiếp gần như không phải ý người dùng — họ bấm
+        // back là muốn thoát. Muốn quét mã khác thì mở lại từ nút QR ở thanh tab.
         case .bankTransfer(let draft):
             BankTransferView(
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: onDismiss,
                 onHome: onDismiss,
                 initialDraft: draft,
                 onSuccess: { info in path.append(.transferSuccess(info)) }
             )
+            // Nút back đã đóng cả luồng, cử chỉ vuốt phải theo cho nhất quán — không chặn
+            // thì vuốt vẫn lùi được về màn quét.
+            .disablesSwipeBack()
         case .walletTransferAmount(let draft):
             WalletTransferAmountView(
                 draft: draft,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: onDismiss,
                 onSuccess: { info in path.append(.transferSuccess(info)) },
                 onHome: onDismiss
             )
+            .disablesSwipeBack()
         case .transferSuccess(let info):
             TransferSuccessView(info: info, onHome: onDismiss)
         case .receiveQr:

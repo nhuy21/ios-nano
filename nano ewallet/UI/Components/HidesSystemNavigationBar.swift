@@ -4,8 +4,40 @@
 //
 
 import SwiftUI
+import UIKit
+
+/// Tắt cử chỉ vuốt-cạnh-màn để lùi. SwiftUI không có API cho việc này
+/// (`navigationBarBackButtonHidden` chỉ ẩn NÚT, cử chỉ vẫn chạy) nên phải với xuống
+/// `UINavigationController.interactivePopGestureRecognizer`.
+private struct SwipeBackDisabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController { Controller() }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+
+    /// Bật/tắt theo vòng đời view: `viewWillAppear` để đè lên thiết lập mà `NavigationStack`
+    /// áp lại mỗi lần đẩy màn, `viewWillDisappear` để TRẢ cử chỉ về cho các màn khác — quên
+    /// trả là cả app mất vuốt-back.
+    private final class Controller: UIViewController {
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            navigationController?.interactivePopGestureRecognizer?.isEnabled = false
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        }
+    }
+}
 
 extension View {
+    /// Chặn vuốt-cạnh-màn để lùi ở màn này — dùng khi lùi lại là sai luồng, vd quét QR xong
+    /// vào màn chuyển tiền thì vuốt về màn quét vừa vô nghĩa vừa lệch với nút back (nút đó
+    /// đóng cả luồng).
+    func disablesSwipeBack() -> some View {
+        background(SwipeBackDisabler().frame(width: 0, height: 0))
+    }
+
     /// Ẩn nav bar rỗng mà `NavigationStack` tự thêm vào mỗi màn được push.
     ///
     /// Toàn bộ màn trong app đều tự vẽ header/nút back riêng (mirror Android), nên nav
