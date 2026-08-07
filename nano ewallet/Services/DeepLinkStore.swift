@@ -35,10 +35,6 @@ final class DeepLinkStore: ObservableObject {
     /// Quick Action "Chuyển khoản ngân hàng".
     @Published private(set) var pendingBankTransferShortcut = false
 
-    /// Có ảnh vừa chia sẻ từ app khác đang chờ bóc tách (Share Extension đã ghi vào App
-    /// Group). Chỉ là CỜ — ảnh đọc riêng qua `SharedImageStore.consumePending()`.
-    @Published private(set) var pendingSharedImage = false
-
     /// Siri "chuyển tiền tới ví" ở tầng 2 (limitPin < amount ≤ limitFace) — draft đã điền sẵn
     /// người nhận/số tiền, người dùng tự xem lại rồi xác nhận như luồng thường. Xem
     /// `QuickTransferIntent` và docs/siri-quick-transfer.md mục 1/4.
@@ -48,7 +44,7 @@ final class DeepLinkStore: ObservableObject {
     var hasPendingDeepLink: Bool {
         pendingPayToken != nil || pendingConversationBkUsername != nil
             || pendingWalletTransferShortcut || pendingBankTransferShortcut
-            || pendingQuickTransferDraft != nil || pendingSharedImage
+            || pendingQuickTransferDraft != nil
     }
 
     // MARK: - Phát
@@ -56,12 +52,6 @@ final class DeepLinkStore: ObservableObject {
     /// Nhận URL từ Universal Link / custom scheme. Trả false nếu không phải link của app.
     @discardableResult
     func handle(url: URL) -> Bool {
-        // Share Extension vừa lưu ảnh vào App Group rồi mở app bằng `nanowallet://onetouch`.
-        // Chỉ đặt cờ, ảnh thật do `SharedImageStore.consumePending()` đọc ở Home.
-        if url.scheme == "nanowallet", url.host == "onetouch" {
-            pendingSharedImage = true
-            return true
-        }
         guard isPayLink(url) else { return false }
         // BE dùng query `req_token` (xem MainActivity.handleDeepLink bên Android).
         guard let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
@@ -129,11 +119,6 @@ final class DeepLinkStore: ObservableObject {
         return pendingDefaultQr
     }
 
-    @discardableResult
-    func consumeSharedImage() -> Bool {
-        defer { pendingSharedImage = false }
-        return pendingSharedImage
-    }
 
     @discardableResult
     func consumeWalletTransferShortcut() -> Bool {

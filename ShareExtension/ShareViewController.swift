@@ -3,10 +3,13 @@
 //  ShareExtension
 //
 //  Mirror ShareReceiverActivity.kt — nhận ảnh chia sẻ từ app khác (chụp màn hình tin nhắn
-//  chuyển khoản, ảnh mã QR) rồi mở app chính để bóc tách.
+//  chuyển khoản, ảnh mã QR) để app chính bóc tách.
 //
-//  KHÔNG có giao diện: người dùng đã chọn đúng ảnh ở share sheet rồi, hiện thêm một màn
-//  xác nhận nữa là thừa một bước. Lưu ảnh xong là đóng và mở app luôn.
+//  KHÁC Android ở bước cuối: extension KHÔNG tự mở được app chính. iOS 18+ chặn hẳn việc
+//  này (`UIApplication` không dùng được trong extension, và mẹo lần theo responder chain
+//  gọi `openURL:` đã bị vô hiệu — Apple cố ý cấm, chỉ Widget mới mở được app qua App
+//  Intents). Nên ở đây chỉ LƯU ảnh rồi báo người dùng tự mở app; app chính thấy ảnh đang
+//  chờ là bóc tách ngay.
 //
 
 import UIKit
@@ -14,12 +17,41 @@ import UniformTypeIdentifiers
 
 final class ShareViewController: UIViewController {
 
+    private let messageLabel = UILabel()
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Nền trong suốt: extension này không vẽ gì, chớp một khung trắng lên rồi tắt sẽ
-        // nhìn như app lỗi.
-        view.backgroundColor = .clear
+        setUpUI()
         handleSharedImage()
+    }
+
+    private func setUpUI() {
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+
+        let card = UIView()
+        card.backgroundColor = .systemBackground
+        card.layer.cornerRadius = 20
+        card.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(card)
+
+        messageLabel.text = "Đang nhận ảnh..."
+        messageLabel.numberOfLines = 0
+        messageLabel.textAlignment = .center
+        messageLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(messageLabel)
+
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+
+            messageLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 24),
+            messageLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -24),
+            messageLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
+            messageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24),
+        ])
     }
 
     private func handleSharedImage() {
@@ -31,7 +63,7 @@ final class ShareViewController: UIViewController {
         guard let provider = providers.first(where: {
             $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
         }) else {
-            finish(openApp: false)
+            finish(message: "Không đọc được ảnh vừa chia sẻ.")
             return
         }
 
@@ -49,38 +81,22 @@ final class ShareViewController: UIViewController {
             }()
 
             guard let image, SharedImageStore.save(image) else {
-                self?.finish(openApp: false)
+                self?.finish(message: "Không lưu được ảnh, vui lòng thử lại.")
                 return
             }
-            self?.finish(openApp: true)
+            self?.finish(message: "Đã nhận ảnh. Mở Ví nano để tiếp tục chuyển tiền.")
         }
     }
 
-    /// Đóng extension TRƯỚC rồi mới mở app, không làm ngược lại: `openURL` phát trong lúc
-    /// extension còn sống hay bị hệ thống nuốt, share sheet đứng im không tắt.
-    private func finish(openApp: Bool) {
+    /// Hiện thông báo rồi tự đóng: không có nút "Mở app" vì extension không mở được app
+    /// chính trên iOS 18+ — có nút mà bấm không ăn còn khó hiểu hơn.
+    private func finish(message: String) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.extensionContext?.completeRequest(returningItems: nil) { _ in
-                guard openApp else { return }
-                DispatchQueue.main.async { self.openHostApp() }
+            self.messageLabel.text = message
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                self.extensionContext?.completeRequest(returningItems: nil)
             }
-        }
-    }
-
-    /// Mở app chính bằng custom scheme. Extension không được gọi `UIApplication.shared` nên
-    /// phải lần theo chuỗi `responder` tìm đối tượng có `openURL:` — cách duy nhất còn dùng
-    /// được trong app extension.
-    private func openHostApp() {
-        guard let url = URL(string: "nanowallet://onetouch") else { return }
-        var responder: UIResponder? = self
-        let selector = sel_registerName("openURL:")
-        while let current = responder {
-            if current.responds(to: selector) {
-                _ = current.perform(selector, with: url)
-                return
-            }
-            responder = current.next
         }
     }
 }

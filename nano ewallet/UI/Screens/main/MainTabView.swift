@@ -25,6 +25,9 @@ struct MainTabView: View {
 
     @StateObject private var deepLinkStore = DeepLinkStore.shared
 
+    /// Dò ảnh chia sẻ đang chờ mỗi lần app trở lại foreground — xem `.onChangeCompat` bên dưới.
+    @Environment(\.scenePhase) private var scenePhase
+
     /// Ngăn xếp của tab Home sống ở ĐÂY chứ không phải trong `HomeView`: view đó bị huỷ
     /// mỗi khi sang tab Cá nhân (dùng `switch`, không phải `TabView`), nên deep link tới
     /// lúc đó sẽ không có chỗ nào để đẩy màn vào.
@@ -128,12 +131,14 @@ struct MainTabView: View {
             _ = deepLinkStore.consumePayToken()
             Task { await resolvePayLink(token: token) }
         }
-        // Ảnh chia sẻ từ app khác (chụp màn hình tin nhắn CK, ảnh QR) — Share Extension đã
-        // ghi vào App Group rồi mở app. Bóc tách bằng ĐÚNG `OneTouchResolver.resolve(image:)`
-        // mà nút "Chọn ảnh trong thư viện" đang dùng, nên kết quả giống hệt.
-        .onChangeCompat(of: deepLinkStore.pendingSharedImage, initial: true) { _, pending in
-            guard pending else { return }
-            deepLinkStore.consumeSharedImage()
+        // Ảnh chia sẻ từ app khác (chụp màn hình tin nhắn CK, ảnh QR): Share Extension chỉ
+        // GHI được vào App Group chứ không mở được app chính (iOS 18+ chặn), nên app phải tự
+        // dò mỗi lần vào foreground — kể cả khi người dùng mở app từ icon chứ không qua link.
+        //
+        // Bóc tách bằng ĐÚNG `OneTouchResolver.resolve(image:)` mà nút "Chọn ảnh trong thư
+        // viện" đang dùng, nên kết quả giống hệt.
+        .onChangeCompat(of: scenePhase, initial: true) { _, phase in
+            guard phase == .active else { return }
             Task { await resolveSharedImage() }
         }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
