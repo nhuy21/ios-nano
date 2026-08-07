@@ -223,6 +223,10 @@ struct QrScanView: View {
                         }
                 }
         }
+        // Phủ CẢ vùng status bar và home indicator: `GeometryReader` chỉ chiếm vùng an toàn
+        // nên lớp sẫm dừng đúng ở hai mép đó, để hở hai dải camera sáng nguyên ở trên/dưới —
+        // nhìn như lớp phủ bị cắt dở.
+        .ignoresSafeArea()
         .allowsHitTesting(false)
     }
 
@@ -280,6 +284,10 @@ struct QrScanView: View {
                 .position(x: center.x, y: center.y + half + 84)
             }
         }
+        // PHẢI khớp `.ignoresSafeArea()` của `scrimOverlay`: hai lớp cùng tính tâm khung qua
+        // `frameCenter(in: geo.size)`, lệch hệ toạ độ là lỗ cắt trên lớp sẫm không trùng với
+        // 4 góc chữ L vẽ ở đây.
+        .ignoresSafeArea()
         .allowsHitTesting(false)
     }
 
