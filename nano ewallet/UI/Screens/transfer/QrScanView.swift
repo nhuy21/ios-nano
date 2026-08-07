@@ -55,15 +55,7 @@ struct QrScanView: View {
             if scanner.isPermissionDenied {
                 permissionPrompt
             } else {
-                CameraPreviewView(
-                    session: scanner.session,
-                    scanner: scanner,
-                    // Khung ngắm không nằm giữa hình học (đẩy lên `frameShiftUp`) nên phải
-                    // truyền đúng tâm để `regionOfInterest` khớp với ô vuông người dùng nhìn
-                    // thấy — lệch khung là quét được mã NGOÀI vùng hiển thị, gây khó hiểu.
-                    frameSize: Self.frameSize,
-                    frameShiftUp: Self.frameShiftUp
-                )
+                CameraPreviewView(session: scanner.session)
                 .ignoresSafeArea()
             }
 
@@ -587,7 +579,6 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureVideoDataO
     /// đổi thread sẽ triệt tiêu lợi ích throttle. `NSLock` giữ mọi thứ trên đúng 1 hàng đợi.
     private final class ScanState: @unchecked Sendable {
         private let lock = NSLock()
-        private var _regionOfInterest: CGRect?
         /// Throttle: Vision tốn CPU/Neural Engine hơn nhiều so với decode hardware, không thể
         /// chạy ở tốc độ 30-60fps của camera. Mirror `STRATEGY_KEEP_ONLY_LATEST` bên Android
         /// (CameraX) — cờ này bỏ qua frame mới nếu frame trước chưa xử lý xong.
@@ -595,11 +586,6 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureVideoDataO
         /// Đã tìm thấy mã hợp lệ — dừng xử lý frame tiếp, tránh Vision chạy tiếp trong lúc UI
         /// đã chuyển màn (view còn sống thêm vài chục ms sau khi state đổi).
         private var didFindCode = false
-
-        var regionOfInterest: CGRect? {
-            get { lock.withLock { _regionOfInterest } }
-            set { lock.withLock { _regionOfInterest = newValue } }
-        }
 
         /// `true` = đã có frame khác đang xử lý hoặc đã tìm thấy mã, gọi nơi khác bỏ qua ngay.
         /// Nếu được phép chạy thì tự chiếm `isProcessingFrame` LUÔN trong cùng 1 lần khoá —
@@ -626,12 +612,6 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureVideoDataO
     }
 
     private let scanState = ScanState()
-    /// Cho `CameraPreviewView` set vùng quét — uỷ lại `scanState` để có đúng 1 nơi giữ khoá.
-    var regionOfInterest: CGRect? {
-        get { scanState.regionOfInterest }
-        set { scanState.regionOfInterest = newValue }
-    }
-
     private let processingQueue = DispatchQueue(label: "dev.casso.nanowallet.qrscan", qos: .userInitiated)
 
     func requestPermissionAndStart() async {
@@ -748,14 +728,17 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureVideoDataO
 
         let request = VNDetectBarcodesRequest()
         request.symbologies = [.qr]
-        // Giới hạn vào đúng khung ngắm — Vision dùng hệ toạ độ (0,0) GÓC DƯỚI-TRÁI (ngược UIKit),
-        // trong khi `regionOfInterest` được `CameraPreviewView` tính bằng
-        // `metadataOutputRectConverted` (gốc trên-trái) — phải lật trục Y.
-        if let roi = scanState.regionOfInterest {
-            request.regionOfInterest = CGRect(
-                x: roi.minX, y: 1 - roi.maxY, width: roi.width, height: roi.height
-            )
-        }
+        // KHÔNG giới hạn `regionOfInterest`: quét TOÀN khung ảnh, giống ML Kit bên Android
+        // (analyzer nhận nguyên `InputImage`, không cắt vùng nào).
+        //
+        // Bản trước cắt theo khung ngắm và đó là lý do gần như không quét được. `regionOfInterest`
+        // của Vision tính trên ảnh ĐÃ XOAY theo `orientation`, còn giá trị lấy từ
+        // `metadataOutputRectConverted` lại nằm trong hệ toạ độ của bộ đệm GỐC (camera nằm
+        // ngang). Giữa hai hệ đó lệch nhau một phép xoay 90° chứ không chỉ lật trục Y — lật Y
+        // như cũ làm vùng quét rơi vào một góc khác hẳn nơi người dùng đang ngắm.
+        //
+        // Ô vuông trên màn vẫn giữ vai trò hướng dẫn người dùng đưa mã vào giữa, không cần
+        // ép thành ràng buộc cứng.
 
         let orientation: CGImagePropertyOrientation = .right // camera sau, thiết bị dọc
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
@@ -779,60 +762,22 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureVideoDataO
     }
 }
 
-/// Bọc `AVCaptureVideoPreviewLayer` cho SwiftUI, đồng thời tính `regionOfInterest` (0...1, gốc
-/// trên-trái) cho controller giới hạn vùng Vision xử lý vào đúng ô vuông khung ngắm.
-///
-/// Không giới hạn thì Vision xử lý TOÀN BỘ khung hình mỗi lần: tốn CPU/Neural Engine hơn hẳn
-/// (vốn đã chậm hơn hardware decode), và nếu người dùng đứng nơi có nhiều mã QR khác (quầy
-/// thanh toán) thì có thể bắt nhầm mã ngoài vùng camera đang chiếu vào.
+/// Bọc `AVCaptureVideoPreviewLayer` cho SwiftUI.
 private struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
-    let scanner: QrScannerController
-    let frameSize: CGFloat
-    let frameShiftUp: CGFloat
 
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.videoPreviewLayer.session = session
         view.videoPreviewLayer.videoGravity = .resizeAspectFill
-        view.scanner = scanner
-        view.frameSize = frameSize
-        view.frameShiftUp = frameShiftUp
         return view
     }
 
-    func updateUIView(_ uiView: PreviewUIView, context: Context) {
-        uiView.scanner = scanner
-        uiView.frameSize = frameSize
-        uiView.frameShiftUp = frameShiftUp
-    }
+    func updateUIView(_ uiView: PreviewUIView, context: Context) {}
 
     final class PreviewUIView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var videoPreviewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-
-        var scanner: QrScannerController?
-        var frameSize: CGFloat = 0
-        var frameShiftUp: CGFloat = 0
-
-        /// `layoutSubviews` là nơi DUY NHẤT biết bounds thật của layer sau khi SwiftUI xếp
-        /// layout xong — tính ở `makeUIView`/`updateUIView` sẽ ra bounds rỗng hoặc cũ. Chạy lại
-        /// mỗi khi bounds đổi (xoay máy, resize) nên luôn khớp layout hiện tại.
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            guard let scanner, bounds.width > 0, bounds.height > 0 else { return }
-
-            let center = CGPoint(x: bounds.midX, y: bounds.midY - frameShiftUp)
-            let half = frameSize / 2
-            let layerRect = CGRect(
-                x: center.x - half, y: center.y - half,
-                width: frameSize, height: frameSize
-            )
-            // Chuyển từ toạ độ layer (điểm, gốc trên-trái) sang toạ độ chuẩn hoá camera (0...1,
-            // đã xoay theo hướng cảm biến, gốc trên-trái) — `captureOutput` tự lật sang hệ toạ
-            // độ Vision (gốc dưới-trái) khi dùng.
-            scanner.regionOfInterest = videoPreviewLayer.metadataOutputRectConverted(fromLayerRect: layerRect)
-        }
     }
 }
 
