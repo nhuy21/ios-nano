@@ -23,10 +23,14 @@ final class ShareViewController: UIViewController {
     }
 
     private func handleSharedImage() {
-        guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
-              let provider = item.attachments?.first(where: {
-                  $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
-              }) else {
+        // Duyệt HẾT các inputItem chứ không chỉ cái đầu: một số app đính kèm thêm item phụ
+        // (text/URL kèm ảnh) và ảnh có thể không nằm ở item đầu tiên.
+        let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? [])
+            .compactMap(\.attachments)
+            .flatMap { $0 }
+        guard let provider = providers.first(where: {
+            $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
+        }) else {
             finish(openApp: false)
             return
         }
@@ -52,11 +56,15 @@ final class ShareViewController: UIViewController {
         }
     }
 
+    /// Đóng extension TRƯỚC rồi mới mở app, không làm ngược lại: `openURL` phát trong lúc
+    /// extension còn sống hay bị hệ thống nuốt, share sheet đứng im không tắt.
     private func finish(openApp: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            if openApp { self.openHostApp() }
-            self.extensionContext?.completeRequest(returningItems: nil)
+            self.extensionContext?.completeRequest(returningItems: nil) { _ in
+                guard openApp else { return }
+                DispatchQueue.main.async { self.openHostApp() }
+            }
         }
     }
 
