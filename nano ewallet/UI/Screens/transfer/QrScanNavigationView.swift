@@ -41,7 +41,10 @@ struct QrScanNavigationView: View {
                 onParsed: { draft in path.append(.bankTransfer(draft)) },
                 onReceiveQr: { path.append(.receiveQr) },
                 onEmergency: onEmergency,
-                onWalletRecipient: { draft in path.append(.walletTransferAmount(draft)) }
+                onWalletRecipient: { draft in path.append(.walletTransferAmount(draft)) },
+                // Ngăn xếp rỗng = màn quét đang ở trên cùng. Đây là tín hiệu để nó mở lại
+                // việc quét sau khi người dùng back từ màn chuyển tiền.
+                isActive: path.isEmpty
             )
             .hidesSystemNavigationBar()
             .navigationDestination(for: QrFlowRoute.self) { route in

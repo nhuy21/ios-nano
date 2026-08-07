@@ -29,6 +29,9 @@ struct QrScanView: View {
     var onEmergency: () -> Void = {}
     /// OneTouch nhận ra nội dung dán là VÍ nội bộ -> sang màn chuyển ví.
     var onWalletRecipient: (WalletTransferDraft) -> Void = { _ in }
+    /// Màn quét có đang ở trên cùng ngăn xếp không. `false` khi đã đẩy sang màn chuyển
+    /// tiền — quay lại `true` thì phải mở lại việc quét, xem `.onChangeCompat` bên dưới.
+    var isActive: Bool = true
 
     @StateObject private var scanner = QrScannerController()
 
@@ -106,6 +109,18 @@ struct QrScanView: View {
             await scanner.requestPermissionAndStart()
         }
         .onDisappear { scanner.stop() }
+        // Quay lại từ màn chuyển tiền: mở lại việc quét. Không có nhánh này thì quét thành
+        // công MỘT lần là màn quét chết — cờ "đã tìm thấy" và `lastHandledValue` giữ nguyên
+        // nên mọi frame sau đều bị bỏ qua, mà camera vẫn chiếu hình nên nhìn không ra.
+        //
+        // Dựa vào ngăn xếp (`isActive`) chứ không dùng `onAppear`: màn quét là gốc của
+        // `NavigationStack`, đẩy màn khác lên không chắc chắn bắn `onDisappear`/`onAppear`.
+        .onChangeCompat(of: isActive) { _, active in
+            guard active else { return }
+            lastHandledValue = nil
+            errorMessage = nil
+            scanner.resumeScanning()
+        }
         .onChangeCompat(of: scanner.lastScannedValue) { _, newValue in
             guard let newValue, newValue != lastHandledValue else { return }
             lastHandledValue = newValue
@@ -755,10 +770,18 @@ final class QrScannerController: NSObject, ObservableObject, AVCaptureVideoDataO
         Task { @MainActor in self.lastScannedValue = payload }
     }
 
-    /// Cho phép quét lại sau khi 1 lượt xử lý thất bại (mirror `lastHandledValue = nil` ở
-    /// `QrScanView.route`) — không thì cờ "đã tìm thấy" giữ nguyên `true` mãi mãi.
+    /// Cho phép quét lại: xoá cờ "đã tìm thấy" VÀ bảo đảm phiên camera đang chạy.
+    ///
+    /// Gọi ở hai chỗ: sau một lượt xử lý thất bại, và mỗi khi quay lại màn quét từ màn
+    /// chuyển tiền. Thiếu chỗ thứ hai thì quét thành công một lần là màn quét chết hẳn —
+    /// camera vẫn chiếu hình nên trông như bình thường, nhưng không frame nào được xử lý.
     func resumeScanning() {
         scanState.reset()
+        // Phiên có thể đã dừng khi màn bị đẩy ra sau; `startRunning` trên phiên đang chạy
+        // là no-op nên gọi thẳng không cần kiểm tra.
+        Task.detached { [session] in
+            if !session.isRunning { session.startRunning() }
+        }
     }
 }
 
