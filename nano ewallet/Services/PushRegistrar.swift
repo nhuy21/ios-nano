@@ -49,6 +49,21 @@ final class PushRegistrar {
             let body = RegisterDeviceRequest(token: token, deviceId: deviceId)
             do {
                 try await APIClient.shared.requestVoid(.post, "devices/register", body: body, auth: true)
+            } catch APIError.unauthenticated {
+                // Phiên hết giữa chừng: hoặc user đăng xuất xen vào, hoặc refresh token đã
+                // hết hạn (hay gặp khi cài đè build mới sau thời gian dài không mở app).
+                //
+                // KHÔNG tự sửa gì ở đây vì hai trường hợp đó khác hẳn nhau về hậu quả:
+                //  - Phiên hết thật -> app tự đưa về Login, đăng nhập lại là `syncCurrentToken`
+                //    đăng ký lại token. Không sao.
+                //  - Phiên VẪN CÒN mà vẫn lỗi -> máy này sẽ KHÔNG nhận được push nào.
+                // Log kèm trạng thái phiên để lần sau nhìn là phân biệt được ngay, thay vì
+                // nuốt lỗi rồi mất luôn dấu vết.
+                let stillSignedIn = AuthStore.shared.accessToken != nil
+                print(
+                    "[Push] Đăng ký device token lỗi: unauthenticated "
+                        + "(phiên \(stillSignedIn ? "VẪN CÒN — cần xem lại" : "đã hết, sẽ đăng ký lại sau khi đăng nhập"))"
+                )
             } catch {
                 print("[Push] Đăng ký device token lỗi: \(error)")
             }
