@@ -14,6 +14,9 @@ import Foundation
 actor TokenRefresher {
 
     private var inFlight: Task<Void, Error>?
+    /// Số thứ tự của lượt refresh đang giữ `inFlight`. `Task` là struct nên không so sánh
+    /// được bằng `===`; đánh số là cách nhận ra "chỗ mình gán còn đó hay đã bị lượt sau thay".
+    private var inFlightId = 0
 
     func refreshIfNeeded(previousToken: String?) async throws {
         // Ai đó đã refresh xong trong lúc mình chờ -> token hiện tại đã mới, khỏi gọi lại.
@@ -27,12 +30,14 @@ actor TokenRefresher {
         }
 
         let task = Task<Void, Error> { try await Self.performRefresh() }
+        inFlightId &+= 1
+        let myId = inFlightId
         inFlight = task
-        // Dọn bằng identity check chứ KHÔNG `defer { inFlight = nil }`: lượt refresh sau có
-        // thể đã gán `inFlight` mới trong lúc lượt này còn đang chờ mạng, gán nil vô điều
-        // kiện sẽ xoá nhầm Task mới đó — các request tới sau mất chỗ bám, tự gọi refresh
-        // thêm lần nữa.
-        defer { if inFlight === task { inFlight = nil } }
+        // Chỉ dọn khi `inFlight` VẪN là lượt của mình, KHÔNG `defer { inFlight = nil }` vô
+        // điều kiện: lượt refresh sau có thể đã gán `inFlight` mới trong lúc lượt này còn
+        // đang chờ mạng, xoá thẳng sẽ mất Task mới đó — các request tới sau không còn chỗ
+        // bám, lại tự gọi refresh thêm lần nữa.
+        defer { if inFlightId == myId { inFlight = nil } }
         try await task.value
     }
 
