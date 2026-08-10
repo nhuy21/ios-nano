@@ -170,7 +170,7 @@ struct PinLimitView: View {
 
             Spacer().frame(height: 6)
 
-            Text("Mã xác nhận 6 số đã gửi tới số điện thoại của bạn. Ngưỡng mới: \(vm.selected.vndFormatted).")
+            Text("Mã xác nhận 6 số đã gửi tới Zalo của bạn. Ngưỡng mới: \(vm.selected.vndFormatted).")
                 .font(AppFont.beVietnamPro(13))
                 .foregroundStyle(AppColor.payMuted)
 

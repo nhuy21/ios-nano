@@ -153,9 +153,9 @@ struct DeviceOtpDialog: View {
 
     private var subtitle: String {
         if let phone {
-            return "Mã xác thực đã gửi tới \(maskPhone(phone))"
+            return "Mã xác thực đã gửi tới Zalo \(maskPhone(phone))"
         }
-        return "Mã xác thực đã gửi tới số điện thoại của bạn"
+        return "Mã xác thực đã gửi tới Zalo của bạn"
     }
 
     /// Mirror `maskPhone` riêng của DeviceOtpDialogs.kt: `84387600501` → `"843****0501"`.

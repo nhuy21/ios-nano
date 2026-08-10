@@ -73,7 +73,7 @@ struct OtpView: View {
 
                 // Sửa bug: hiện đầy đủ câu dẫn thay vì chỉ SĐT trần.
                 HStack(spacing: 0) {
-                    Text("Mã xác thực đã gửi tới ")
+                    Text("Mã xác thực đã gửi tới Zalo ")
                         .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.payMuted)
                     Text(maskedPhone)

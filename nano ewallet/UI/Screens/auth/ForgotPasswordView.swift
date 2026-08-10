@@ -259,7 +259,7 @@ struct ForgotPasswordView: View {
             return "Mật khẩu của bạn đã được đặt lại. Hãy đăng nhập bằng mật khẩu mới."
         }
         if vm.codeSent {
-            return "Nhập mã xác nhận đã gửi và mật khẩu mới của bạn."
+            return "Nhập mã xác nhận đã gửi tới Zalo và mật khẩu mới của bạn."
         }
         return "Nhập số điện thoại đã đăng ký, chúng tôi sẽ gửi mã xác nhận để đặt lại mật khẩu."
     }
