@@ -66,12 +66,14 @@ struct WalletLinkBaoKimView: View {
 
                     Spacer().frame(height: 16)
 
+                    // Bàn phím thường chứ không phải `.numberPad`: tài khoản Bảo Kim có thể
+                    // là email hoặc tên đăng nhập có chữ, khoá bàn phím số thì những tài
+                    // khoản đó không gõ nổi.
                     labeledField(
                         label: "Số ví Bảo Kim",
                         text: $walletNo,
                         placeholder: "Nhập số ví",
-                        field: .walletNo,
-                        keyboard: .numberPad
+                        field: .walletNo
                     )
                 }
                 .frame(maxWidth: .infinity)
@@ -140,13 +142,8 @@ struct WalletLinkBaoKimView: View {
                             lineWidth: 1
                         )
                 }
-                .onChangeNewCompat(of: text.wrappedValue) { newValue in
-                    // Số ví chỉ nhận chữ số — bàn phím số vẫn gõ được dấu chấm/phẩy trên
-                    // vài bố cục bàn phím, và dán từ clipboard thì lọt mọi ký tự.
-                    guard field == .walletNo else { return }
-                    let digits = newValue.filter(\.isNumber)
-                    if digits != newValue { text.wrappedValue = digits }
-                }
+                // Không lọc bỏ chữ cái ở ô số ví: tài khoản Bảo Kim có thể là email hoặc tên
+                // đăng nhập có chữ, lọc chỉ giữ chữ số thì gõ vào bao nhiêu mất bấy nhiêu.
         }
     }
 
