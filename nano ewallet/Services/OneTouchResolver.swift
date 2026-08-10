@@ -81,7 +81,13 @@ enum OneTouchResolver {
         }
 
         // Tin nhắn -> để backend bóc ngân hàng + STK + số tiền.
-        if let parsed = try? await BankService.parseMessage(rawMessage: trimmed) {
+        //
+        // GIỮ LẠI lỗi thay vì `try?`: backend phân biệt rõ "không bóc được nội dung" với
+        // "tính năng chưa cấu hình / hết phiên / mất mạng", mà nuốt hết thành `nil` thì mọi
+        // trường hợp đều hiện chung một câu chung chung, không lần ra được nguyên nhân.
+        var parseError: String?
+        do {
+            let parsed = try await BankService.parseMessage(rawMessage: trimmed)
             return .bank(
                 BankTransferDraft(
                     bin: parsed.bankBin, bankName: parsed.bankName ?? "Ngân hàng",
@@ -93,6 +99,10 @@ enum OneTouchResolver {
                     amountEditable: parsed.isAmountEditable, contentEditable: true
                 )
             )
+        } catch let error as APIError {
+            parseError = error.message
+        } catch {
+            parseError = nil
         }
 
         // Bóc ngân hàng trượt -> dò từng dãy số trong tin nhắn xem có phải số ví không.
@@ -103,7 +113,8 @@ enum OneTouchResolver {
                 return .wallet(walletDraft(username: candidate, holderName: name, source: text))
             }
         }
-        return .failure("Không nhận diện được ngân hàng hoặc ví từ nội dung dán")
+        // Ưu tiên câu backend trả về — nó nói đúng chuyện gì đã xảy ra.
+        return .failure(parseError ?? "Không nhận diện được ngân hàng hoặc ví từ nội dung dán")
     }
 
     /// Mã QR (quét camera hoặc tìm thấy trong ảnh) -> nhờ backend verify CRC + tra chủ TK.

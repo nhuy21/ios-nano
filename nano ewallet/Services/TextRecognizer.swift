@@ -38,6 +38,19 @@ enum TextRecognizer {
                             return lhs.boundingBox.origin.x < rhs.boundingBox.origin.x
                         }
                         .compactMap { $0.topCandidates(1).first?.string }
+                        // Bỏ dòng chỉ ĐÚNG MỘT chữ cái đứng riêng: ảnh chụp màn hình có bàn
+                        // phím ảo thì mỗi phím (Q, W, E, R, T...) là một block riêng, Vision
+                        // ở mức `.accurate` đọc ra hơn hai chục "dòng" một ký tự như vậy —
+                        // toàn nhiễu, không ai đặt tên ngân hàng/nội dung chuyển khoản bằng
+                        // đúng 1 chữ cái. Với văn bản dài, hàng phím này chen ngay sau dòng
+                        // thông tin thật, làm mô hình trích xuất phía backend nhận nhầm tín
+                        // hiệu. CHỈ lọc chữ cái đơn — không đụng số ("0", "1"...) hay dòng đã
+                        // có từ 2 ký tự trở lên ("Em", "10k", "Vietin"...).
+                        .filter { line in
+                            let trimmed = line.trimmingCharacters(in: .whitespaces)
+                            guard trimmed.count == 1, let char = trimmed.first else { return true }
+                            return !char.isLetter
+                        }
                     continuation.resume(returning: lines.joined(separator: "\n"))
                 }
                 // `accurate` vì tin nhắn CK có số tài khoản dài, nhận nhầm 1 chữ số là
@@ -81,21 +94,23 @@ enum TextRecognizer {
     }()
 
     // MARK: - Chuẩn hoá
-
-    /// Nối lại dãy số bị OCR tách rời — mirror `OcrText.kt`.
-    ///
-    /// Vấn đề có thật: OCR hay chèn khoảng trắng vào giữa một dãy số dài tuỳ font và khoảng
-    /// cách chữ trong ảnh — "0976505139" đọc thành "09765051 39". Backend chỉ thấy hai dãy
-    /// rời, lấy dãy đầu làm số tài khoản nên tra cứu hỏng, mà người dùng chỉ nhận được câu
-    /// "Tài khoản không hợp lệ" chẳng đoán nổi vì sao.
-    ///
-    /// NHƯNG phải chừa SỐ TIỀN: trong "bidv 7101914631 200k", số tài khoản kết thúc bằng chữ
-    /// số còn "200k" mở đầu bằng chữ số — nối vô điều kiện sẽ dính thành "7101914631200k",
-    /// hỏng cả hai. Quy tắc: không nối nếu nhóm số phía sau có đơn vị tiền đi kèm.
-    ///
-    /// Chỉ bỏ khoảng trắng NGANG, giữ nguyên xuống dòng: hai dòng khác nhau là hai thông tin
-    /// khác nhau, dính vào nhau là sai nghĩa.
-    static func normalize(_ raw: String) -> String {
+    //
+    // Mirror `services/OcrText.kt` (`normalizeOcrText`) — CÓ tồn tại bên Android, đã tra sai
+    // đường dẫn (package cũ `com.baynet.digiflank`, đã đổi sang `vn.casso.nano`) nên trước
+    // đó tưởng nhầm là không có và xoá mất bước này. Giữ nguyên vì Vision cùng có tật của
+    // ML Kit: chèn khoảng trắng vào giữa một dãy số dài tuỳ font/khoảng cách chữ trong ảnh —
+    // "0976505139" đọc thành "09765051 39". Backend chỉ thấy hai dãy rời, lấy dãy đầu làm số
+    // tài khoản nên tra cứu hỏng, mà người dùng chỉ nhận "Tài khoản không hợp lệ" không đoán
+    // được vì sao.
+    //
+    // NHƯNG phải chừa SỐ TIỀN: trong "bidv 7101914631 200k", số tài khoản kết thúc bằng chữ
+    // số còn "200k" mở đầu bằng chữ số — nối vô điều kiện sẽ dính thành "7101914631200k",
+    // hỏng cả hai. Quy tắc: không nối nếu nhóm số phía sau có ĐƠN VỊ TIỀN đi kèm, kể cả khi
+    // đơn vị cách nhóm số bằng khoảng trắng ("200 nghìn", "2 tr").
+    //
+    // Chỉ bỏ khoảng trắng NGANG, giữ nguyên xuống dòng: hai dòng khác nhau là hai thông tin
+    // khác nhau, dính vào nhau là sai nghĩa.
+    private static func normalize(_ raw: String) -> String {
         guard let gapRegex = Self.digitGapRegex, let unitRegex = Self.moneyUnitRegex else {
             return raw
         }
