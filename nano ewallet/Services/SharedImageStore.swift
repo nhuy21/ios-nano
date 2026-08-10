@@ -34,15 +34,21 @@ enum SharedImageStore {
     }
 
     /// Extension gọi: chép ảnh vào App Group. Trả `false` khi chưa bật App Group.
+    ///
+    /// PNG chứ KHÔNG phải JPEG: ảnh chia sẻ vào đây gần như luôn là ảnh chụp màn hình tin
+    /// nhắn chuyển khoản, mà JPEG sinh nhiễu quanh nét chữ nhỏ — đúng thứ khiến OCR đọc nhầm
+    /// chữ số trong số tài khoản. PNG không mất mát, và ảnh chụp màn hình là đồ hoạ phẳng nên
+    /// nén PNG cũng không phình mấy.
     @discardableResult
     static func save(_ image: UIImage) -> Bool {
-        guard let folder = folderUrl,
-              let data = image.jpegData(compressionQuality: 0.9) else { return false }
+        guard let folder = folderUrl, let data = image.pngData() else { return false }
         // Ghi đè một tên cố định: chỉ cần ảnh MỚI NHẤT, giữ nhiều file chỉ tốn chỗ rồi
         // phải tự dọn.
-        let url = folder.appendingPathComponent("pending.jpg")
-        return (try? data.write(to: url, options: .atomic)) != nil
+        return (try? data.write(to: folder.appendingPathComponent(fileName), options: .atomic)) != nil
     }
+
+    /// Tên file cố định. Đổi đuôi sang `.png` kèm việc đổi định dạng ở `save`.
+    private static let fileName = "pending.png"
 
     /// Có ảnh đang chờ và còn hạn không — CHỈ hỏi, không đọc cũng không xoá.
     ///
@@ -50,7 +56,7 @@ enum SharedImageStore {
     /// mở QR bắt quét thêm mã nữa là sai ý người dùng.
     static var hasPending: Bool {
         guard let folder = folderUrl else { return false }
-        let url = folder.appendingPathComponent("pending.jpg")
+        let url = folder.appendingPathComponent(fileName)
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let modified = attributes[.modificationDate] as? Date else { return false }
         return Date().timeIntervalSince(modified) <= maxAge
@@ -60,7 +66,7 @@ enum SharedImageStore {
     /// lý một lần, không để mở app lần sau lại bóc tách lại ảnh cũ.
     static func consumePending() -> UIImage? {
         guard let folder = folderUrl else { return nil }
-        let url = folder.appendingPathComponent("pending.jpg")
+        let url = folder.appendingPathComponent(fileName)
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let modified = attributes[.modificationDate] as? Date else { return nil }
 

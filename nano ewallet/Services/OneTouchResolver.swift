@@ -11,6 +11,7 @@
 import Foundation
 import UIKit
 import CoreImage
+import Vision
 
 enum OneTouchResult {
     case bank(BankTransferDraft)
@@ -135,13 +136,42 @@ enum OneTouchResolver {
         )
     }
 
+    /// Tìm mã QR trong ảnh. Thử Vision trước rồi mới tới `CIDetector`: `CIDetector` là API
+    /// đời cũ, bỏ sót khá nhiều với mã bị mờ, chụp nghiêng hoặc đảo màu — đúng những kiểu ảnh
+    /// người dùng hay chụp lại từ màn hình người khác.
     private static func qrPayload(in image: UIImage) -> String? {
-        guard let ciImage = CIImage(image: image),
-              let detector = CIDetector(
-                ofType: CIDetectorTypeQRCode, context: nil,
-                options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
-              )
-        else { return nil }
+        guard let cgImage = image.cgImage else { return nil }
+        // Hướng ảnh nằm ở `UIImage.imageOrientation` chứ không nằm trong `cgImage`; bỏ qua
+        // thì ảnh chụp từ camera (thường xoay 90°) không dò ra mã.
+        let orientation = CGImagePropertyOrientation(image.imageOrientation)
+
+        if let payload = visionQrPayload(cgImage: cgImage, orientation: orientation) {
+            return payload
+        }
+
+        guard let detector = CIDetector(
+            ofType: CIDetectorTypeQRCode, context: nil,
+            options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+        ) else { return nil }
+        let ciImage = CIImage(cgImage: cgImage).oriented(orientation)
         return (detector.features(in: ciImage) as? [CIQRCodeFeature])?.first?.messageString
+    }
+
+    private static func visionQrPayload(
+        cgImage: CGImage,
+        orientation: CGImagePropertyOrientation
+    ) -> String? {
+        let request = VNDetectBarcodesRequest()
+        request.symbologies = [.qr]
+        do {
+            try VNImageRequestHandler(
+                cgImage: cgImage, orientation: orientation, options: [:]
+            ).perform([request])
+        } catch {
+            return nil
+        }
+        return (request.results as? [VNBarcodeObservation])?
+            .compactMap(\.payloadStringValue)
+            .first
     }
 }
