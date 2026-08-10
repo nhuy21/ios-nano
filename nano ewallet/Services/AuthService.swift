@@ -197,9 +197,13 @@ enum AuthService {
         // báo lỗi, và khoá ký giao dịch thành khoá mồ côi.
         BiometricTokenStore.remove()
         BiometricKeyStore.deleteKey()
+        // Dọn TOÀN BỘ cache theo user tại ĐÂY — điểm duy nhất mọi luồng đăng xuất đi qua.
+        // Để mỗi nơi gọi tự nhớ xoá thì sót một chỗ là tài khoản đăng nhập sau thấy dữ liệu
+        // của tài khoản trước (số dư, giao dịch, danh bạ, hộp thư).
         WalletStore.shared.clear()
         TransactionStore.shared.clear()
         BeneficiaryStore.shared.clear()
+        NotificationStore.shared.clear()
     }
 
     /// `GET auth/devices` — thiết bị đang đăng nhập, active trước rồi `lastUsedAt` giảm dần.

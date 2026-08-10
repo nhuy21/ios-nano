@@ -39,8 +39,15 @@ final class TransactionStore: ObservableObject {
 
     /// Thêm 1 giao dịch mới vào đầu danh sách — dùng khi vừa chuyển tiền xong hoặc
     /// nhận push realtime, không cần gọi lại API. Dedupe theo `id`.
+    /// Khử trùng theo CẢ `id` LẪN `bkTransId`: bản ghi chèn sớm ngay sau khi chuyển tiền chỉ
+    /// biết mã Bảo Kim (chưa có id nội bộ DB), còn bản từ push/API lại có id DB — chỉ so `id`
+    /// thì một giao dịch hiện thành hai dòng.
     func prepend(_ transaction: TransactionEntity) {
-        recentTransactions.removeAll { $0.id == transaction.id }
+        recentTransactions.removeAll {
+            if $0.id == transaction.id { return true }
+            guard let incoming = transaction.bkTransId, !incoming.isEmpty else { return false }
+            return $0.bkTransId == incoming
+        }
         recentTransactions.insert(transaction, at: 0)
     }
 

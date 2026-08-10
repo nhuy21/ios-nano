@@ -43,6 +43,11 @@ struct NotificationsView: View {
     /// Chặn mở trùng khi đang tải chi tiết giao dịch (bấm nhanh 2 lần).
     @State private var isOpeningBill = false
 
+    @Environment(\.scenePhase) private var scenePhase
+    /// Bỏ qua lần `onAppear` ĐẦU TIÊN: `.task {}` bên dưới đã gọi `load()` rồi, refresh
+    /// thêm ngay lúc đó là gọi API hai lần cho cùng một dữ liệu.
+    @State private var didAppearOnce = false
+
     private var visibleItems: [AppNotification] {
         switch selectedTab {
         case .unread: return store.items.filter { !$0.isRead }
@@ -67,6 +72,18 @@ struct NotificationsView: View {
         }
         .screenBackground(Color.white)
         .task { await load() }
+        .onAppear {
+            guard didAppearOnce else {
+                didAppearOnce = true
+                return
+            }
+            Task { await load() }
+        }
+        // App trở lại từ nền: thông báo mới có thể đã tới trong lúc app ngủ.
+        .onChangeNewCompat(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task { await load() }
+        }
         .sheet(item: $billTransaction) { tx in
             TransactionDetailSheet(tx: tx, onDismiss: { billTransaction = nil })
         }

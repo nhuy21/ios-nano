@@ -170,7 +170,11 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 fee: "0",
                 description: string(info["description"]),
                 cachedBalanceAfter: int64(info["balanceAfter"]).map(String.init),
-                bkTransId: nil,
+                // BE gửi kèm `bkTransId` trong payload push đúng để khử trùng: bản ghi chèn
+                // sớm lúc vừa chuyển xong CHƯA có id nội bộ DB (chỉ có mã Bảo Kim), còn bản
+                // từ push thì có id DB — thiếu field này thì không khoá nào khớp, một giao
+                // dịch hiện thành hai dòng.
+                bkTransId: string(info["bkTransId"]),
                 benBankNo: string(info["benBankNo"]),
                 benAccNo: nil,
                 benAccName: string(info["benAccName"]),

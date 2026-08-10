@@ -575,6 +575,32 @@ struct WithdrawView: View {
         let elapsed = submitStartedAt.map { Date().timeIntervalSince($0) }
         await WalletStore.shared.refresh(force: true)
         let bankName = BankCache.shared.bank(bin: bankNo)?.shortName ?? "Ngân hàng"
+
+        // Chèn lạc quan để Home/Lịch sử thấy giao dịch NGAY, không phải chờ một vòng gọi
+        // API. Đặt ở đây nên phủ CẢ ba đường thành công (rút thẳng, PIN, Face ID) vì cả ba
+        // đều đổ về hàm này. Không cần rollback: chỉ chạy khi BE đã xác nhận thành công,
+        // và bản ghi thật từ server sẽ thay thế nó qua khử trùng `bkTransId` trong
+        // `TransactionStore.prepend`.
+        TransactionStore.shared.prepend(
+            TransactionEntity(
+                id: result.bkTransId ?? result.transId ?? UUID().uuidString,
+                type: TransactionType.withdraw.rawValue,
+                amount: String(amount),
+                fee: result.feeAmount.map(String.init) ?? "0",
+                description: nil,
+                cachedBalanceAfter: nil,
+                bkTransId: result.bkTransId ?? result.transId,
+                benBankNo: bankNo,
+                benAccNo: accNo,
+                // Nhánh chưa liên kết rút về TK vừa nhập tay, tên chủ TK nằm ở
+                // `manualHolderName` — lấy `wallet.accName` là tên của TK ĐÃ LIÊN KẾT, sai
+                // người nhận trên dòng vừa chèn.
+                benAccName: isLinked ? wallet.accName : manualHolderName,
+                benBankName: bankName,
+                status: TransactionStatus.success.rawValue,
+                createdAt: ISO8601DateFormatter().string(from: Date())
+            )
+        )
         onSuccess(
             // Rút tiền cũng đổ về TK ngân hàng nên dùng nhánh `.bank` của biên lai.
             TransferSuccessInfo(

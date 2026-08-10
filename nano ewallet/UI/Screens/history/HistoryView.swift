@@ -40,6 +40,11 @@ struct HistoryView: View {
     @State private var detailTransaction: TransactionEntity?
     @State private var searchTask: Task<Void, Never>?
 
+    @Environment(\.scenePhase) private var scenePhase
+    /// Bỏ qua lần `onAppear` ĐẦU TIÊN: `.task {}` bên dưới đã nạp trang đầu rồi, refresh
+    /// thêm ngay lúc đó là gọi API hai lần cho cùng một dữ liệu.
+    @State private var didAppearOnce = false
+
     private var isSearchMode: Bool {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty || dateStart != nil || dateEnd != nil
     }
@@ -78,6 +83,26 @@ struct HistoryView: View {
             await store.loadFirstPage(filter: filter)
         }
         .onChangeNewCompat(of: searchText) { _ in triggerSearchOrReload() }
+        .onAppear {
+            guard didAppearOnce else {
+                didAppearOnce = true
+                return
+            }
+            refreshOnReappear()
+        }
+        .onChangeNewCompat(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            refreshOnReappear()
+        }
+    }
+
+    /// Nạp lại trang đầu khi màn hiện ra lại (quay về từ màn khác, hoặc app trở lại từ nền).
+    ///
+    /// Đang tìm kiếm thì KHÔNG nạp: `loadFirstPage` ghi đè `items` bằng danh sách đầy đủ,
+    /// xoá sạch kết quả tìm mà người dùng đang xem.
+    private func refreshOnReappear() {
+        guard !isSearchMode else { return }
+        Task { await store.loadFirstPage(filter: filter) }
     }
 
     // MARK: - Header

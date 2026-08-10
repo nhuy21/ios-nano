@@ -57,7 +57,20 @@ struct ConversationView: View {
             composer
         }
         .screenBackground(Color.white)
-        .task { await reload() }
+        // Poll 3s để thấy đối phương đồng ý/từ chối mà không phải thoát ra vào lại màn.
+        // `.task` tự huỷ khi rời màn nên vòng lặp không sống quá vòng đời view.
+        // KHÔNG hạ dưới 3s: BE chặn tần suất endpoint này ở 30 request / 60 giây.
+        .task {
+            while !Task.isCancelled {
+                // Đang có thao tác dở (gửi/đồng ý/từ chối/huỷ, hoặc đang chờ nhập PIN) thì bỏ
+                // lượt này: thao tác đó tự reload khi xong, để poll chen vào sẽ ghi đè danh
+                // sách bằng dữ liệu cũ hơn.
+                if busyId == nil && !isSending && pendingTransactionId == nil {
+                    await reload()
+                }
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
         .sheet(isPresented: pendingTransactionIdBinding) {
             PinEntrySheet(
                 amountText: Int(pinAmount).vndFormatted,
@@ -311,6 +324,10 @@ struct ConversationView: View {
                 )
                 amountText = ""
                 note = ""
+                // Hạ cờ TRƯỚC khi reload (không để `defer` chạy sau): còn cờ thì poll bị chặn
+                // suốt thời gian reload, hạ sau thì hai lượt reload chồng nhau và lượt về
+                // muộn hơn — có thể là lượt cũ hơn — ghi đè dữ liệu mới.
+                isSending = false
                 await reload()
             } catch let error as APIError {
                 errorMessage = error.message
@@ -342,8 +359,9 @@ struct ConversationView: View {
                     pinRecipientName = displayName
                     pendingTransactionId = transactionId
                 } else {
-                    await reload()
+                    // Hạ cờ TRƯỚC khi reload — xem ghi chú ở `send()`.
                     busyId = nil
+                    await reload()
                 }
             } catch let error as APIError {
                 errorMessage = error.message
@@ -361,9 +379,10 @@ struct ConversationView: View {
             _ = try await TransferService.verifyTransfer(
                 VerifyTransferRequest(password: pin, transactionId: transactionId)
             )
+            // Hạ cả hai cờ TRƯỚC khi reload — xem ghi chú ở `send()`.
             pendingTransactionId = nil
-            await reload()
             busyId = nil
+            await reload()
         } catch let error as APIError {
             pinError = error.message
         } catch {
@@ -377,13 +396,16 @@ struct ConversationView: View {
         Task {
             do {
                 try await MoneyRequestService.decline(id: item.id)
+                // Hạ cờ TRƯỚC khi reload — xem ghi chú ở `send()`.
+                busyId = nil
                 await reload()
             } catch let error as APIError {
                 errorMessage = error.message
+                busyId = nil
             } catch {
                 errorMessage = "Từ chối thất bại"
+                busyId = nil
             }
-            busyId = nil
         }
     }
 
@@ -393,13 +415,16 @@ struct ConversationView: View {
         Task {
             do {
                 try await MoneyRequestService.cancel(id: item.id)
+                // Hạ cờ TRƯỚC khi reload — xem ghi chú ở `send()`.
+                busyId = nil
                 await reload()
             } catch let error as APIError {
                 errorMessage = error.message
+                busyId = nil
             } catch {
                 errorMessage = "Huỷ thất bại"
+                busyId = nil
             }
-            busyId = nil
         }
     }
 

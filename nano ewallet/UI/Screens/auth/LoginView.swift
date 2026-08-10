@@ -146,7 +146,7 @@ struct LoginView: View {
             Text("Chưa có tài khoản? ")
                 .font(AppFont.beVietnamPro(14))
                 .foregroundStyle(AppColor.payMuted)
-            Text("Đăng kí")
+            Text("Đăng ký")
                 .font(AppFont.beVietnamPro(14, .semibold))
                 .foregroundStyle(AppColor.brand)
         }

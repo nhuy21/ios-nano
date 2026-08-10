@@ -28,7 +28,11 @@ actor TokenRefresher {
 
         let task = Task<Void, Error> { try await Self.performRefresh() }
         inFlight = task
-        defer { inFlight = nil }
+        // Dọn bằng identity check chứ KHÔNG `defer { inFlight = nil }`: lượt refresh sau có
+        // thể đã gán `inFlight` mới trong lúc lượt này còn đang chờ mạng, gán nil vô điều
+        // kiện sẽ xoá nhầm Task mới đó — các request tới sau mất chỗ bám, tự gọi refresh
+        // thêm lần nữa.
+        defer { if inFlight === task { inFlight = nil } }
         try await task.value
     }
 
