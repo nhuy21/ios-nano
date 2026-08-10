@@ -56,7 +56,7 @@ struct QuickTopUpSheet: View {
                 }
             }
             // Trần chiều cao để danh sách + ô tiền + nút vẫn nằm gọn trong màn máy nhỏ.
-            .frame(maxHeight: 260)
+            .frame(maxHeight: 320)
 
             amountField
 
@@ -83,19 +83,13 @@ struct QuickTopUpSheet: View {
         )
     }
 
-    /// Hàng chọn ngân hàng.
-    ///
-    /// KHÔNG bọc trong `Button { } label: { }`: logo tải qua mạng nằm trong label của Button
-    /// thì SwiftUI coi cả cụm là hình vẽ của nút, ảnh bị áp kiểu tô template và vòng tải
-    /// không chạy — chỉ thấy ô xám giữ chỗ mãi. Dùng `.pressable` (tự bọc Button ở lớp
-    /// ngoài) nên phần nội dung vẫn là view thường.
     private func bankRow(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
         let isPicked = pickedAppId == bank.appId
         return HStack(spacing: 14) {
-            bankLogo(bank)
+            BankAppIcon(bank: bank)
 
             Text(bank.displayName)
-                .font(AppFont.beVietnamPro(14, .semibold))
+                .font(AppFont.beVietnamPro(15, .semibold))
                 .foregroundStyle(AppColor.payInk)
 
             Spacer(minLength: 0)
@@ -107,48 +101,12 @@ struct QuickTopUpSheet: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .background(isPicked ? Self.brand.opacity(0.08) : Color.clear)
         .contentShape(Rectangle())
         .pressable {
             pickedAppId = bank.appId
             errorMessage = nil
-        }
-    }
-
-    private func bankLogo(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
-        AsyncImage(url: URL(string: bank.logoUrl)) { phase in
-            switch phase {
-            case .success(let image):
-                // `scaledToFill` chứ KHÔNG phải `scaledToFit`: đây là ảnh quảng bá App Store
-                // 1200x630 (tỉ lệ 1.9) chứ không phải icon vuông — icon thật nằm giữa, hai
-                // bên là nền trắng. Fit vào ô 40x40 thì ảnh co còn 40x21 và phần nhìn thấy
-                // gần như toàn nền trắng, trên nền sheet trắng thành ra như không có gì.
-                // Fill lấp đầy ô vuông rồi cắt bớt hai bên thừa, đúng phần icon còn lại.
-                image.resizable().scaledToFill()
-            case .failure:
-                // Tải hỏng (mất mạng, ảnh đổi địa chỉ) thì hiện chữ đầu của tên ngân hàng —
-                // ô xám trơn trông như đang tải dở và người dùng sẽ ngồi đợi mãi.
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Self.brand.opacity(0.12))
-                    .overlay {
-                        Text(bank.displayName.prefix(1))
-                            .font(AppFont.beVietnamPro(16, .bold))
-                            .foregroundStyle(Self.brand)
-                    }
-            default:
-                // Đang tải: ô xám giữ chỗ, không dùng spinner — 5 vòng xoay cùng lúc lúc mở
-                // sheet trông như đang lỗi.
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(AppColor.line.opacity(0.5))
-            }
-        }
-        .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        // Viền mảnh để icon nền trắng (VietinBank, ACB...) không lẫn vào nền trắng của sheet.
-        .overlay {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(AppColor.line, lineWidth: 1)
         }
     }
 
@@ -209,6 +167,76 @@ struct QuickTopUpSheet: View {
         onOpenedBankApp()
         openURL(url)
         onDismiss()
+    }
+}
+
+/// Icon app ngân hàng, tải bằng `URLSession` chứ KHÔNG dùng `AsyncImage`.
+///
+/// `AsyncImage` nằm trong `fullScreenCover` bị huỷ dở lúc lớp phủ đang chuyển cảnh và không
+/// bao giờ thử lại — kết quả là danh sách trống logo mãi, dù mở đúng URL đó bằng Safari trên
+/// cùng máy vẫn ra ảnh. Tự tải thì kiểm soát được vòng đời, và có cache để mở lại sheet
+/// không phải tải lần nữa.
+///
+/// Trong lúc chờ (và khi mạng hỏng hẳn) hiện logo vector local theo BIN, nên ô icon không bao
+/// giờ trống chỗ.
+private struct BankAppIcon: View {
+    let bank: QuickTopUpDeeplink.SourceBank
+    var size: CGFloat = 52
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                // `scaledToFill` (= ContentScale.Crop bên Kotlin): icon App Store là ảnh
+                // VUÔNG có nền riêng, fit vào vòng tròn sẽ hở bốn góc nền trắng.
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                localFallback
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        // Viền mảnh để icon nền trắng (VietinBank, ACB...) vẫn tách khỏi nền trắng của sheet.
+        .overlay {
+            Circle().strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
+        }
+        .task(id: bank.appId) { await load() }
+    }
+
+    /// Hiện trong lúc ảnh chưa về (và khi mạng hỏng hẳn) nên ô icon không bao giờ trống chỗ.
+    /// Vector local port từ Android đã bỏ màu gốc nên chỉ tô được một màu mực.
+    private var localFallback: some View {
+        Color.white
+            .overlay {
+                if let shape = BankLogoPaths.shape(bin: bank.bin) {
+                    ZStack {
+                        ForEach(Array(shape.paths.enumerated()), id: \.offset) { _, pathData in
+                            SVGPath(pathData: pathData, viewBox: shape.viewBox)
+                                .fill(AppColor.payInk, style: FillStyle(eoFill: shape.usesEvenOdd))
+                        }
+                    }
+                    .frame(width: size * 0.55, height: size * 0.55)
+                } else {
+                    Text(bank.displayName.prefix(1))
+                        .font(AppFont.beVietnamPro(18, .bold))
+                        .foregroundStyle(AppColor.payInk)
+                }
+            }
+    }
+
+    private func load() async {
+        guard let url = URL(string: bank.logoUrl) else { return }
+        // `URLSession.shared` đã tự cache theo `URLCache` mặc định, mà response của Apple có
+        // `Cache-Control: max-age` rất dài — nên không cần tự dựng thêm một lớp cache nữa.
+        guard let (data, _) = try? await URLSession.shared.data(from: url),
+              let loaded = UIImage(data: data) else {
+            // Tải hỏng thì cứ để vector local — không có gì thêm phải làm.
+            return
+        }
+        image = loaded
     }
 }
 

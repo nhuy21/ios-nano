@@ -37,7 +37,11 @@ enum QuickTopUpDeeplink {
     struct SourceBank: Identifiable, Hashable {
         let appId: String
         let displayName: String
+        /// Icon app trên App Store.
         let logoUrl: String
+        /// BIN NAPAS — dùng vẽ logo vector LOCAL trong lúc ảnh chưa tải xong, và làm chỗ dựa
+        /// nếu mạng hỏng. Nhờ vậy danh sách không bao giờ trống chỗ.
+        let bin: String
 
         var id: String { appId }
     }
@@ -50,27 +54,32 @@ enum QuickTopUpDeeplink {
         SourceBank(
             appId: "icb",
             displayName: "VietinBank iPay",
-            logoUrl: "https://is4-ssl.mzstatic.com/image/thumb/Purple112/v4/14/04/b8/1404b8f4-a91f-f8bf-7af5-1a0e59bbdf19/AppIcon-0-0-1x_U007emarketing-0-0-0-7-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/1200x630wa.png"
+            logoUrl: "https://is4-ssl.mzstatic.com/image/thumb/Purple112/v4/14/04/b8/1404b8f4-a91f-f8bf-7af5-1a0e59bbdf19/AppIcon-0-0-1x_U007emarketing-0-0-0-7-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/1200x630wa.png",
+            bin: "970415"
         ),
         SourceBank(
             appId: "bidv",
             displayName: "BIDV SmartBanking",
-            logoUrl: "https://is1-ssl.mzstatic.com/image/thumb/Purple112/v4/88/1b/e6/881be6df-e9b6-8b66-e0fb-2499ac874734/AppIcon-1x_U007emarketing-0-6-0-0-85-220.png/1200x630wa.png"
+            logoUrl: "https://is1-ssl.mzstatic.com/image/thumb/Purple112/v4/88/1b/e6/881be6df-e9b6-8b66-e0fb-2499ac874734/AppIcon-1x_U007emarketing-0-6-0-0-85-220.png/1200x630wa.png",
+            bin: "970418"
         ),
         SourceBank(
             appId: "ocb",
             displayName: "OCB OMNI",
-            logoUrl: "https://is4-ssl.mzstatic.com/image/thumb/Purple122/v4/f0/66/94/f066942c-2cc6-2c87-407b-a38f2e99656f/AppIcon-0-0-1x_U007emarketing-0-0-0-10-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/1200x630wa.png"
+            logoUrl: "https://is4-ssl.mzstatic.com/image/thumb/Purple122/v4/f0/66/94/f066942c-2cc6-2c87-407b-a38f2e99656f/AppIcon-0-0-1x_U007emarketing-0-0-0-10-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/1200x630wa.png",
+            bin: "970448"
         ),
         SourceBank(
             appId: "acb",
             displayName: "ACB ONE",
-            logoUrl: "https://is4-ssl.mzstatic.com/image/thumb/Purple122/v4/a1/ae/1e/a1ae1e68-2d58-92bc-9ec5-42917a59f767/AppIcon-1x_U007emarketing-0-7-0-0-85-220.png/1200x630wa.png"
+            logoUrl: "https://is4-ssl.mzstatic.com/image/thumb/Purple122/v4/a1/ae/1e/a1ae1e68-2d58-92bc-9ec5-42917a59f767/AppIcon-1x_U007emarketing-0-7-0-0-85-220.png/1200x630wa.png",
+            bin: "970416"
         ),
         SourceBank(
             appId: "mb",
             displayName: "MB Bank",
-            logoUrl: "https://is2-ssl.mzstatic.com/image/thumb/Purple122/v4/f4/0a/b6/f40ab6a2-e67d-e267-9c46-ae03dfa238a9/AppIcon-0-0-1x_U007emarketing-0-0-0-7-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/1200x630wa.png"
+            logoUrl: "https://is2-ssl.mzstatic.com/image/thumb/Purple122/v4/f4/0a/b6/f40ab6a2-e67d-e267-9c46-ae03dfa238a9/AppIcon-0-0-1x_U007emarketing-0-0-0-7-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/1200x630wa.png",
+            bin: "970422"
         ),
     ]
 
