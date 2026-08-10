@@ -87,13 +87,20 @@ struct PersonalInfoView: View {
     // MARK: - Thành phần
 
     private var avatar: some View {
+        // Cùng kiểu với avatar ở màn Cá nhân: không tô nền, chỉ viền + chữ màu thương hiệu.
         Circle()
-            .fill(AppColor.brandSoft)
+            .strokeBorder(
+                LinearGradient(
+                    colors: [Color(hex: 0x2ECB6E), Color(hex: 0x00A24A)],
+                    startPoint: .top, endPoint: .bottom
+                ),
+                lineWidth: 2
+            )
             .frame(width: 88, height: 88)
             .overlay {
                 Text(initials)
                     .font(AppFont.beVietnamPro(32, .heavy))
-                    .foregroundStyle(AppColor.brand)
+                    .foregroundStyle(Color(hex: 0x00A24A))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
