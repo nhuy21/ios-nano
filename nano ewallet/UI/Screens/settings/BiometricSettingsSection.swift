@@ -193,6 +193,13 @@ struct BiometricSettingsSection: View {
         .disabled(isWorking)
         .overlay { if isWorking { ProgressView().tint(AppColor.brand) } }
         .presentationDetents([.height(360)])
+        // Sheet không set nền sẽ lấy nền hệ thống — ở dark mode là ĐEN, mà chữ trong đây đều
+        // là màu tối cố định (`payInk`/`payMuted`) nên bị dìm gần như không đọc được.
+        //
+        // Phải giãn hết khung TRƯỚC khi tô nền: `VStack` chỉ cao bằng nội dung, mà detent cố
+        // định thường cao hơn — tô nền theo `VStack` sẽ để hở dải dưới lộ lại nền đen.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color.white)
         .presentationDragIndicator(.hidden)
     }
 
