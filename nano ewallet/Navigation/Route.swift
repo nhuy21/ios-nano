@@ -23,6 +23,7 @@ enum Route: Hashable {
 
 /// Route con của tab Settings — cây điều hướng riêng (NavigationStack độc lập với Auth).
 enum SettingsRoute: Hashable {
+    case personalInfo
     case security
     case changePassword
     case pinLimit

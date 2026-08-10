@@ -122,6 +122,8 @@ struct SettingsView: View {
                 Spacer().frame(height: 24)
 
                 menuSection(title: "Tài khoản") {
+                    navMenuRow(title: "Thông tin cá nhân", systemImage: "person.fill", route: .personalInfo)
+                    divider
                     navMenuRow(title: "Ngân hàng liên kết", systemImage: "creditcard.fill", route: .linkedBanks)
                     divider
                     navMenuRow(title: "Bảo mật & Mật khẩu", systemImage: "lock.fill", route: .security)
@@ -206,6 +208,8 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(for route: SettingsRoute) -> some View {
         switch route {
+        case .personalInfo:
+            PersonalInfoView(onBack: popBack)
         case .security:
             SecurityView(
                 onBack: popBack,
@@ -317,12 +321,8 @@ struct SettingsView: View {
                 .font(AppFont.beVietnamPro(18, .bold))
                 .foregroundStyle(AppColor.payInk)
 
-            if let phone = authStore.userPhone, !phone.isEmpty {
-                Text("+\(phone)")
-                    .font(AppFont.beVietnamPro(14))
-                    .foregroundStyle(AppColor.payMuted)
-            }
-
+            // Số điện thoại chuyển hẳn sang màn Thông tin cá nhân: đây là màn ai mở máy cũng
+            // liếc thấy, không cần phơi số ngay đầu.
             verificationBadge
                 .padding(.top, 4)
         }

@@ -8,7 +8,27 @@
 
 import Foundation
 
+/// Hồ sơ người dùng cho màn Thông tin cá nhân — `GET users/me`.
+///
+/// `phone`/`email`/`kycStatus` KHÔNG optional vì BE luôn trả (tài khoản nào cũng có), còn
+/// nhóm thông tin giấy tờ chỉ có sau khi eKYC xong nên để optional.
+struct UserProfile: Decodable {
+    let fullName: String?
+    let phone: String
+    let email: String
+    let idNumber: String?
+    let birthDay: String?
+    /// 1 = Nam, 2 = Nữ, 3 = Khác — xem `PersonalInfoView.genderLabel`.
+    let gender: Int?
+    let kycStatus: String
+}
+
 enum AccountService {
+
+    /// `GET users/me` — hồ sơ đầy đủ cho màn Thông tin cá nhân.
+    static func getMyProfile() async throws -> UserProfile {
+        try await APIClient.shared.request(.get, "users/me", auth: true, as: UserProfile.self)
+    }
 
     /// `POST users/change-password/request-otp`
     static func requestChangePasswordOtp() async throws {
