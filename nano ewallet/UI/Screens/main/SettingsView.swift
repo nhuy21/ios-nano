@@ -436,16 +436,16 @@ struct SettingsView: View {
     /// Android, nhưng khung rộng 28 BẰNG `rowIcon`: khung 40 cũ đẩy chữ lệch hẳn một cột so
     /// với các hàng ở khối trên, thấy rõ ngay khi mọi hàng đã cao bằng nhau.
     private func toggleRowIcon(_ systemImage: String) -> some View {
+        rowIcon(systemImage)
+    }
+
+    /// Dùng chung cho MỌI hàng trong màn này — icon 24pt màu mực. Trước đây khối "Tài khoản"
+    /// để 16pt màu xanh còn khối "Cài đặt" 24pt màu mực, nên hai khối xếp ngay cạnh nhau mà
+    /// icon lệch cỡ và lệch màu.
+    private func rowIcon(_ systemImage: String) -> some View {
         Image(systemName: systemImage)
             .font(.system(size: 24))
             .foregroundStyle(AppColor.payInk)
-            .frame(width: 28)
-    }
-
-    private func rowIcon(_ systemImage: String) -> some View {
-        Image(systemName: systemImage)
-            .font(.system(size: 16))
-            .foregroundStyle(SettingsColor.accent)
             .frame(width: 28)
     }
 
