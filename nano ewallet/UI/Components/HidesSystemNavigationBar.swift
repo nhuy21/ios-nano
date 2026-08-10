@@ -108,6 +108,25 @@ extension View {
     }
 }
 
+extension UIApplication {
+    /// Chiều cao vùng an toàn phía trên (status bar / Dynamic Island) của cửa sổ đang hiện.
+    ///
+    /// Cần khi một màn tự bỏ qua safe area trên (`ignoresSafeArea(edges: .top)`) rồi phải tự
+    /// bù lại khoảng đó cho nội dung — lúc ấy không còn cách nào lấy được số này từ layout.
+    /// Đọc từ window thật chứ không ghim hằng số: tai thỏ, Dynamic Island và máy không tai
+    /// mỗi loại một chiều cao khác nhau. `UIScreen.main` đã bị khai tử từ iOS 26 nên đi qua
+    /// scene; không tìm được scene nào thì lấy 47pt (Dynamic Island) làm mức đoán.
+    var topSafeAreaInset: CGFloat {
+        let scene = connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let inset = scene?.windows.first { $0.isKeyWindow }?.safeAreaInsets.top
+            ?? scene?.windows.first?.safeAreaInsets.top
+        return inset ?? 47
+    }
+}
+
 /// Nhún khi nhấn, dùng qua `View.pressable`.
 ///
 /// Hai chiều dùng animation KHÁC nhau, cố ý: nhấn xuống phải bắt kịp ngón tay nên đi thẳng

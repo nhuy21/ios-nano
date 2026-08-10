@@ -91,6 +91,12 @@ struct SettingsView: View {
     private var settingsContent: some View {
         settingsScrollContent
         .screenBackground(SettingsColor.screenBg)
+        // Cho NỘI DUNG (không chỉ nền) tràn lên status bar, để banner chạm tới đỉnh màn.
+        // `screenBackground` chỉ mở safe area cho lớp nền phía sau, còn `.frame` của nó vẫn
+        // giữ nội dung trong vùng an toàn — nên đặt `.ignoresSafeArea` bên trong ScrollView
+        // là vô ích, phải đặt ở NGOÀI, sau `screenBackground`. Banner tự cộng bù chiều cao
+        // status bar (xem `profileHeader`) nên chữ và avatar không bị đôn lên dưới đồng hồ.
+        .ignoresSafeArea(edges: .top)
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
             Button("Huỷ", role: .cancel) {}
@@ -246,23 +252,27 @@ struct SettingsView: View {
     /// có `.clipShape` sẽ cắt mất nửa trên avatar — mirror đúng cảnh báo trong
     /// `SettingsScreen.kt` (Box "avatar phải SIBLING, không phải con của ô trắng").
     private var profileHeader: some View {
-        ZStack(alignment: .top) {
+        // Chiều cao status bar — `ScrollView` đã bỏ qua safe area trên nên banner phải TỰ
+        // cộng phần này vào, nếu không avatar và tên sẽ bị đôn lên nằm ngay dưới đồng hồ.
+        // Đọc từ window thật thay vì hằng số cứng: tai thỏ, Dynamic Island và máy không tai
+        // mỗi loại một chiều cao khác nhau.
+        let topInset = UIApplication.shared.topSafeAreaInset
+        let bannerHeight = ProfileHeaderMetrics.bannerHeight + topInset
+
+        return ZStack(alignment: .top) {
             // `Color.clear` là view quyết định kích thước (tự co theo khung chứa, KHÔNG có
             // kích thước riêng); ảnh chỉ VẼ ĐÈ qua `.overlay` + `.clipped()` nên không tham
             // gia tính layout. Để `Image` làm con trực tiếp của ZStack thì ảnh gốc 1600px
             // với `.aspectRatio(.fill)` sẽ kéo giãn ZStack, đẩy cả màn tràn ra 2 bên (chữ
             // "Tài khoản"/"Cài đặt" và icon/toggle hai mép đều bị cắt).
             Color.clear
-                .frame(height: ProfileHeaderMetrics.bannerHeight)
+                .frame(height: bannerHeight)
                 .overlay {
                     Image("banner_home")
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 }
                 .clipped()
-                // Tràn lên cả status bar, không né safe area trên — mirror Android (không có
-                // `statusBarsPadding()` ở banner).
-                .ignoresSafeArea(edges: .top)
 
             VStack(spacing: 0) {
                 nameSection
@@ -278,12 +288,12 @@ struct SettingsView: View {
                     topTrailingRadius: ProfileHeaderMetrics.cardRadius
                 )
             )
-            .padding(.top, ProfileHeaderMetrics.bannerHeight - ProfileHeaderMetrics.cardOverlap)
+            .padding(.top, bannerHeight - ProfileHeaderMetrics.cardOverlap)
 
             avatar
                 .padding(
                     .top,
-                    ProfileHeaderMetrics.bannerHeight - ProfileHeaderMetrics.cardOverlap
+                    bannerHeight - ProfileHeaderMetrics.cardOverlap
                         - ProfileHeaderMetrics.avatarSize / 2
                 )
                 .frame(maxWidth: .infinity)

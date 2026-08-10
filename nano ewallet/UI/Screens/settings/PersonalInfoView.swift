@@ -12,6 +12,8 @@ import SwiftUI
 struct PersonalInfoView: View {
     let onBack: () -> Void
 
+    @StateObject private var authStore = AuthStore.shared
+
     @State private var profile: UserProfile?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -89,12 +91,25 @@ struct PersonalInfoView: View {
             .fill(AppColor.brandSoft)
             .frame(width: 88, height: 88)
             .overlay {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 40))
+                Text(initials)
+                    .font(AppFont.beVietnamPro(32, .heavy))
                     .foregroundStyle(AppColor.brand)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
+    }
+
+    /// Chữ cái đầu của họ và của tên — dùng chung `nameInitials` với màn Cá nhân để hai nơi
+    /// không bao giờ ra kết quả khác nhau.
+    ///
+    /// Ưu tiên tên vừa lấy từ API hơn tên trong cache: màn này đã gọi `users/me` nên có bản
+    /// mới nhất, còn cache có thể là tên cũ từ lần đăng nhập trước.
+    private var initials: String {
+        // `profile?.fullName` là `String??` (cả profile lẫn fullName đều optional) nên phải
+        // gỡ hai lớp bằng `??` chứ không dùng `flatMap` được.
+        let fromApi = (profile?.fullName ?? nil).flatMap { $0.isEmpty ? nil : $0 }
+        let name = fromApi ?? authStore.userFullName ?? "Người dùng Nano"
+        return name.nameInitials
     }
 
     private func groupLabel(_ text: String) -> some View {

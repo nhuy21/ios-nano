@@ -16,17 +16,8 @@ struct WalletRulesView: View {
     let onStart: () -> Void
     var onAdjustLimit: () -> Void = {}
 
-    /// Chiều cao safe area trên (tai thỏ / Dynamic Island). Đọc qua `connectedScenes` thay
-    /// `UIScreen.main` (deprecated iOS 26); không có scene thì rơi về 47pt (Dynamic Island).
-    private static var topSafeInset: CGFloat {
-        let scene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }
-            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let inset = scene?.windows.first { $0.isKeyWindow }?.safeAreaInsets.top
-            ?? scene?.windows.first?.safeAreaInsets.top
-        return inset ?? 47
-    }
+    /// Chiều cao safe area trên (tai thỏ / Dynamic Island) — xem `UIApplication.topSafeAreaInset`.
+    private static var topSafeInset: CGFloat { UIApplication.shared.topSafeAreaInset }
 
     var body: some View {
         VStack(spacing: 0) {
