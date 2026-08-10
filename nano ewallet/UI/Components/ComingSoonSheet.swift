@@ -51,7 +51,7 @@ struct ComingSoonSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .padding(.horizontal, 24)
             .padding(.top, 8)
             .padding(.bottom, 24)

@@ -48,7 +48,7 @@ struct DeviceConflictDialog: View {
                         .background(AppColor.bgSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(sending)
 
                 Button {
@@ -62,7 +62,7 @@ struct DeviceConflictDialog: View {
                         .background(DialogColor.green.opacity(sending ? 0.5 : 1))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(sending)
             }
             .padding(.top, 20)
@@ -223,7 +223,7 @@ private struct DialogKeypad: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: DialogColor.ink.opacity(0.14), radius: 8, x: 0, y: 3)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(disabled)
     }
 
@@ -244,7 +244,7 @@ private struct DialogKeypad: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: AppColor.brand.opacity(0.2), radius: 4, x: 0, y: 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(disabled)
     }
 }

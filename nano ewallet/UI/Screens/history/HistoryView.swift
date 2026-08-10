@@ -28,6 +28,9 @@ private enum HistoryColor {
 
 struct HistoryView: View {
     let onBack: () -> Void
+    /// Mở chi tiết giao dịch. Màn này không sở hữu `NavigationStack.path` (Home giữ) nên
+    /// đẩy ngược lên trên thay vì tự push.
+    var onOpenTransaction: (TransactionEntity) -> Void = { _ in }
 
     @StateObject private var store = HistoryStore()
 
@@ -37,7 +40,6 @@ struct HistoryView: View {
     @State private var dateStart: Date?
     @State private var dateEnd: Date?
     @State private var showDateFilter = false
-    @State private var detailTransaction: TransactionEntity?
     @State private var searchTask: Task<Void, Never>?
 
     @Environment(\.scenePhase) private var scenePhase
@@ -75,9 +77,6 @@ struct HistoryView: View {
                 onDismiss: { showDateFilter = false }
             )
             .transparentSheetBackground()
-        }
-        .sheet(item: $detailTransaction) { tx in
-            TransactionDetailSheet(tx: tx, onDismiss: { detailTransaction = nil })
         }
         .task {
             await store.loadFirstPage(filter: filter)
@@ -119,7 +118,7 @@ struct HistoryView: View {
                         .frame(width: 40, height: 40)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Quay lại")
 
                 Text("Lịch sử giao dịch")
@@ -159,7 +158,7 @@ struct HistoryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Search bar + date chip
@@ -183,7 +182,7 @@ struct HistoryView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(AppColor.payMuted)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Xoá")
             }
         }
@@ -214,7 +213,7 @@ struct HistoryView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 12))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
         }
         .foregroundStyle(AppColor.brand)
         .padding(.horizontal, 12)
@@ -299,7 +298,7 @@ struct HistoryView: View {
                             Capsule().strokeBorder(HistoryColor.pillBorder, lineWidth: 1)
                         }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
             Spacer(minLength: 0)
         }
@@ -360,7 +359,7 @@ struct HistoryView: View {
     private func row(_ tx: TransactionEntity) -> some View {
         let icon = TransactionDisplay.iconStyle(for: tx)
         return Button {
-            detailTransaction = tx
+            onOpenTransaction(tx)
         } label: {
             HStack(alignment: .top, spacing: 8) {
                 TransactionIcon(kind: icon.icon, tint: icon.tint)
@@ -399,7 +398,7 @@ struct HistoryView: View {
             .padding(.horizontal, 4)
             .padding(.vertical, 10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Empty / error states
@@ -441,7 +440,7 @@ struct HistoryView: View {
             Button("Tải lại") {
                 Task { await store.loadFirstPage(filter: filter) }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .font(AppFont.beVietnamPro(14, .semibold))
             .foregroundStyle(AppColor.brand)
             .padding(.horizontal, 20)

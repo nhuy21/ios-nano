@@ -195,7 +195,7 @@ struct VoiceCommandOverlay: View {
                 .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Trạng thái hiển thị

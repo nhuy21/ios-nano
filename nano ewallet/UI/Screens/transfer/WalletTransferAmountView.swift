@@ -375,7 +375,7 @@ struct WalletTransferAmountView: View {
                     .clipShape(Circle())
                     .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Quay lại")
 
             Spacer()
@@ -396,7 +396,7 @@ struct WalletTransferAmountView: View {
                         .frame(width: 38, height: 38)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Hỗ trợ")
 
                 Rectangle()
@@ -411,7 +411,7 @@ struct WalletTransferAmountView: View {
                         .frame(width: 38, height: 38)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Trang chủ")
             }
         }
@@ -483,7 +483,7 @@ struct WalletTransferAmountView: View {
                     .foregroundStyle(AppColor.brand)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
 
             HStack(spacing: 8) {
@@ -524,7 +524,7 @@ struct WalletTransferAmountView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
             .padding(.leading, 16)
             .padding(.trailing, 8)
@@ -663,7 +663,7 @@ struct WalletTransferAmountView: View {
                                 }
                                 .contentShape(Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                     }
                 }
             }
@@ -688,7 +688,7 @@ struct WalletTransferAmountView: View {
                 )
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(speech.isListening ? "Dừng nghe" : "Nhập số tiền bằng giọng nói")
     }
 
@@ -743,7 +743,7 @@ struct WalletTransferAmountView: View {
                             .background(AppColor.brandSoft)
                             .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                 }
             }
         }

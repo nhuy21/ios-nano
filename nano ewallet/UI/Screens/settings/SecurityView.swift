@@ -64,7 +64,7 @@ struct SecurityView: View {
             // nhận chạm — phải bấm đúng chữ hoặc mũi tên mới mở được thẻ.
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 }
 

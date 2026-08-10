@@ -29,7 +29,7 @@ struct PrimaryButton: View {
                 .background(AppColor.brand.opacity(tappable ? 1 : 0.6))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(!tappable)
         .primaryButtonShadow()
     }
@@ -50,7 +50,7 @@ struct BackHeader: View {
                     .background(Color.white)
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .circleButtonShadow()
             .accessibilityLabel("Quay lại")
 

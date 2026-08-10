@@ -43,11 +43,17 @@ final class AuthStore: ObservableObject {
     var accessToken: String? { KeychainStore.get(.accessToken) }
     var refreshToken: String? { KeychainStore.get(.refreshToken) }
 
+    /// Tăng lên mỗi lần phiên kết thúc. Dùng làm tín hiệu huỷ cho các tiến trình nền sống ở
+    /// gốc cây view (vd `TopUpWatcher`): chúng KHÔNG bị huỷ khi điều hướng về màn Login, nên
+    /// không có mốc này thì vòng chờ tiền về của tài khoản vừa đăng xuất vẫn chạy tiếp.
+    @Published private(set) var sessionRevision = 0
+
     /// Xoá token + hồ sơ user. KHÔNG xoá `lastPhone` (xem `clearLastPhone`).
     func clearTokens() {
         KeychainStore.remove(.accessToken)
         KeychainStore.remove(.refreshToken)
         clearUser()
+        sessionRevision &+= 1
     }
 
     // MARK: - Hồ sơ user

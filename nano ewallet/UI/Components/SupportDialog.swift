@@ -67,7 +67,7 @@ struct SupportDialog: View {
                         .background(AppColor.brand)
                         .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
 
                 Button {
                     onDismiss()
@@ -78,7 +78,7 @@ struct SupportDialog: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .padding(.top, 4)
             }
             .padding(.horizontal, 24)

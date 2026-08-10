@@ -1,27 +1,33 @@
 //
-//  TransactionDetailSheet.swift
+//  TransactionDetailView.swift
 //  nano ewallet
 //
-//  Mirror TransactionDetailSheet.kt — dùng chung cho HomeView và HistoryView.
+//  Chi tiết giao dịch — mirror TransactionDetailScreen.kt. Trước đây là bottom sheet,
+//  nay là màn riêng push vào `NavigationStack`: sheet không đủ chỗ cho biên lai và bị
+//  thanh điều hướng hệ thống che mất nút Đóng ở cuối.
 //
 
 import SwiftUI
 import UIKit
 
-struct TransactionDetailSheet: View {
+struct TransactionDetailView: View {
     let tx: TransactionEntity
-    let onDismiss: () -> Void
+    let onBack: () -> Void
 
     @StateObject private var toast = ToastState()
 
     var body: some View {
+        VStack(spacing: 0) {
+            DetailHeader(title: "Chi tiết giao dịch", onBack: onBack)
+            content
+        }
+        .screenBackground(AppColor.bgSoft)
+        .toast(toast, bottomPadding: 24)
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(spacing: 16) {
-                Capsule()
-                    .fill(AppColor.line)
-                    .frame(width: 40, height: 4)
-                    .padding(.top, 8)
-
                 let icon = TransactionDisplay.iconStyle(for: tx)
                 TransactionIcon(kind: icon.icon, tint: icon.tint)
                     .frame(width: 40, height: 40)
@@ -80,22 +86,7 @@ struct TransactionDetailSheet: View {
                     }
                 }
 
-                // Kích thước/nền phải nằm TRONG label kèm contentShape: để ở ngoài Button
-                // thì vùng bấm chỉ là mấy chữ "Đóng", nền xanh chỉ là hình trang trí.
-                Button {
-                    onDismiss()
-                } label: {
-                    Text("Đóng")
-                        .font(AppFont.beVietnamPro(15, .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(AppColor.brand)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
+                totalRow
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
@@ -105,14 +96,24 @@ struct TransactionDetailSheet: View {
             .frame(maxWidth: .infinity)
             .background(AppColor.bgSoft)
         }
-        // Sheet trước đây KHÔNG set nền nên lấy nền hệ thống — ở dark mode là ĐEN, mà chữ
-        // trong đây đều là màu tối cố định (`payInk`, `payMuted`) nên bị dìm gần như không
-        // đọc được. Ghim nền sáng cho khớp Android (bên đó là `Color.White` cứng).
-        .background(AppColor.bgSoft)
-        .presentationDragIndicator(.hidden)
-        // Toast nổi trong CHÍNH sheet này, không phải ở màn phía sau — sheet che gần hết
-        // màn nên toast của màn dưới sẽ bị khuất.
-        .toast(toast, bottomPadding: 24)
+    }
+
+    /// Số tiền + phí gộp lại — thứ người dùng thật sự bị trừ. Chỉ hiện ở giao dịch đi:
+    /// giao dịch nhận không có phí nên dòng này lặp lại y hệt số tiền ở trên.
+    @ViewBuilder
+    private var totalRow: some View {
+        if !tx.isIncome {
+            HStack {
+                Text("Tổng cộng")
+                    .font(AppFont.beVietnamPro(14, .semibold))
+                    .foregroundStyle(AppColor.payInk)
+                Spacer(minLength: 0)
+                Text(Int(tx.amountValue + tx.feeValue).vndFormatted)
+                    .font(AppFont.beVietnamPro(16, .bold))
+                    .foregroundStyle(AppColor.payInk)
+            }
+            .padding(.top, 4)
+        }
     }
 
     private var statusBadge: some View {
@@ -160,7 +161,7 @@ struct TransactionDetailSheet: View {
                             .frame(width: 32, height: 20)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .accessibilityLabel("Sao chép \(label.lowercased())")
                 }
             }
@@ -189,7 +190,7 @@ struct TransactionDetailSheet: View {
 }
 
 #Preview {
-    TransactionDetailSheet(
+    TransactionDetailView(
         tx: TransactionEntity(
             id: "abc123",
             type: "TRANSFER_IN",
@@ -205,6 +206,6 @@ struct TransactionDetailSheet: View {
             status: "SUCCESS",
             createdAt: "2026-07-31T10:24:00.000Z"
         ),
-        onDismiss: {}
+        onBack: {}
     )
 }

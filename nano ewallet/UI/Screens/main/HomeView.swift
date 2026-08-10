@@ -32,12 +32,14 @@ struct HomeView: View {
 
     @State private var showBalance = false
     @State private var comingSoonFeature: String?
-    @State private var detailTransaction: TransactionEntity?
     @State private var showTopupWithdrawChooser = false
+    @State private var showQuickTopUp = false
     @State private var showOneTouchChooser = false
     @State private var oneTouchPhoto: PhotosPickerItem?
     @State private var showOneTouchPhotoPicker = false
     @State private var isResolvingOneTouch = false
+    /// Dòng chữ ở màn chờ OneTouch — resolver tự đẩy tên bước đang chạy vào đây.
+    @State private var oneTouchStage = "Đang xử lý..."
     @State private var oneTouchError: String?
     @State private var showVoiceCommand = false
     @State private var isSyncing = false
@@ -79,6 +81,12 @@ struct HomeView: View {
                 subtitle: "Chọn thao tác",
                 actions: [
                     .init(
+                        systemImage: "bolt.fill",
+                        title: "Nạp ví nhanh",
+                        subtitle: "Mở thẳng app ngân hàng, điền sẵn số tài khoản",
+                        handler: { showQuickTopUp = true }
+                    ),
+                    .init(
                         systemImage: "qrcode",
                         title: "Nạp tiền",
                         subtitle: "Quét mã QR để chuyển tiền vào ví",
@@ -95,6 +103,15 @@ struct HomeView: View {
             )
             .transparentSheetBackground()
         }
+        .fullScreenCover(isPresented: $showQuickTopUp) {
+            QuickTopUpSheet(
+                onDismiss: { showQuickTopUp = false },
+                onOpenedBankApp: {
+                    DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
+                }
+            )
+            .transparentSheetBackground()
+        }
         // OneTouch — chọn nguồn nội dung, mirror dialog PasteSourceRow bên Kotlin.
         .fullScreenCover(isPresented: $showOneTouchChooser) {
             ActionChooserSheet(
@@ -105,7 +122,15 @@ struct HomeView: View {
                         systemImage: "doc.on.clipboard",
                         title: "Dán từ bộ nhớ tạm",
                         subtitle: "Nội dung hoặc ảnh đã copy",
-                        handler: { Task { await runOneTouch { await OneTouchResolver.resolveClipboard() } } }
+                        handler: {
+                            Task {
+                                await runOneTouch {
+                                    await OneTouchResolver.resolveClipboard(
+                                        onProgress: { oneTouchStage = $0 }
+                                    )
+                                }
+                            }
+                        }
                     ),
                     .init(
                         systemImage: "photo.on.rectangle",
@@ -124,15 +149,19 @@ struct HomeView: View {
             oneTouchPhoto = nil
             Task {
                 await runOneTouch {
+                    oneTouchStage = "Đang mở ảnh..."
                     guard let data = try? await item.loadTransferable(type: Data.self),
                           let image = UIImage(data: data) else {
                         return .failure("Không đọc được ảnh")
                     }
-                    return await OneTouchResolver.resolve(image: image)
+                    return await OneTouchResolver.resolve(
+                        image: image,
+                        onProgress: { oneTouchStage = $0 }
+                    )
                 }
             }
         }
-        .overlay { if isResolvingOneTouch { ProcessingOverlay(message: "Đang nhận diện...") } }
+        .overlay { if isResolvingOneTouch { OneTouchWaitingOverlay(message: oneTouchStage) } }
         .fullScreenCover(isPresented: $showVoiceCommand) {
             VoiceCommandOverlay(
                 onDismiss: { showVoiceCommand = false },
@@ -174,6 +203,9 @@ struct HomeView: View {
     /// Chạy một lượt OneTouch rồi đưa kết quả tới đúng màn.
     private func runOneTouch(_ resolve: () async -> OneTouchResult) async {
         guard !isResolvingOneTouch else { return }
+        // Đặt lại về bước đầu: lần chạy trước có thể đã đẩy chữ tới bước cuối, giữ nguyên
+        // thì lần này vừa mở ra đã hiện "Đang bóc tách nội dung..." dù chưa làm gì.
+        oneTouchStage = "Đang xử lý..."
         isResolvingOneTouch = true
         defer { isResolvingOneTouch = false }
 
@@ -191,13 +223,17 @@ struct HomeView: View {
     private func destination(for route: HomeRoute) -> some View {
         switch route {
         case .history:
-            HistoryView(onBack: { if !path.isEmpty { path.removeLast() } })
+            HistoryView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenTransaction: { tx in path.append(.transactionDetail(tx)) }
+            )
         case .notifications:
             NotificationsView(
                 onClose: { if !path.isEmpty { path.removeLast() } },
                 onOpenConversation: { bkUsername in
                     path.append(.conversation(otherName: "", otherBkUsername: bkUsername))
-                }
+                },
+                onOpenTransaction: { tx in path.append(.transactionDetail(tx)) }
             )
         case .linkedBanks:
             LinkedBanksView(onBack: { if !path.isEmpty { path.removeLast() } })
@@ -261,6 +297,11 @@ struct HomeView: View {
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onSuccess: { info in path.append(.transferSuccess(info)) }
             )
+        case .transactionDetail(let tx):
+            TransactionDetailView(
+                tx: tx,
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         }
     }
 
@@ -312,9 +353,6 @@ struct HomeView: View {
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .screenBackground(Color(hex: 0xF3F5F7))
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
-        .sheet(item: $detailTransaction) { tx in
-            TransactionDetailSheet(tx: tx, onDismiss: { detailTransaction = nil })
-        }
         .task {
             // Home luôn revalidate số dư (force: true) — mirror WalletCache.refresh
             // được gọi lại mỗi lần vào Home bên Android, không "trúng cache là thôi".
@@ -374,7 +412,7 @@ struct HomeView: View {
                         .background(Color.black.opacity(0.06))
                         .clipShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 // Chấm đỏ chỉ hiện khi CÓ thông báo chưa đọc thật — trước đây vẽ cứng
                 // nên lúc nào cũng đỏ, người dùng không phân biệt được có gì mới hay không.
                 if notifications.unreadCount > 0 {
@@ -401,7 +439,7 @@ struct HomeView: View {
                 .background(Color.black.opacity(0.06))
                 .clipShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Balance card
@@ -448,7 +486,7 @@ struct HomeView: View {
                         .background(Color.white.opacity(0.2))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                 }
 
                 // Số ví giữ giãn cách CỐ ĐỊNH, không đổi theo bật/tắt số dư.
@@ -464,7 +502,7 @@ struct HomeView: View {
                                 .font(.system(size: 13))
                                 .foregroundStyle(.white.opacity(0.7))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                     }
                 })
 
@@ -481,7 +519,7 @@ struct HomeView: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(.white.opacity(0.85))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                     }
                 )
 
@@ -633,7 +671,7 @@ struct HomeView: View {
             .clipShape(Capsule())
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(isLoading)
     }
 
@@ -692,7 +730,7 @@ struct HomeView: View {
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         // Kéo đáy dải xanh dài thêm 81 để nền trắng đè lên mà không hở — mirror
         // `padding(bottom = 81.dp)` bên Android. Vùng nối thêm CHỈ là nền, không bấm
         // được (nút chỉ bọc phần chữ ở trên), nên bấm vào chỗ trống không mở màn nạp tiền.
@@ -812,7 +850,7 @@ struct HomeView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                 }
             }
         }
@@ -845,7 +883,7 @@ struct HomeView: View {
                 Button("Xem tất cả") {
                     path.append(.contacts(filter: nil))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(AppColor.brand)
             }
@@ -908,7 +946,7 @@ struct HomeView: View {
             .frame(width: 58)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     /// Mirror `HomeAvatarColors` + `homeAvatarColorFor` bên Android.
@@ -943,7 +981,7 @@ struct HomeView: View {
             .frame(width: 58)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Giao dịch gần đây
@@ -958,7 +996,7 @@ struct HomeView: View {
                 Button("Xem tất cả") {
                     path.append(.history)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(AppColor.brand)
             }
@@ -999,7 +1037,7 @@ struct HomeView: View {
     private func transactionRow(_ tx: TransactionEntity) -> some View {
         let icon = TransactionDisplay.iconStyle(for: tx)
         return Button {
-            detailTransaction = tx
+            path.append(.transactionDetail(tx))
         } label: {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -1033,7 +1071,7 @@ struct HomeView: View {
             }
             .padding(.vertical, 8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func subtitle(for tx: TransactionEntity) -> String {

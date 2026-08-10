@@ -72,7 +72,7 @@ struct CccdScanView: View {
                         .frame(width: 36, height: 36)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Quay lại")
 
                 Spacer()
@@ -146,7 +146,7 @@ struct CccdScanView: View {
                 .frame(height: 56)
                 .background(AppColor.brand.opacity(isPreparing ? 0.55 : 1), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(isPreparing)
             .padding(.top, 24)
             .padding(.bottom, 24)

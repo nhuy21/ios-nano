@@ -113,7 +113,7 @@ struct AddContactSheet: View {
                     )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func resetEnteredData() {
@@ -230,7 +230,7 @@ struct AddContactSheet: View {
                 )
 
                 Button("Đóng") { showBankSheet = false }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.brand)
                     .frame(maxWidth: .infinity)
@@ -263,7 +263,7 @@ struct AddContactSheet: View {
                     .background(Color(hex: 0xF6F7F9))
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Đóng")
         }
         .padding(20)
@@ -334,7 +334,7 @@ struct AddContactSheet: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func bankFallback(_ bank: Bank) -> some View {

@@ -184,7 +184,7 @@ struct BiometricSettingsSection: View {
                 password = ""
                 pendingEnable = nil
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .font(AppFont.beVietnamPro(14, .semibold))
             .foregroundStyle(AppColor.payMuted)
             .padding(.bottom, 16)

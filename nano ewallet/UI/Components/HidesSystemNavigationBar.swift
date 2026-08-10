@@ -77,4 +77,62 @@ extension View {
         frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .background(color.ignoresSafeArea())
     }
+
+    /// Chạm vào là nhún nhẹ rồi bật lại — phản hồi chung cho mọi thứ bấm được trong app.
+    ///
+    /// Đặt SAU các modifier tạo hình (`background`/`clipShape`/`overlay`) để cả khối nhún
+    /// cùng nhau; đặt trước chúng thì chỉ phần nội dung co lại còn nền đứng yên. Ngược với
+    /// Compose — bên đó `pressable` phải đứng TRƯỚC `clip/background`, vì thứ tự modifier
+    /// hai bên chạy ngược chiều nhau.
+    ///
+    /// - Parameters:
+    ///   - enabled: `false` thì không nhún và không nhận chạm.
+    ///   - scale: độ co khi nhấn.
+    ///   - action: việc cần làm khi nhả tay trong vùng.
+    func pressable(
+        enabled: Bool = true,
+        scale: CGFloat = 0.94,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) { self }
+            .buttonStyle(PressableButtonStyle(scale: scale))
+            .disabled(!enabled)
+    }
+
+    /// Bấm được nhưng KHÔNG nhún — cho những chỗ mà co lại là sai: nút mic đang nghe (đã có
+    /// hiệu ứng sóng riêng), lớp phủ trên camera/WebView, và các vùng chặn chạm của sheet.
+    func tappable(enabled: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) { self }
+            .buttonStyle(.plain)
+            .disabled(!enabled)
+    }
+}
+
+/// Nhún khi nhấn, dùng qua `View.pressable`.
+///
+/// Hai chiều dùng animation KHÁC nhau, cố ý: nhấn xuống phải bắt kịp ngón tay nên đi thẳng
+/// và ngắn (70ms), còn nhả ra mới nảy. Dùng chung một spring cho cả hai chiều thì cú chạm
+/// nhanh (~120ms) chỉ kịp co được vài phần trăm — nhìn như không có hiệu ứng gì.
+struct PressableButtonStyle: ButtonStyle {
+    var scale: CGFloat = 0.94
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            // `scaleEffect` chỉ ảnh hưởng lúc VẼ, không đo lại layout, nên phần tử bên cạnh
+            // không bị xê dịch theo.
+            .scaleEffect(configuration.isPressed ? scale : 1)
+            // Gom thành một lớp trước khi thu nhỏ, để bóng đổ (gắn ở NGOÀI style, như
+            // `PrimaryButton.primaryButtonShadow`) co theo nút thay vì đứng nguyên cỡ cũ
+            // rồi thò ra ngoài mép lúc nhấn.
+            .compositingGroup()
+            .animation(
+                configuration.isPressed
+                    ? .easeOut(duration: 0.07)
+                    : .interpolatingSpring(stiffness: 320, damping: 18),
+                value: configuration.isPressed
+            )
+            // Giữ nguyên vùng chạm là cả khung kể cả chỗ trong suốt — thiếu dòng này thì
+            // khoảng đệm quanh icon không ăn chạm, nút nhỏ trở nên khó bấm.
+            .contentShape(Rectangle())
+    }
 }

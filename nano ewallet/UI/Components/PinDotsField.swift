@@ -87,7 +87,7 @@ struct PinDotsField: View {
                             .font(.system(size: 20))
                             .foregroundStyle(AppColor.payPlaceholder)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .padding(.trailing, 6)
                     .accessibilityLabel(showValue ? "Ẩn mật khẩu" : "Hiện mật khẩu")
                 }

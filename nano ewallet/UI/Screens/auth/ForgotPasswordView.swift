@@ -78,7 +78,7 @@ struct ForgotPasswordView: View {
                     .background(Color.white)
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .circleButtonShadow()
             .padding(.leading, 16)
             .padding(.top, 8)
@@ -183,7 +183,7 @@ struct ForgotPasswordView: View {
                         .foregroundStyle(AppColor.brand)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(vm.isSending)
             }
         }

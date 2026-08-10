@@ -86,7 +86,7 @@ struct LoginView: View {
                 Button("Quên mật khẩu?") {
                     onForgotPassword()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(AppColor.brand)
                 .frame(maxWidth: .infinity, alignment: .trailing)

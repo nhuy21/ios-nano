@@ -258,7 +258,7 @@ struct KycReviewView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 6)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                 }
             }
 
@@ -388,7 +388,7 @@ struct KycReviewView: View {
                     )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private var accountField: some View {
@@ -448,7 +448,7 @@ struct KycReviewView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                 }
             }
             .padding(.horizontal, 14)
@@ -473,7 +473,7 @@ struct KycReviewView: View {
                 .background(AppColor.brand.opacity(canSubmit ? 1 : 0.45))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(!canSubmit)
         .primaryButtonShadow()
     }

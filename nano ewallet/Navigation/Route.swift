@@ -64,6 +64,10 @@ enum HomeRoute: Hashable {
     /// Rút tiền về TK ngân hàng — mirror WithdrawScreen.kt. "Nạp tiền" không có route
     /// riêng, chỉ mở lại `.receiveQr` (Android cũng vậy — user tự chuyển khoản vào VA).
     case withdraw
+    /// Chi tiết một giao dịch. Trước đây là bottom sheet; tách thành màn riêng để có đủ
+    /// chỗ cho biên lai (hai đầu gửi/nhận, tổng cộng, nút chia sẻ) và để phần safe area
+    /// dưới được tính đúng — sheet bị thanh điều hướng hệ thống che mất nút Đóng.
+    case transactionDetail(TransactionEntity)
 }
 
 /// Dữ liệu hiển thị màn kết quả — gộp chung cho cả 2 luồng bank/wallet (Android tách

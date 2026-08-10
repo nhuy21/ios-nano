@@ -114,7 +114,7 @@ struct DevicesView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(AppColor.error)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Xoá thiết bị")
             }
         }

@@ -142,7 +142,7 @@ private struct FlowChips: View {
                             Capsule().strokeBorder(isActive ? AppColor.brand : AppColor.payInputBorder, lineWidth: 1)
                         }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
         }
     }

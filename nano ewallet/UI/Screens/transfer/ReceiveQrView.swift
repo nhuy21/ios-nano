@@ -31,6 +31,7 @@ struct ReceiveQrView: View {
     @State private var isCreatingPayLink = false
     @State private var payLinkError: String?
     @State private var shareTextItem: ShareableText?
+    @State private var showQuickTopUp = false
 
     private var qrContent: String? {
         guard let bin = wallet.vaBankNo, !bin.isEmpty,
@@ -89,6 +90,7 @@ struct ReceiveQrView: View {
                     .padding(.top, 24)
                 }
                 .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
+                quickTopUpPill
                 actionRow
             }
         }
@@ -96,6 +98,15 @@ struct ReceiveQrView: View {
         // navigation bar hệ thống (dù ẩn UI) vẫn chừa khoảng trên, khiến `brandBackground`
         // dù đã `.ignoresSafeArea()` cũng không tràn hết lên được status bar.
         .hidesSystemNavigationBar()
+        .fullScreenCover(isPresented: $showQuickTopUp) {
+            QuickTopUpSheet(
+                onDismiss: { showQuickTopUp = false },
+                onOpenedBankApp: {
+                    DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
+                }
+            )
+            .transparentSheetBackground()
+        }
         .task { await wallet.refresh() }
         // Dialog phủ TOÀN màn (nền tối riêng) thay vì sheet 240pt — sheet thấp vẫn để lộ
         // màn QR phía sau. Cùng cách Login dựng DeviceConflictDialog/DeviceOtpDialog.
@@ -141,7 +152,7 @@ struct ReceiveQrView: View {
                     .background(Color.white.opacity(0.18))
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
 
             Text("QR nhận tiền")
                 .font(AppFont.beVietnamPro(20, .bold))
@@ -174,7 +185,7 @@ struct ReceiveQrView: View {
                     .padding(.vertical, 10)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
         }
         .padding(.vertical, 32)
         .frame(maxWidth: .infinity)
@@ -280,6 +291,28 @@ struct ReceiveQrView: View {
 
     // MARK: - Action row
 
+    /// Lối tắt sang "Nạp ví nhanh" — đứng ngay trên hàng thao tác vì nó là cách nạp tiền
+    /// nhanh hơn hẳn so với việc tự copy số tài khoản trên mã QR rồi dán sang app ngân hàng.
+    private var quickTopUpPill: some View {
+        HStack {
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Nạp ví nhanh")
+                    .font(AppFont.beVietnamPro(13.5, .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.18), in: Capsule())
+            .contentShape(Capsule())
+            .pressable { showQuickTopUp = true }
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 10)
+    }
+
     private var actionRow: some View {
         HStack(spacing: 0) {
             actionButton(icon: "square.and.arrow.up", title: "Chia sẻ mã QR") {
@@ -313,7 +346,7 @@ struct ReceiveQrView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Amount sheet
@@ -349,7 +382,7 @@ struct ReceiveQrView: View {
                         }
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
 
                 Button {
                     fixedAmount = Int(amountInput.amountDigits)
@@ -364,7 +397,7 @@ struct ReceiveQrView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
@@ -428,7 +461,7 @@ struct ReceiveQrView: View {
                         }
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
 
                 Button {
                     Task { await createAndSharePayLink() }
@@ -448,7 +481,7 @@ struct ReceiveQrView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(isCreatingPayLink)
             }
             .padding(.horizontal, 20)

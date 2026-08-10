@@ -152,7 +152,7 @@ struct AgreementWebView: View {
                     .background(Bk.accent.opacity(canSubmit ? 1 : 0.45))
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(!canSubmit)
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
@@ -309,7 +309,7 @@ struct AgreementWebView: View {
                         }
                     }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
 
             content()
 
@@ -381,7 +381,7 @@ struct AgreementWebView: View {
                     .background(Bk.accent.opacity(stage == .checking ? 0.45 : 1))
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(stage == .checking)
             .padding(.horizontal, 16)
             .padding(.bottom, 16)

@@ -21,34 +21,51 @@ enum OneTouchResult {
 
 enum OneTouchResolver {
 
+    /// Báo bước đang chạy để màn chờ đổi dòng chữ. Mỗi bước ở đây là một việc CÓ THẬT vừa
+    /// bắt đầu, không phải chuỗi thông báo trang trí chạy theo đồng hồ.
+    typealias ProgressHandler = @MainActor (String) -> Void
+
     /// Đọc bộ nhớ tạm: ưu tiên ảnh (người dùng hay chụp/lưu ảnh QR rồi copy), sau đó text.
-    static func resolveClipboard() async -> OneTouchResult {
+    static func resolveClipboard(onProgress: ProgressHandler? = nil) async -> OneTouchResult {
         if let image = UIPasteboard.general.image {
-            return await resolve(image: image)
+            return await resolve(image: image, onProgress: onProgress)
         }
         let text = (UIPasteboard.general.string ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return .failure("Bộ nhớ tạm trống. Hãy copy nội dung chuyển khoản hoặc ảnh mã QR trước.")
         }
-        return await resolve(text: text)
+        return await resolve(text: text, onProgress: onProgress)
     }
 
     /// Ảnh: thử tìm mã QR trước, không có thì OCR rồi xử như tin nhắn.
-    static func resolve(image: UIImage) async -> OneTouchResult {
+    static func resolve(image: UIImage, onProgress: ProgressHandler? = nil) async -> OneTouchResult {
+        await report(onProgress, "Đang tìm mã QR trong ảnh...")
         if let raw = qrPayload(in: image) {
+            await report(onProgress, "Đang đọc mã QR...")
             return await resolveQr(raw)
         }
+        await report(onProgress, "Đang đọc chữ trong ảnh...")
         let text = await TextRecognizer.recognizeText(in: image)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return .failure("Ảnh không có mã QR và không đọc được chữ")
         }
-        return await resolve(text: text)
+        return await resolve(text: text, onProgress: onProgress)
     }
 
     /// Nhận diện text là VÍ nội bộ hay NGÂN HÀNG.
-    static func resolve(text: String) async -> OneTouchResult {
+    static func resolve(text: String, onProgress: ProgressHandler? = nil) async -> OneTouchResult {
+        await report(onProgress, "Đang bóc tách nội dung...")
+        return await resolveTextInner(text)
+    }
+
+    private static func report(_ handler: ProgressHandler?, _ message: String) async {
+        guard let handler else { return }
+        await MainActor.run { handler(message) }
+    }
+
+    private static func resolveTextInner(_ text: String) async -> OneTouchResult {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Số trơn -> thử verify là ví. Không phải ví thì báo rõ, KHÔNG thử bóc ngân hàng:

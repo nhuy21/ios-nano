@@ -80,7 +80,7 @@ struct FixEkycFieldsView: View {
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Quay lại")
 
             Text("Bổ sung thông tin")
@@ -156,7 +156,7 @@ struct FixEkycFieldsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                     }
                 }
                 .padding(.horizontal, 14)
@@ -287,7 +287,7 @@ struct KycOptionDropdown: View {
                     .strokeBorder(hasError ? AppColor.error : AppColor.payInputBorder, lineWidth: 1)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         // `fullScreenCover` nền trong suốt rồi tự vẽ lớp mờ + thẻ, thay vì `sheet` hệ
         // thống: sheet nhiều nấc thì cuộn danh sách lại kéo giãn cả bảng làm tiêu đề
         // trôi lên, và vùng mờ của nó không nhận chạm để đóng.
@@ -483,7 +483,7 @@ struct KycOptionPickerSheet: View {
                     )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 }
 

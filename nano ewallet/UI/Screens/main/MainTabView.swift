@@ -30,6 +30,9 @@ struct MainTabView: View {
 
     /// Đang bóc tách ảnh vừa chia sẻ — che Home để không lộ ra rồi bị đẩy đi.
     @State private var isResolvingSharedImage = false
+    /// Bước đang chạy khi bóc tách ảnh chia sẻ — luồng này chậm nhất (OCR rồi gọi backend)
+    /// nên rất cần cho người dùng thấy nó đang tiến chứ không đứng im.
+    @State private var sharedImageStage = "Đang xử lý..."
 
     /// Ngăn xếp của tab Home sống ở ĐÂY chứ không phải trong `HomeView`: view đó bị huỷ
     /// mỗi khi sang tab Cá nhân (dùng `switch`, không phải `TabView`), nên deep link tới
@@ -124,6 +127,17 @@ struct MainTabView: View {
             deepLinkStore.consumeDefaultQr()
             showQrScan = true
         }
+        // Vừa nạp tiền xong quay về từ app ngân hàng -> đưa về Trang chủ để thấy số dư
+        // (và thấy banner chờ tiền về), thay vì màn quét QR mặc định.
+        //
+        // KHÔNG `consume` cờ ở đây: `TopUpWatcher` cũng đang chờ chính cờ này để bắt đầu
+        // theo dõi. Ai tiêu thụ trước thì bên kia mất tín hiệu, nên chỗ này chỉ đọc và điều
+        // hướng, còn việc xoá cờ để watcher làm.
+        .onChangeCompat(of: deepLinkStore.pendingTopUpReturn, initial: true) { _, pending in
+            guard pending else { return }
+            showQrScan = false
+            selectedTab = .home
+        }
         // Push "xin tiền" -> mở thẳng màn Cuộc thoại. Quan sát ở đây (gốc, luôn sống)
         // thay vì trong HomeView, để bấm push lúc đang ở tab Cá nhân vẫn mở được.
         .onChangeCompat(of: deepLinkStore.pendingConversationBkUsername, initial: true) { _, value in
@@ -148,7 +162,7 @@ struct MainTabView: View {
         }
         // Che Home trong lúc bóc tách: nhận diện QR/OCR + gọi API mất vài giây, không che thì
         // người dùng thấy Home hiện ra rồi bị đẩy sang màn chuyển tiền, nhìn như app tự nhảy.
-        .overlay { if isResolvingSharedImage { ProcessingOverlay(message: "Đang nhận diện...") } }
+        .overlay { if isResolvingSharedImage { OneTouchWaitingOverlay(message: sharedImageStage) } }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
         // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
         // Cả 2 draft đều nil vì đây là mở màn NHẬP TAY, không phải "Chuyển cho <tên>" có sẵn
@@ -214,9 +228,10 @@ struct MainTabView: View {
     /// lỗi hiện cùng một chỗ cho nhất quán.
     private func resolveSharedImage() async {
         guard !isResolvingSharedImage, let image = SharedImageStore.consumePending() else { return }
+        sharedImageStage = "Đang xử lý..."
         isResolvingSharedImage = true
         defer { isResolvingSharedImage = false }
-        switch await OneTouchResolver.resolve(image: image) {
+        switch await OneTouchResolver.resolve(image: image, onProgress: { sharedImageStage = $0 }) {
         case .bank(let draft):
             openOnHome(.bankTransfer(draft: draft))
         case .wallet(let draft):
@@ -355,7 +370,7 @@ struct MainTabView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .animation(.spring(response: 0.35, dampingFraction: 0.55), value: isActive)
     }
 
@@ -384,7 +399,7 @@ struct MainTabView: View {
                         .frame(width: 28, height: 28)
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .shadow(color: Color(hex: 0x00A24A).opacity(0.2), radius: 6, x: 0, y: 3)
         .accessibilityLabel("Quét QR")
     }

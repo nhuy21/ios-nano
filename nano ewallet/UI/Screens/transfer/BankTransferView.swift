@@ -319,7 +319,7 @@ struct BankTransferView: View {
                 .clipShape(Circle())
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(accessibilityLabel)
     }
 
@@ -504,7 +504,7 @@ struct BankTransferView: View {
                 .background(selected ? Color.white : Color.clear)
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     /// Số tài khoản/thẻ dùng bàn phím SỐ HỆ THỐNG (không phải NumericKeypad tự vẽ) —
@@ -543,7 +543,7 @@ struct BankTransferView: View {
                         .font(.system(size: 20))
                         .foregroundStyle(Color(hex: 0xBFC4CC))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             } else {
                 // Nút "Dán" như ô nhập số ví: `keyboardType(.numberPad)` KHÔNG có menu
                 // Paste khi long-press (bàn phím số không kèm thanh chỉnh sửa), nên không
@@ -576,7 +576,7 @@ struct BankTransferView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
 
             Button {
@@ -587,7 +587,7 @@ struct BankTransferView: View {
                     .font(.system(size: 20))
                     .foregroundStyle(Color(hex: 0x00542F))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Chọn từ danh bạ")
         }
     }
@@ -691,7 +691,7 @@ struct BankTransferView: View {
                 .overlay { Capsule().strokeBorder(AppColor.line, lineWidth: 1) }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     /// Mirror `saveToggle` bên `WalletTransferAmountView` để hai luồng chuyển tiền nhìn
@@ -762,7 +762,7 @@ struct BankTransferView: View {
                             .padding(.vertical, 7)
                             .overlay { Capsule().strokeBorder(AppColor.line, lineWidth: 1) }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .disabled(!contentEditable)
                 }
             }
@@ -810,7 +810,7 @@ struct BankTransferView: View {
             .background(canContinue ? AppColor.brand : AppColor.bgSoft)
             .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(!canContinue || isSubmitting)
     }
 
@@ -828,7 +828,7 @@ struct BankTransferView: View {
                 )
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .padding(10)
         .accessibilityLabel(speech.isListening ? "Dừng nghe" : "Nhập số tiền bằng giọng nói")
     }
@@ -1228,7 +1228,7 @@ struct BankPickerSheet: View {
                             // nhận chạm — bấm vào giữa hàng là không chọn được ngân hàng.
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         Rectangle().fill(AppColor.line).frame(height: 1)
                     }
                 }

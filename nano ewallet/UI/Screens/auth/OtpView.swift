@@ -47,7 +47,7 @@ struct OtpView: View {
                         .background(Color.white)
                         .clipShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Quay lại")
 
                 Spacer()
@@ -205,7 +205,7 @@ struct OtpView: View {
             .background(isEnabled ? AppColor.brand : AppColor.bgSoft)
             .clipShape(RoundedRectangle(cornerRadius: 999, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(!isEnabled)
     }
 
@@ -219,7 +219,7 @@ struct OtpView: View {
                 Button(vm.isResending ? "Đang gửi..." : "Gửi lại OTP") {
                     Task { await vm.resend() }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(vm.isResending ? AppColor.muted : AppColor.brand)
                 .underline()

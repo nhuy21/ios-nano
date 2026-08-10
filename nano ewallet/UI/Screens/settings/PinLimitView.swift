@@ -132,7 +132,7 @@ struct PinLimitView: View {
                 .clipShape(Circle())
                 .overlay { Circle().strokeBorder(AppColor.payInputBorder, lineWidth: 1) }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private var presetGrid: some View {
@@ -155,7 +155,7 @@ struct PinLimitView: View {
                                 .strokeBorder(isSelected ? AppColor.brand : AppColor.payInputBorder, lineWidth: 1)
                         }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
         }
     }
@@ -211,7 +211,7 @@ struct PinLimitView: View {
                     .foregroundStyle(AppColor.brand)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(vm.isLoading)
         }
     }

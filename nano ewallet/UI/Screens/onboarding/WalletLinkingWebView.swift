@@ -77,7 +77,7 @@ struct WalletLinkingWebView: View {
                         .frame(width: 38, height: 38)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Quay lại")
                 Spacer(minLength: 0)
             }

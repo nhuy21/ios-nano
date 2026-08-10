@@ -302,7 +302,7 @@ struct TransferSuccessView: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Lưu / chia sẻ biên lai

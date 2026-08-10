@@ -85,7 +85,7 @@ struct WalletLinkErrorView: View {
                     .frame(width: 44, height: 44, alignment: .trailing)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Đăng xuất")
         }
         .padding(.leading, 22)
@@ -105,7 +105,7 @@ struct WalletLinkErrorView: View {
             .frame(width: 272, height: 46)
             .background(AppColor.brand, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .shadow(color: AppColor.brand.opacity(0x59 / 255.0), radius: 6, y: 3)
     }
 }

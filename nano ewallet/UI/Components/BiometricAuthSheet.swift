@@ -69,7 +69,7 @@ struct BiometricAuthSheet: View {
                     Button("Thử lại \(label)") {
                         Task { await authenticate() }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -78,7 +78,7 @@ struct BiometricAuthSheet: View {
                 }
 
                 Button("Dùng mật khẩu") { onUsePassword() }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.brand)
                     .frame(maxWidth: .infinity)
@@ -87,7 +87,7 @@ struct BiometricAuthSheet: View {
                     .disabled(isAuthenticating)
 
                 Button("Huỷ") { onCancel() }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(14, .semibold))
                     .foregroundStyle(AppColor.payMuted)
                     .disabled(isAuthenticating)

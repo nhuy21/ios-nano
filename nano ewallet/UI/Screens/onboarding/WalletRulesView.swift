@@ -119,7 +119,7 @@ struct WalletRulesView: View {
                     .frame(height: 54)
                     .background(AppColor.brand, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
@@ -167,7 +167,7 @@ struct WalletRulesView: View {
                             .font(AppFont.beVietnamPro(13, .bold))
                             .foregroundStyle(AppColor.brand)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -121,7 +121,7 @@ struct ContactsView: View {
                     .background(Color.white.opacity(0.2))
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
 
             Spacer()
 
@@ -142,7 +142,7 @@ struct ContactsView: View {
                     .background(Color.white.opacity(0.2))
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Thêm")
         }
         .padding(.horizontal, 16)
@@ -189,7 +189,7 @@ struct ContactsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private var searchBar: some View {
@@ -211,7 +211,7 @@ struct ContactsView: View {
                 } label: {
                     Image(systemName: "xmark").foregroundStyle(AppColor.payMuted)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Xoá")
             }
         }
@@ -288,7 +288,7 @@ struct ContactsView: View {
 
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(14, .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
@@ -334,7 +334,7 @@ struct ContactsView: View {
                     .foregroundStyle(AppColor.payMuted)
                     .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
         }
         .padding(.vertical, 10)
         .contentShape(Rectangle())

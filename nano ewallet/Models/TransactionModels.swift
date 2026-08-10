@@ -17,7 +17,11 @@ struct TransactionPage: Decodable {
     let hasMore: Bool
 }
 
-struct TransactionEntity: Decodable, Identifiable {
+/// `Hashable` để đi thẳng qua `NavigationStack.path` tới màn chi tiết — mọi thuộc tính đều
+/// là `String`/`String?` nên compiler tự sinh, không phải viết tay. Nhờ vậy iOS không cần
+/// tới store trung gian như bên Android (Compose không truyền được object composite qua
+/// nav argument, phải gửi qua một singleton riêng).
+struct TransactionEntity: Decodable, Identifiable, Hashable {
     let id: String
     let type: String
     let amount: String

@@ -126,7 +126,7 @@ struct ChangePasswordView: View {
                     .font(AppFont.beVietnamPro(13, .semibold))
                     .foregroundStyle(AppColor.brand)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(vm.isSendingOtp)
             .padding(.top, 8)
         }

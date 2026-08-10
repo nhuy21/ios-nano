@@ -55,7 +55,7 @@ struct EditNicknameSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
 
                 Button {
                     onSave(value.trimmingCharacters(in: .whitespaces))
@@ -69,7 +69,7 @@ struct EditNicknameSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
             .padding(.top, 8)
         }

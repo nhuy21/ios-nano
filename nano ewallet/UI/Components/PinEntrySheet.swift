@@ -69,7 +69,7 @@ struct PinEntrySheet: View {
             Spacer(minLength: 20)
 
             Button("Huỷ") { onCancel() }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(14, .semibold))
                 .foregroundStyle(AppColor.payMuted)
                 .padding(.bottom, 16)

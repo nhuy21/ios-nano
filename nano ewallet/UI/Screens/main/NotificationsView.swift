@@ -15,6 +15,9 @@ struct NotificationsView: View {
     let onClose: () -> Void
     /// Mở cuộc thoại xin tiền — Home sở hữu NavigationStack nên đẩy route từ ngoài vào.
     var onOpenConversation: (String) -> Void = { _ in }
+    /// Mở biên lai của thông báo giao dịch. Khác hai luồng kia, giao dịch phải TẢI VỀ trước
+    /// (thông báo chỉ mang `txId`), nên callback nhận cả entity chứ không nhận id.
+    var onOpenTransaction: (TransactionEntity) -> Void = { _ in }
 
     private enum Tab: Int, CaseIterable {
         case all, unread, system
@@ -39,7 +42,6 @@ struct NotificationsView: View {
     @State private var selectedTab: Tab = .all
     @State private var isLoading = true
     @State private var hasError = false
-    @State private var billTransaction: TransactionEntity?
     /// Chặn mở trùng khi đang tải chi tiết giao dịch (bấm nhanh 2 lần).
     @State private var isOpeningBill = false
 
@@ -83,9 +85,6 @@ struct NotificationsView: View {
         .onChangeNewCompat(of: scenePhase) { phase in
             guard phase == .active else { return }
             Task { await load() }
-        }
-        .sheet(item: $billTransaction) { tx in
-            TransactionDetailSheet(tx: tx, onDismiss: { billTransaction = nil })
         }
     }
 
@@ -131,7 +130,7 @@ struct NotificationsView: View {
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
 
             Button(action: onClose) {
@@ -141,7 +140,7 @@ struct NotificationsView: View {
                     .frame(width: 40, height: 40)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Đóng")
         }
         .padding(.horizontal, 20)
@@ -197,7 +196,7 @@ struct NotificationsView: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Nội dung
@@ -216,7 +215,7 @@ struct NotificationsView: View {
                     .font(AppFont.beVietnamPro(15, .semibold))
                     .foregroundStyle(AppColor.payInk)
                 Button("Thử lại") { Task { await load() } }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(13, .bold))
                     .foregroundStyle(NsColor.accent)
                     .padding(8)
@@ -309,7 +308,7 @@ struct NotificationsView: View {
             .background(isUnread ? NsColor.unreadRow : Color.clear)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Bấm vào thông báo
@@ -325,7 +324,8 @@ struct NotificationsView: View {
             isOpeningBill = true
             Task {
                 defer { isOpeningBill = false }
-                billTransaction = try? await TransactionService.getById(txId)
+                guard let tx = try? await TransactionService.getById(txId) else { return }
+                onOpenTransaction(tx)
             }
             return
         }

@@ -23,7 +23,7 @@ struct DetailHeader: View {
                     .background(Color.white)
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .circleButtonShadow()
             .accessibilityLabel("Quay lại")
 

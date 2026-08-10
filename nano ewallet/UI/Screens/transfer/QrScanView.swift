@@ -149,7 +149,7 @@ struct QrScanView: View {
                         .frame(width: 40, height: 40)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
 
                 Spacer()
 
@@ -163,7 +163,7 @@ struct QrScanView: View {
                         .frame(width: 40, height: 40)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
         }
         .padding(.horizontal, 20)
@@ -185,6 +185,7 @@ struct QrScanView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
+        // Không nhún: đây là lớp phủ kín màn, co lại sẽ hở viền đen quanh mép.
         .buttonStyle(.plain)
         .ignoresSafeArea()
     }
@@ -447,7 +448,7 @@ struct QrScanView: View {
         Button(action: action) {
             pillLabel(title: title, isNew: isNew, icon: icon)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     /// Icon ô "Tải từ ảnh" — vòng xoay khi đang decode, ngược lại là icon ảnh.

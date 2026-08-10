@@ -11,6 +11,176 @@
 
 import SwiftUI
 
+/// "Nạp ví nhanh" — chọn app ngân hàng đang có tiền, nhập số tiền, rồi mở thẳng app đó với
+/// số tài khoản VA của ví điền sẵn. Khác luồng QR thường ở chỗ người dùng không phải tự copy
+/// số tài khoản dán sang app ngân hàng nữa, chỉ cần xác nhận.
+///
+/// Số tiền là BẮT BUỘC (không phải để cho đẹp): thiếu nó thì dl.vietqr.io không sinh mã, app
+/// ngân hàng mở lên đứng ở màn chính — xem `QuickTopUpDeeplink`.
+struct QuickTopUpSheet: View {
+    let onDismiss: () -> Void
+    /// Đã mở app ngân hàng — nơi gọi bắt đầu theo dõi tiền về.
+    let onOpenedBankApp: () -> Void
+
+    @State private var pickedAppId: String?
+    @State private var amountText = ""
+    @State private var errorMessage: String?
+
+    @Environment(\.openURL) private var openURL
+
+    private static let brand = Color(hex: 0x00A85E)
+
+    private var amount: Int64 { amountText.amountValue }
+    private var canContinue: Bool { pickedAppId != nil && amount > 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Nạp ví nhanh")
+                .font(AppFont.beVietnamPro(16, .bold))
+                .foregroundStyle(AppColor.payInk)
+                .padding(.horizontal, 20)
+
+            Text("Chọn ngân hàng bạn đang có tiền")
+                .font(AppFont.beVietnamPro(12))
+                .foregroundStyle(AppColor.payMuted)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 2)
+
+            Spacer().frame(height: 10)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(QuickTopUpDeeplink.supportedBanks) { bank in
+                        bankRow(bank)
+                    }
+                }
+            }
+            // Trần chiều cao để danh sách + ô tiền + nút vẫn nằm gọn trong màn máy nhỏ.
+            .frame(maxHeight: 260)
+
+            amountField
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(AppFont.beVietnamPro(12, .medium))
+                    .foregroundStyle(AppColor.error)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+            }
+
+            continueButton
+        }
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { onDismiss() }
+        )
+    }
+
+    private func bankRow(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
+        let isPicked = pickedAppId == bank.appId
+        return Button {
+            pickedAppId = bank.appId
+            errorMessage = nil
+        } label: {
+            HStack(spacing: 14) {
+                AsyncImage(url: URL(string: bank.logoUrl)) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    // Chưa tải xong thì để ô xám cùng kích thước, không dùng spinner —
+                    // 5 spinner quay cùng lúc lúc mở sheet trông như đang lỗi.
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(AppColor.line.opacity(0.5))
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                Text(bank.displayName)
+                    .font(AppFont.beVietnamPro(14, .semibold))
+                    .foregroundStyle(AppColor.payInk)
+
+                Spacer(minLength: 0)
+
+                if isPicked {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Self.brand)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(isPicked ? Self.brand.opacity(0.08) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
+
+    private var amountField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Số tiền")
+                .font(AppFont.beVietnamPro(12, .semibold))
+                .foregroundStyle(AppColor.payMuted)
+
+            HStack(spacing: 8) {
+                TextField("", text: $amountText, prompt: .appPlaceholder("0"))
+                    .font(AppFont.beVietnamPro(18, .bold))
+                    .foregroundStyle(AppColor.payInk)
+                    .keyboardType(.numberPad)
+                    .tint(Self.brand)
+                    .thousandsSeparated($amountText)
+
+                Text("đ")
+                    .font(AppFont.beVietnamPro(16, .semibold))
+                    .foregroundStyle(AppColor.payMuted)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 48)
+            .background(AppColor.bgSoft)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+    }
+
+    private var continueButton: some View {
+        Button(action: openBankApp) {
+            Text("Mở app ngân hàng")
+                .font(AppFont.beVietnamPro(15, .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Self.brand.opacity(canContinue ? 1 : 0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(PressableButtonStyle())
+        .disabled(!canContinue)
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+    }
+
+    private func openBankApp() {
+        guard let pickedAppId, amount > 0 else { return }
+        guard let url = QuickTopUpDeeplink.buildURL(sourceAppId: pickedAppId, amount: amount) else {
+            // Chỉ xảy ra khi ví chưa có số tài khoản VA — báo thẳng thay vì mở app ngân hàng
+            // rồi để người dùng đối diện một màn trống không hiểu vì sao.
+            errorMessage = "Ví chưa có số tài khoản nhận tiền. Vui lòng thử lại sau."
+            return
+        }
+        // Báo TRƯỚC khi rời app: nơi gọi cần chốt mốc số dư ngay lúc này, vì tiền có thể về
+        // trong lúc người dùng còn đang ở app ngân hàng.
+        onOpenedBankApp()
+        openURL(url)
+        onDismiss()
+    }
+}
+
 struct ActionChooserSheet: View {
     let title: String
     let subtitle: String
@@ -73,7 +243,7 @@ struct ActionChooserSheet: View {
                     .padding(.vertical, 12)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
         }
         .padding(.vertical, 18)

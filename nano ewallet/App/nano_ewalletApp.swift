@@ -39,6 +39,10 @@ struct nano_ewalletApp: App {
                         }
                 }
 
+                // Banner chờ tiền về sau "Nạp ví nhanh". Đặt ở gốc để hiện xuyên suốt mọi
+                // màn — người dùng quay lại từ app ngân hàng có thể đang đứng ở bất kỳ đâu.
+                TopUpWatcher()
+
                 // Che số dư/giao dịch khỏi thẻ preview App Switcher — xem PrivacyScreenOverlay.
                 PrivacyScreenOverlay()
             }

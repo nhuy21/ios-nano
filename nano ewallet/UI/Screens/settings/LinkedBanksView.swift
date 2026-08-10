@@ -81,7 +81,7 @@ struct LinkedBanksView: View {
                     .background(Color(hex: 0xF1F3F5))
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Quay lại")
 
             Text("Ngân hàng liên kết")

@@ -99,7 +99,7 @@ struct ConversationView: View {
                     .foregroundStyle(AppColor.payInk)
                     .frame(width: 40, height: 40)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
 
             Circle()
                 .fill(AppColor.brandSoft)
@@ -187,7 +187,7 @@ struct ConversationView: View {
                                 }
                                 .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
 
                         Button { approve(item) } label: {
                             Text("Đồng ý")
@@ -199,14 +199,14 @@ struct ConversationView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                     }
                     .disabled(busyId == item.id)
                     .opacity(busyId == item.id ? 0.6 : 1)
                     .padding(.top, 4)
                 } else if pending && item.outgoing {
                     Button("Huỷ yêu cầu") { cancel(item) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .font(AppFont.beVietnamPro(13))
                         .foregroundStyle(AppColor.error)
                         .disabled(busyId == item.id)
@@ -247,7 +247,7 @@ struct ConversationView: View {
                         .background(AppColor.brandSoft)
                         .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
             }
 
             AppTextField(text: $note, placeholder: "Lời nhắn (vd: mẹ ơi chuyển cho con 100k)", submitLabel: .next, maxLength: 200)
@@ -280,7 +280,7 @@ struct ConversationView: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(isSending)
             }
         }

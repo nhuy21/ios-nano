@@ -73,7 +73,7 @@ struct ContactActionSheet: View {
             // khoảng trống cạnh chữ là không ăn.
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     /// "Cấp cứu ví tui" — icon vẽ tay từ Android (ic_request_money), không phải Material Icon.
@@ -95,6 +95,6 @@ struct ContactActionSheet: View {
             // khoảng trống cạnh chữ là không ăn.
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 }

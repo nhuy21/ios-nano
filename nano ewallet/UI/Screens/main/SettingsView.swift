@@ -345,7 +345,7 @@ struct SettingsView: View {
                 .background(isVerified ? SettingsColor.greenPillBg : SettingsColor.orangePillBg)
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(isVerified)
     }
 
@@ -404,13 +404,13 @@ struct SettingsView: View {
             // NHAU, mà `toggleRow` có icon 40pt còn hàng này 28pt nên cùng một padding vẫn
             // ra hai chiều cao khác nhau. Xem `Self.rowHeight`.
             .frame(height: Self.rowHeight)
-            // BẮT BUỘC: `Button` + `.buttonStyle(.plain)` chỉ nhận chạm trên vùng VẼ THẬT
+            // BẮT BUỘC: `Button` + `.buttonStyle(PressableButtonStyle())` chỉ nhận chạm trên vùng VẼ THẬT
             // (chữ + icon). `Spacer()` ở giữa và phần `padding` là trong suốt nên bấm vào
             // không ăn — người dùng phải nhắm đúng chữ hoặc mũi tên mới mở được thẻ.
             // `contentShape` khai cả hàng là vùng bấm.
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func toggleRow(
@@ -473,7 +473,7 @@ struct SettingsView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: Color(hex: 0x784628).opacity(0x14 / 255.0), radius: 6, x: 0, y: 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(isLoggingOut)
     }
 
@@ -543,7 +543,7 @@ private struct SupportSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .padding(.horizontal, 24)
             .padding(.top, 4)
             .padding(.bottom, 24)
@@ -584,7 +584,7 @@ private struct SupportSheet: View {
             // phải chạm đúng icon/chữ mới ăn.
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 }
 

@@ -170,7 +170,7 @@ struct WithdrawView: View {
                     .clipShape(Circle())
                     .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("Quay lại")
 
             Text("Rút tiền về ngân hàng")
@@ -257,7 +257,7 @@ struct WithdrawView: View {
                 FieldLabel(text: "Ngân hàng").padding(.bottom, 0)
                 Spacer()
                 Button("Xem tất cả") { showAllBanks = true }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .font(AppFont.beVietnamPro(13, .semibold))
                     .foregroundStyle(AppColor.brand)
             }
@@ -341,7 +341,7 @@ struct WithdrawView: View {
             }
             .frame(width: 64)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func accTypeToggle(title: String, index: Int) -> some View {
@@ -360,7 +360,7 @@ struct WithdrawView: View {
                 .background(isSelected ? AppColor.brand : Color.clear)
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Số tiền
@@ -444,7 +444,7 @@ struct WithdrawView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(!canContinue || isSubmitting)
             .padding(16)
         }

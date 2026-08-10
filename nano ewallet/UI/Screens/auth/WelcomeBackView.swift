@@ -64,7 +64,7 @@ struct WelcomeBackView: View {
                 Button("Quên mật khẩu?") {
                     onForgotPassword()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(13, .semibold))
                 .foregroundStyle(AppColor.brand)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -95,7 +95,7 @@ struct WelcomeBackView: View {
                         .frame(height: 52)
                         .background(AppColor.brandSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .disabled(vm.isSubmitting)
                 }
 
@@ -108,7 +108,7 @@ struct WelcomeBackView: View {
                 Button("Đăng nhập bằng tài khoản khác?") {
                     onUseAnotherAccount()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .font(AppFont.beVietnamPro(14, .semibold))
                 .foregroundStyle(AppColor.brand)
                 .frame(maxWidth: .infinity)
