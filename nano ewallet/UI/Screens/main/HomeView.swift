@@ -84,7 +84,17 @@ struct HomeView: View {
                         systemImage: "bolt.fill",
                         title: "Nạp ví nhanh",
                         subtitle: "Mở thẳng app ngân hàng, điền sẵn số tài khoản",
-                        handler: { showQuickTopUp = true }
+                        // Chờ hộp chọn đóng xong rồi mới mở sheet kế: iOS bỏ qua yêu cầu
+                        // trình bày khi còn một lớp đang đóng dở, bật cờ ngay tại đây thì
+                        // bấm vào chỉ thấy hộp chọn biến mất chứ không có gì hiện lên.
+                        // Các mục còn lại không cần vì `path.append` là đẩy màn, không
+                        // phải trình bày lớp phủ.
+                        handler: {
+                            Task {
+                                try? await Task.sleep(nanoseconds: 350_000_000)
+                                showQuickTopUp = true
+                            }
+                        }
                     ),
                     .init(
                         systemImage: "qrcode",
@@ -694,10 +704,11 @@ struct HomeView: View {
 
     private var topUpCta: some View {
         Button {
-            // "Nạp tiền" không có màn riêng — user tự chuyển khoản vào VA hiển thị ở
-            // đây, mirror Android (nút "Nạp tiền" trong dialog chooser cũng mở thẳng
-            // ReceiveQrScreen).
-            path.append(.receiveQr)
+            // Mở hộp chọn thay vì vào thẳng màn QR: từ khi có "Nạp ví nhanh" thì nạp tiền
+            // có hai cách khác hẳn nhau (mở app ngân hàng điền sẵn / tự quét QR), nhảy
+            // thẳng vào một cách là giấu mất cách còn lại — mà đây lại là nút nạp tiền dễ
+            // thấy nhất trên Trang chủ.
+            showTopupWithdrawChooser = true
         } label: {
             // Cỡ chữ/icon lấy đúng theo Kotlin: tiêu đề 16 bold, phụ đề 13, icon 20,
             // mũi tên 22 — trước đây iOS để 13/11/16/13 nên cụm này nhỏ và mỏng hơn hẳn.

@@ -83,42 +83,73 @@ struct QuickTopUpSheet: View {
         )
     }
 
+    /// Hàng chọn ngân hàng.
+    ///
+    /// KHÔNG bọc trong `Button { } label: { }`: logo tải qua mạng nằm trong label của Button
+    /// thì SwiftUI coi cả cụm là hình vẽ của nút, ảnh bị áp kiểu tô template và vòng tải
+    /// không chạy — chỉ thấy ô xám giữ chỗ mãi. Dùng `.pressable` (tự bọc Button ở lớp
+    /// ngoài) nên phần nội dung vẫn là view thường.
     private func bankRow(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
         let isPicked = pickedAppId == bank.appId
-        return Button {
+        return HStack(spacing: 14) {
+            bankLogo(bank)
+
+            Text(bank.displayName)
+                .font(AppFont.beVietnamPro(14, .semibold))
+                .foregroundStyle(AppColor.payInk)
+
+            Spacer(minLength: 0)
+
+            if isPicked {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Self.brand)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(isPicked ? Self.brand.opacity(0.08) : Color.clear)
+        .contentShape(Rectangle())
+        .pressable {
             pickedAppId = bank.appId
             errorMessage = nil
-        } label: {
-            HStack(spacing: 14) {
-                AsyncImage(url: URL(string: bank.logoUrl)) { image in
-                    image.resizable().scaledToFit()
-                } placeholder: {
-                    // Chưa tải xong thì để ô xám cùng kích thước, không dùng spinner —
-                    // 5 spinner quay cùng lúc lúc mở sheet trông như đang lỗi.
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(AppColor.line.opacity(0.5))
-                }
-                .frame(width: 40, height: 40)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-
-                Text(bank.displayName)
-                    .font(AppFont.beVietnamPro(14, .semibold))
-                    .foregroundStyle(AppColor.payInk)
-
-                Spacer(minLength: 0)
-
-                if isPicked {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Self.brand)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(isPicked ? Self.brand.opacity(0.08) : Color.clear)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(PressableButtonStyle())
+    }
+
+    private func bankLogo(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
+        AsyncImage(url: URL(string: bank.logoUrl)) { phase in
+            switch phase {
+            case .success(let image):
+                // `scaledToFill` chứ KHÔNG phải `scaledToFit`: đây là ảnh quảng bá App Store
+                // 1200x630 (tỉ lệ 1.9) chứ không phải icon vuông — icon thật nằm giữa, hai
+                // bên là nền trắng. Fit vào ô 40x40 thì ảnh co còn 40x21 và phần nhìn thấy
+                // gần như toàn nền trắng, trên nền sheet trắng thành ra như không có gì.
+                // Fill lấp đầy ô vuông rồi cắt bớt hai bên thừa, đúng phần icon còn lại.
+                image.resizable().scaledToFill()
+            case .failure:
+                // Tải hỏng (mất mạng, ảnh đổi địa chỉ) thì hiện chữ đầu của tên ngân hàng —
+                // ô xám trơn trông như đang tải dở và người dùng sẽ ngồi đợi mãi.
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Self.brand.opacity(0.12))
+                    .overlay {
+                        Text(bank.displayName.prefix(1))
+                            .font(AppFont.beVietnamPro(16, .bold))
+                            .foregroundStyle(Self.brand)
+                    }
+            default:
+                // Đang tải: ô xám giữ chỗ, không dùng spinner — 5 vòng xoay cùng lúc lúc mở
+                // sheet trông như đang lỗi.
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(AppColor.line.opacity(0.5))
+            }
+        }
+        .frame(width: 40, height: 40)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        // Viền mảnh để icon nền trắng (VietinBank, ACB...) không lẫn vào nền trắng của sheet.
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(AppColor.line, lineWidth: 1)
+        }
     }
 
     private var amountField: some View {
