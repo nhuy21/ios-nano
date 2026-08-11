@@ -156,9 +156,29 @@ struct WalletLinkingWebView: View {
             default:
                 break
             }
+            _ = await controller.evaluate(Self.forceNumpadScript)
             try? await Task.sleep(nanoseconds: Self.domPollInterval)
         }
     }
+
+    /// Ép 6 ô nhập OTP (div.otp-inputs > input[type=text][maxlength=1] — đúng cấu trúc DOM
+    /// thật của trang embed OTP Bảo Kim) sang bàn phím số thay vì bàn phím chữ mặc định.
+    /// autocomplete="one-time-code" để iOS tự gợi ý mã SMS ngay trên bàn phím (QuickType),
+    /// user bấm 1 phát là điền xong thay vì gõ tay từng số. Đánh dấu data-nano-numpad để
+    /// không set lại mỗi vòng poll.
+    private static let forceNumpadScript = """
+    (function(){
+      var inputs = document.querySelectorAll('.otp-inputs input');
+      for (var i = 0; i < inputs.length; i++) {
+        var el = inputs[i];
+        if (el.getAttribute('data-nano-numpad')) continue;
+        el.setAttribute('inputmode', 'numeric');
+        el.setAttribute('pattern', '[0-9]*');
+        el.setAttribute('autocomplete', 'one-time-code');
+        el.setAttribute('data-nano-numpad', '1');
+      }
+    })();
+    """
 
     // MARK: - Đối soát ví
 
