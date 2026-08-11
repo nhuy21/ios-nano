@@ -2,7 +2,7 @@
 //  WalletLinkBaoKimView.swift
 //  nano ewallet
 //
-//  Mirror WalletLinkBaoKimScreen.kt — nhập họ tên + số ví Bảo Kim để đồng bộ vào Ví
+//  Mirror WalletLinkBaoKimScreen.kt — nhập họ tên + tên đăng nhập Bảo Kim để đồng bộ vào Ví
 //  nano, thay cho luồng eKYC khi người dùng chọn "Đồng bộ từ ví Bảo Kim".
 //
 //  Lỗi Bảo Kim từ chối ngay tại request này (ví không tồn tại, ví khoá, SĐT đã liên
@@ -70,9 +70,9 @@ struct WalletLinkBaoKimView: View {
                     // là email hoặc tên đăng nhập có chữ, khoá bàn phím số thì những tài
                     // khoản đó không gõ nổi.
                     labeledField(
-                        label: "Số ví Bảo Kim",
+                        label: "Tên đăng nhập",
                         text: $walletNo,
-                        placeholder: "Nhập số ví",
+                        placeholder: "Nhập tên đăng nhập",
                         field: .walletNo
                     )
                 }
@@ -94,8 +94,7 @@ struct WalletLinkBaoKimView: View {
         }
         .padding(.horizontal, 20)
         .screenBackground(Color.white)
-        // Số ví dùng bàn phím số của hệ thống nên không có nút Done — chạm ra ngoài để
-        // đóng (cử chỉ ở tầng UIWindow, xem DismissKeyboardOnTap).
+        // Chạm ra ngoài để đóng bàn phím (cử chỉ ở tầng UIWindow, xem DismissKeyboardOnTap).
         .contentShape(Rectangle())
     }
 
@@ -142,8 +141,8 @@ struct WalletLinkBaoKimView: View {
                             lineWidth: 1
                         )
                 }
-                // Không lọc bỏ chữ cái ở ô số ví: tài khoản Bảo Kim có thể là email hoặc tên
-                // đăng nhập có chữ, lọc chỉ giữ chữ số thì gõ vào bao nhiêu mất bấy nhiêu.
+                // Không lọc bỏ chữ cái: tài khoản Bảo Kim có thể là email hoặc tên đăng nhập
+                // có chữ, lọc chỉ giữ chữ số thì gõ vào bao nhiêu mất bấy nhiêu.
         }
     }
 
