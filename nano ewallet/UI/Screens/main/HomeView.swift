@@ -1091,7 +1091,12 @@ struct HomeView: View {
                     Text(TransactionDisplay.listTitle(for: tx))
                         .font(AppFont.beVietnamPro(14, .semibold))
                         .foregroundStyle(AppColor.payInk)
-                        .lineLimit(2)
+                        // MỘT dòng, cắt bằng dấu ba chấm — khớp `maxLines = 1` bên Android.
+                        // Để 2 dòng thì tiêu đề dài ("Rút tiền về ngân hàng liên kết") xuống
+                        // hàng, hàng giao dịch cao vống lên và so le với các hàng còn lại.
+                        // Màn Lịch sử vẫn để 2 dòng vì bên đó hàng rộng hơn (Android cũng vậy).
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     Text(subtitle(for: tx))
                         .font(AppFont.beVietnamPro(11))
                         .foregroundStyle(AppColor.payMuted)

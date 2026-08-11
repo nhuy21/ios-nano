@@ -47,6 +47,7 @@ struct TransactionDetailView: View {
             if showInfo {
                 TxInfoDialog(
                     statusText: TransactionDisplay.statusMeta(for: tx).text,
+                    showTransIdHint: tx.kind != .topUp,
                     onDismiss: { showInfo = false }
                 )
             }
@@ -164,8 +165,14 @@ struct TransactionDetailView: View {
         VStack(spacing: 0) {
             // Thứ tự mirror TransactionDetailScreen.kt — mã giao dịch trước, rồi tiền/phí/
             // tổng, sau mới tới thông tin phân loại.
-            detailRow(label: "Mã giao dịch", value: "#" + (tx.bkTransId ?? tx.id))
-            dashedDivider
+            //
+            // NẠP VÍ thì ẨN mã giao dịch: tiền vào ví qua tài khoản VA (người dùng tự chuyển
+            // từ app ngân hàng khác) nên mã ở đây là mã nội bộ Bảo Kim, KHÔNG phải mã họ tra
+            // soát được ở ngân hàng của mình — hiện ra chỉ gây nhầm khi đối chiếu.
+            if tx.kind != .topUp {
+                detailRow(label: "Mã giao dịch", value: "#" + (tx.bkTransId ?? tx.id))
+                dashedDivider
+            }
             detailRow(label: "Số tiền", value: Int(tx.amountValue).vndFormatted)
             dashedDivider
             // "0đ" chứ không phải "Miễn phí": biên lai là chứng từ, ghi đúng con số.
@@ -897,9 +904,18 @@ private struct SaveToContactsButton: View {
 
 private struct TxInfoDialog: View {
     let statusText: String
+    /// `false` với nạp ví — màn đó không hiện mã giao dịch, nên hướng dẫn "liên hệ kèm mã
+    /// giao dịch" chỉ khiến người dùng đi tìm một thứ không có trên màn hình.
+    var showTransIdHint: Bool = true
     let onDismiss: () -> Void
 
     private static let supportPhone = "0986995079"
+
+    private var guidance: String {
+        showTransIdHint
+            ? "Mã giao dịch là căn cứ để tra soát. Nếu thấy sai lệch, hãy chụp lại màn hình này (nút Chia sẻ) và liên hệ hỗ trợ kèm mã giao dịch."
+            : "Nếu thấy sai lệch, hãy chụp lại màn hình này (nút Chia sẻ) và liên hệ hỗ trợ."
+    }
 
     var body: some View {
         ZStack {
@@ -912,7 +928,7 @@ private struct TxInfoDialog: View {
                     .font(AppFont.beVietnamPro(17, .bold))
                     .foregroundStyle(AppColor.payInk)
 
-                Text("Trạng thái hiện tại: \(statusText).\n\nMã giao dịch là căn cứ để tra soát. Nếu thấy sai lệch, hãy chụp lại màn hình này (nút Chia sẻ) và liên hệ hỗ trợ kèm mã giao dịch.")
+                Text("Trạng thái hiện tại: \(statusText).\n\n" + guidance)
                     .font(AppFont.beVietnamPro(14))
                     .foregroundStyle(AppColor.payMuted)
                     .padding(.top, 10)
