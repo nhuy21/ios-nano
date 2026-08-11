@@ -65,13 +65,26 @@ struct AppTextField: View {
 struct FieldLabel: View {
     let text: String
     var size: CGFloat = 14
+    /// Trường bắt buộc — thêm dấu `*` đỏ sau nhãn.
+    var required: Bool = false
 
     var body: some View {
-        Text(text)
+        label
             .font(AppFont.beVietnamPro(size, .semibold))
-            .foregroundStyle(AppColor.payInk)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
+    }
+
+    /// Dấu `*` để RIÊNG một `Text` màu đỏ chứ không nối vào chuỗi nhãn: nối vào thì nó thừa
+    /// hưởng màu chữ nhãn, mắt không nhận ra đó là dấu bắt buộc.
+    @ViewBuilder
+    private var label: some View {
+        if required {
+            Text(text).foregroundStyle(AppColor.payInk)
+                + Text(" *").foregroundStyle(AppColor.error)
+        } else {
+            Text(text).foregroundStyle(AppColor.payInk)
+        }
     }
 }
 

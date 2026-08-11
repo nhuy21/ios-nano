@@ -30,6 +30,12 @@ struct PinDotsField: View {
     var dotsAlignment: DotsAlignment = .leading
     var submitLabel: SubmitLabel = .done
     var onSubmit: () -> Void = {}
+    /// Gọi khi vừa gõ đủ 6 số — dùng để tự nhảy sang ô kế hoặc ẩn bàn phím.
+    ///
+    /// Cần đường thứ hai KHÔNG phụ thuộc bàn phím: ô này dùng bàn phím SỐ, mà một số bàn
+    /// phím không vẽ nút hành động cho kiểu đó — lúc ấy người dùng gõ xong không biết bấm gì.
+    /// Độ dài cố định 6 nên cứ đủ số là biết đã xong.
+    var onFilled: () -> Void = {}
 
     @State private var showValue = false
     @FocusState private var isFocused: Bool
@@ -55,7 +61,13 @@ struct PinDotsField: View {
                 .frame(width: 1, height: 1)
                 .onChangeNewCompat(of: value) { newValue in
                     let filtered = String(newValue.filter(\.isNumber).prefix(maxLength))
-                    if filtered != newValue { value = filtered }
+                    if filtered != newValue {
+                        value = filtered
+                        // Đổi `value` sẽ bắn lại `onChange`, để lượt sau báo `onFilled` —
+                        // báo ở đây nữa là gọi hai lần cho cùng một lần gõ.
+                        return
+                    }
+                    if filtered.count == maxLength { onFilled() }
                 }
                 .onSubmit(onSubmit)
 

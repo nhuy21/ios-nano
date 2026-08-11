@@ -44,7 +44,7 @@ struct RegisterView: View {
 
                     Spacer().frame(height: 24)
 
-                    fieldBlock(label: "Số điện thoại") {
+                    fieldBlock(label: "Số điện thoại", required: true) {
                         AppTextField(
                             text: $vm.phone,
                             placeholder: "Nhập số điện thoại của bạn",
@@ -61,7 +61,7 @@ struct RegisterView: View {
 
                     Spacer().frame(height: 16)
 
-                    fieldBlock(label: "Email") {
+                    fieldBlock(label: "Email", required: true) {
                         AppTextField(
                             text: $vm.email,
                             placeholder: "Nhập địa chỉ email của bạn",
@@ -78,16 +78,17 @@ struct RegisterView: View {
 
                     Spacer().frame(height: 16)
 
-                    fieldBlock(label: "Mật khẩu") {
+                    fieldBlock(label: "Mật khẩu", required: true) {
                         PinDotsField(
                             value: $vm.password,
                             placeholder: "Nhập mật khẩu",
                             hasError: false,
                             dotsAlignment: .leading,
-                            submitLabel: .next
-                        ) {
-                            focusedField = .confirm
-                        }
+                            submitLabel: .next,
+                            onSubmit: { focusedField = .confirm },
+                            // Đủ 6 số là tự nhảy sang ô nhập lại, không chờ bấm nút bàn phím.
+                            onFilled: { focusedField = .confirm }
+                        )
                         .focused($focusedField, equals: .password)
                     }
                     if let error = vm.errors["password"] {
@@ -96,14 +97,18 @@ struct RegisterView: View {
 
                     Spacer().frame(height: 16)
 
-                    fieldBlock(label: "Nhập lại mật khẩu") {
+                    fieldBlock(label: "Nhập lại mật khẩu", required: true) {
                         PinDotsField(
                             value: $vm.confirmPassword,
                             placeholder: "Nhập lại mật khẩu",
                             hasError: false,
                             dotsAlignment: .leading,
                             submitLabel: .done,
-                            onSubmit: submit
+                            onSubmit: submit,
+                            // Chỉ ẩn bàn phím để lộ nút "Tạo tài khoản", CỐ Ý không tự bấm:
+                            // gõ sai số cuối là hiện "mật khẩu nhập lại không khớp" ngay giữa
+                            // lúc người ta còn đang sửa.
+                            onFilled: { focusedField = nil }
                         )
                         .focused($focusedField, equals: .confirm)
                     }
@@ -141,9 +146,13 @@ struct RegisterView: View {
     }
 
     @ViewBuilder
-    private func fieldBlock<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func fieldBlock<Content: View>(
+        label: String,
+        required: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            FieldLabel(text: label, size: 13)
+            FieldLabel(text: label, size: 13, required: required)
             content()
         }
     }
