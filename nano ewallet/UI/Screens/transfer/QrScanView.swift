@@ -37,6 +37,8 @@ struct QrScanView: View {
 
     @State private var isParsing = false
     @State private var errorMessage: String?
+    /// Ảnh chọn từ thư viện có nhiều người nhận -> hỏi chọn, không đoán hộ.
+    @State private var choiceList: OneTouchChoiceList?
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var lastHandledValue: String?
     @State private var isDecodingImage = false
@@ -105,6 +107,34 @@ struct QrScanView: View {
         // `.background(...ignoresSafeArea())` — thiếu bước ép giãn thì nền không có gì để
         // tràn ra, vẫn hở hai dải sáng ở status bar / home indicator.
         .screenBackground(Color.black, alignment: .center)
+        .fullScreenCover(item: $choiceList) { pick in
+            ActionChooserSheet(
+                title: pick.title,
+                subtitle: "Chọn tài khoản bạn muốn chuyển tới",
+                actions: pick.options.map { choice in
+                    .init(
+                        systemImage: choice.systemImage,
+                        title: choice.holderName,
+                        subtitle: choice.subtitle,
+                        handler: {
+                            switch choice {
+                            case .bank(let draft): onParsed(draft)
+                            case .wallet(let draft): onWalletRecipient(draft)
+                            }
+                        }
+                    )
+                },
+                onDismiss: {
+                    choiceList = nil
+                    // Mở lại việc quét: bỏ qua hộp chọn mà không reset thì camera vẫn coi
+                    // như đã xong việc và không xử lý frame nào nữa. Phải reset CẢ hai —
+                    // state ở view lẫn cờ bên trong controller.
+                    lastHandledValue = nil
+                    scanner.resumeScanning()
+                }
+            )
+            .transparentSheetBackground()
+        }
         .task {
             await scanner.requestPermissionAndStart()
         }
@@ -527,6 +557,8 @@ struct QrScanView: View {
             onParsed(draft)
         case .wallet(let draft):
             onWalletRecipient(draft)
+        case .choose(let title, let options):
+            choiceList = OneTouchChoiceList(title: title, options: options)
         case .failure(let message):
             errorMessage = message
             // Cho phép quét lại mã vừa thất bại — cả state ở view (lastHandledValue) lẫn cờ

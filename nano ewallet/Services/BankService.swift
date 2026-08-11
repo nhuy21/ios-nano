@@ -34,6 +34,19 @@ struct ParsedQr: Decodable {
     let content: String?
     let isAmountEditable: Bool
     let isContentEditable: Bool
+    /// CHỈ có ở `banks/parse-message`, và chỉ khi văn bản chứa TỪ 2 TÀI KHOẢN THẬT trở lên
+    /// (BE đã tra tên từng cái và loại số nào không tra ra — số điện thoại, ngày tháng, số
+    /// tiền đều rụng ở bước đó). Các trường phía trên vẫn là tài khoản BE tự chọn như cũ,
+    /// nên `nil` = hành xử y hệt trước đây.
+    let accounts: [ParsedAccount]?
+}
+
+/// Một tài khoản trong `ParsedQr.accounts` — BE đã tra ra tên chủ tài khoản thật.
+struct ParsedAccount: Decodable, Hashable {
+    let bankBin: String
+    let bankName: String?
+    let accountNumber: String
+    let accountName: String
 }
 
 enum BankService {

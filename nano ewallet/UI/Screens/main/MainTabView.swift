@@ -33,6 +33,8 @@ struct MainTabView: View {
     /// Bước đang chạy khi bóc tách ảnh chia sẻ — luồng này chậm nhất (OCR rồi gọi backend)
     /// nên rất cần cho người dùng thấy nó đang tiến chứ không đứng im.
     @State private var sharedImageStage = "Đang xử lý..."
+    /// Ảnh chia sẻ vào app có nhiều người nhận -> hỏi chọn, không đoán hộ.
+    @State private var sharedImageChoice: OneTouchChoiceList?
 
     /// Ngăn xếp của tab Home sống ở ĐÂY chứ không phải trong `HomeView`: view đó bị huỷ
     /// mỗi khi sang tab Cá nhân (dùng `switch`, không phải `TabView`), nên deep link tới
@@ -163,6 +165,22 @@ struct MainTabView: View {
         // Che Home trong lúc bóc tách: nhận diện QR/OCR + gọi API mất vài giây, không che thì
         // người dùng thấy Home hiện ra rồi bị đẩy sang màn chuyển tiền, nhìn như app tự nhảy.
         .overlay { if isResolvingSharedImage { OneTouchWaitingOverlay(message: sharedImageStage) } }
+        .fullScreenCover(item: $sharedImageChoice) { pick in
+            ActionChooserSheet(
+                title: pick.title,
+                subtitle: "Chọn tài khoản bạn muốn chuyển tới",
+                actions: pick.options.map { choice in
+                    .init(
+                        systemImage: choice.systemImage,
+                        title: choice.holderName,
+                        subtitle: choice.subtitle,
+                        handler: { openSharedChoice(choice) }
+                    )
+                },
+                onDismiss: { sharedImageChoice = nil }
+            )
+            .transparentSheetBackground()
+        }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
         // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
         // Cả 2 draft đều nil vì đây là mở màn NHẬP TAY, không phải "Chuyển cho <tên>" có sẵn
@@ -236,8 +254,18 @@ struct MainTabView: View {
             openOnHome(.bankTransfer(draft: draft))
         case .wallet(let draft):
             openOnHome(.walletTransferAmount(draft))
+        case .choose(let title, let options):
+            sharedImageChoice = OneTouchChoiceList(title: title, options: options)
         case .failure(let message):
             payLinkError = message
+        }
+    }
+
+    /// Mở màn chuyển tiền cho lựa chọn vừa bấm trong hộp chọn.
+    private func openSharedChoice(_ choice: OneTouchChoice) {
+        switch choice {
+        case .bank(let draft): openOnHome(.bankTransfer(draft: draft))
+        case .wallet(let draft): openOnHome(.walletTransferAmount(draft))
         }
     }
 

@@ -40,6 +40,8 @@ struct HomeView: View {
     @State private var isResolvingOneTouch = false
     /// Dòng chữ ở màn chờ OneTouch — resolver tự đẩy tên bước đang chạy vào đây.
     @State private var oneTouchStage = "Đang xử lý..."
+    /// Ảnh có nhiều người nhận -> hỏi chọn, không đoán hộ.
+    @State private var oneTouchChoice: OneTouchChoiceList?
     @State private var oneTouchError: String?
     @State private var showVoiceCommand = false
     @State private var isSyncing = false
@@ -172,6 +174,22 @@ struct HomeView: View {
             }
         }
         .overlay { if isResolvingOneTouch { OneTouchWaitingOverlay(message: oneTouchStage) } }
+        .fullScreenCover(item: $oneTouchChoice) { pick in
+            ActionChooserSheet(
+                title: pick.title,
+                subtitle: "Chọn tài khoản bạn muốn chuyển tới",
+                actions: pick.options.map { choice in
+                    .init(
+                        systemImage: choice.systemImage,
+                        title: choice.holderName,
+                        subtitle: choice.subtitle,
+                        handler: { openChoice(choice) }
+                    )
+                },
+                onDismiss: { oneTouchChoice = nil }
+            )
+            .transparentSheetBackground()
+        }
         .fullScreenCover(isPresented: $showVoiceCommand) {
             VoiceCommandOverlay(
                 onDismiss: { showVoiceCommand = false },
@@ -224,8 +242,18 @@ struct HomeView: View {
             path.append(.bankTransfer(draft: draft))
         case .wallet(let draft):
             path.append(.walletTransferAmount(draft))
+        case .choose(let title, let options):
+            oneTouchChoice = OneTouchChoiceList(title: title, options: options)
         case .failure(let message):
             oneTouchError = message
+        }
+    }
+
+    /// Mở màn chuyển tiền cho lựa chọn người dùng vừa bấm trong hộp chọn.
+    private func openChoice(_ choice: OneTouchChoice) {
+        switch choice {
+        case .bank(let draft): path.append(.bankTransfer(draft: draft))
+        case .wallet(let draft): path.append(.walletTransferAmount(draft))
         }
     }
 
