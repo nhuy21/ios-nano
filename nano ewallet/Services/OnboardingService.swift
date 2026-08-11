@@ -108,6 +108,9 @@ struct SubmitEkycRequest: Encodable {
     let accNo: String
     let accName: String
     let deviceId: String
+    /// BẮT BUỘC — BE khai `@IsString() @IsNotEmpty()` theo spec Bảo Kim. Thiếu trường này thì
+    /// ValidationPipe của NestJS chặn ngay, và thông báo trả về không nói rõ thiếu gì.
+    let ipAddress: String
 }
 
 enum OnboardingService {
@@ -163,12 +166,44 @@ enum OnboardingService {
             purposeOfUsing: payload.purposeOfUsing,
             businessAreaId: payload.businessAreaId,
             bankNo: bankNo, accNo: accNo, accName: accName,
-            deviceId: AuthStore.shared.getOrCreateDeviceId()
+            deviceId: AuthStore.shared.getOrCreateDeviceId(),
+            ipAddress: Self.localIPAddress()
         )
         return try await APIClient.shared.request(
             .post, "onboarding/submit", body: body,
             auth: true, slow: true, as: OnboardingResult.self
         )
+    }
+
+    /// Địa chỉ IPv4 nội bộ của máy (Wi-Fi hoặc 4G) — mirror `localIpAddress()` bên Android.
+    ///
+    /// Bảo Kim yêu cầu trường này trong hồ sơ eKYC. Không lấy được thì trả `127.0.0.1` thay
+    /// vì để trống: BE khai `@IsNotEmpty()` nên chuỗi rỗng sẽ bị chặn, mà hồ sơ hỏng chỉ vì
+    /// không đọc nổi IP thì vô lý — thà gửi giá trị giữ chỗ còn hơn chặn người dùng.
+    private static func localIPAddress() -> String {
+        var head: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&head) == 0, let first = head else { return "127.0.0.1" }
+        defer { freeifaddrs(head) }
+
+        for pointer in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(pointer.pointee.ifa_flags)
+            // Bỏ card chưa bật hoặc là loopback — `127.0.0.1` không phải IP thật của máy.
+            guard flags & IFF_UP != 0, flags & IFF_LOOPBACK == 0,
+                  let addr = pointer.pointee.ifa_addr,
+                  addr.pointee.sa_family == UInt8(AF_INET) else { continue }
+
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let ok = getnameinfo(
+                addr, socklen_t(addr.pointee.sa_len),
+                &host, socklen_t(host.count),
+                nil, 0, NI_NUMERICHOST
+            )
+            if ok == 0 {
+                let ip = String(cString: host)
+                if !ip.isEmpty { return ip }
+            }
+        }
+        return "127.0.0.1"
     }
 
     /// `POST onboarding/create-agreement` — một lần gọi. Trả `PENDING` khi Bảo Kim còn
@@ -204,7 +239,10 @@ enum OnboardingService {
     /// - Parameter fields: khoá theo tên BE nhận ("name", "placeOfIssues", "bankNo"...).
     static func updateEkyc(fields: [String: String]) async throws -> OnboardingResult {
         var body = fields
+        // `deviceId` và `ipAddress` đều BẮT BUỘC ở endpoint này (BE khai `@IsNotEmpty()` theo
+        // spec Bảo Kim), kể cả khi chỉ sửa đúng một trường.
         body["deviceId"] = AuthStore.shared.getOrCreateDeviceId()
+        body["ipAddress"] = Self.localIPAddress()
         return try await APIClient.shared.request(
             .post, "onboarding/update", body: body,
             auth: true, slow: true, as: OnboardingResult.self

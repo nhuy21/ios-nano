@@ -144,17 +144,35 @@ enum EkycLauncher {
 
     // MARK: - Private
 
-    /// Ảnh do `rawDataDelegate` đổ vào; ở đây chỉ lấy phần chữ từ kết quả NFC.
+    /// Ảnh do `rawDataDelegate` đổ vào; ở đây lấy phần chữ.
+    ///
+    /// Ưu tiên NFC (dữ liệu chip đã ký số, không sửa được), thiếu thì lấy từ OCR ảnh thẻ.
+    /// Nhiều thẻ CCCD trả `dateOfIssuance` RỖNG từ chip — trường này vốn in ở mặt sau thẻ,
+    /// chip không bắt buộc chứa. Chỉ đọc mỗi NFC thì nộp hồ sơ bị BE từ chối vì thiếu ngày
+    /// cấp, mà người dùng không hiểu vì sao đã quét đủ mà vẫn lỗi.
+    ///
+    /// NƠI CẤP chỉ có ở OCR, chip không hề mang trường này.
     private static func applyTextFields(from result: CmcEkycResult?) {
-        guard let nfc = result?.nfcResult else { return }
+        guard let result else { return }
+        let nfc = result.nfcResult
+        // Ngày cấp/nơi cấp in ở MẶT SAU nên đọc `backResult` trước; các trường còn lại
+        // (tên, ngày sinh, số thẻ) nằm ở mặt trước.
+        let back = result.backResult?.field
+        let front = result.frontResult?.field
         let store = PendingKyc.shared
-        store.idCardNumber = nfc.idNumber ?? store.idCardNumber
-        store.fullName = nfc.name ?? store.fullName
-        store.dateOfBirth = nfc.dateOfBirth ?? store.dateOfBirth
-        store.gender = nfc.gender ?? store.gender
-        store.address = nfc.address ?? store.address
-        store.issueDate = nfc.dateOfIssuance ?? store.issueDate
-        store.expireDate = nfc.dateOfExpiry ?? store.expireDate
+
+        func pick(_ values: String?...) -> String? {
+            values.compactMap { $0 }.first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        }
+
+        store.idCardNumber = pick(nfc?.idNumber, front?.idNumber, back?.idNumber) ?? store.idCardNumber
+        store.fullName = pick(nfc?.name, front?.name, back?.name) ?? store.fullName
+        store.dateOfBirth = pick(nfc?.dateOfBirth, front?.birthday, back?.birthday) ?? store.dateOfBirth
+        store.gender = pick(nfc?.gender, front?.gender, back?.gender) ?? store.gender
+        store.address = pick(nfc?.address, front?.resident, back?.resident) ?? store.address
+        store.issueDate = pick(nfc?.dateOfIssuance, back?.dateOfIssue, front?.dateOfIssue) ?? store.issueDate
+        store.expireDate = pick(nfc?.dateOfExpiry, back?.dateOfExpiry, front?.dateOfExpiry) ?? store.expireDate
+        store.placeOfIssues = pick(back?.placeOfIssue, front?.placeOfIssue) ?? store.placeOfIssues
     }
 
     /// Lỗi NFC do SDK bắn ra kèm hai closure — dựng hộp thoại để người dùng chọn thử lại

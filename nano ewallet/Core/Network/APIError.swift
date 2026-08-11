@@ -35,7 +35,16 @@ enum APIError: LocalizedError, Equatable {
         switch self {
         case .offline:
             return "Không có kết nối internet"
-        case .server(_, let message):
+        case .server(let code, let message):
+            // BE (và Bảo Kim phía sau) đôi khi trả message trống rỗng kiểu "Error"/"Bad
+            // Request" — hiện nguyên xi thì người dùng không biết chuyện gì, mà mình cũng
+            // không lần được lỗi từ ảnh chụp màn hình họ gửi. Kèm mã HTTP cho những message
+            // vô nghĩa như vậy; message có nội dung thật thì giữ nguyên, không làm rối.
+            let trimmed = message.trimmingCharacters(in: .whitespaces)
+            let uninformative = ["error", "bad request", "internal server error", "forbidden", ""]
+            if uninformative.contains(trimmed.lowercased()) {
+                return "Yêu cầu không hợp lệ (HTTP \(code))"
+            }
             return message
         case .decoding(let detail):
             return "Dữ liệu trả về không đúng định dạng (\(detail))"

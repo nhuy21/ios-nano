@@ -58,7 +58,8 @@ final class PendingKyc: ObservableObject {
     @Published var address: String?
     @Published var issueDate: String?
     @Published var expireDate: String?
-    /// Chip không trả nơi cấp — để trống, lúc nộp hồ sơ điền mặc định.
+    /// Chip KHÔNG mang nơi cấp — lấy từ OCR mặt sau thẻ; OCR cũng không đọc được thì lúc
+    /// nộp hồ sơ điền giá trị mặc định.
     @Published var placeOfIssues: String?
 
     /// Người dùng tự nhập/chọn ở màn bổ sung thông tin.
