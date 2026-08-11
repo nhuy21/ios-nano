@@ -93,16 +93,37 @@ enum OneTouchResolver {
         return await resolve(text: text, onProgress: onProgress)
     }
 
-    /// Ảnh: thử tìm mã QR trước, không có thì OCR rồi xử như tin nhắn.
+    /// Ảnh: đọc mã QR và chữ trong CÙNG một lượt, rồi ghép lại.
+    ///
+    /// Đọc song song thay vì "có QR thì thôi đọc chữ": ảnh chụp mã QR TĨNH (không nhúng số
+    /// tiền ở tag 54) luôn mất số tiền dù nó in rõ ngay cạnh mã. Hai việc độc lập nhau nên
+    /// chạy cùng lúc cũng không chậm hơn đường cũ.
     static func resolve(image: UIImage, onProgress: ProgressHandler? = nil) async -> OneTouchResult {
-        await report(onProgress, "Đang tìm mã QR trong ảnh...")
+        await report(onProgress, "Đang đọc nội dung ảnh...")
+
+        // Đọc CẢ HAI, kể cả khi tìm thấy mã QR — khác đường cũ (thấy QR là bỏ hẳn phần chữ).
+        // `recognizeText` đã tự chuyển sang luồng nền bên trong nên không chặn giao diện;
+        // `qrPayloads` chạy đồng bộ nhưng nhanh hơn OCR nhiều nên đặt trước.
         let payloads = qrPayloads(in: image)
+        let text = await TextRecognizer.recognizeText(in: image)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !payloads.isEmpty {
-            await report(onProgress, "Đang đọc mã QR...")
             // Bóc SONG SONG từng mã: mỗi mã một lượt gọi API độc lập nên mã không phải QR
             // chuyển tiền (wifi, link, vé...) chỉ bị loại chứ không làm hỏng cả luồng.
-            let drafts = await parseQrDrafts(payloads)
+            var drafts = await parseQrDrafts(payloads)
+
+            // Chỉ điền số tiền từ chữ khi mã QR KHÔNG có sẵn, và luôn để người dùng sửa
+            // được — số suy từ chữ là phỏng đoán, khác hẳn số nhúng trong QR động (số đó
+            // chắc chắn nên vẫn khoá như cũ).
+            //
+            // Ảnh có NHIỀU tài khoản thì bỏ qua: gán số tiền nào cho tài khoản nào cũng là
+            // đoán hộ, y như chuyện chọn tài khoản.
+            if drafts.count == 1, drafts[0].prefillAmount == nil,
+               let ocrAmount = AmountParser.ocrAmount(from: text) {
+                drafts[0].prefillAmount = Int(ocrAmount)
+                drafts[0].amountEditable = true
+            }
 
             if drafts.count == 1 {
                 return .bank(drafts[0])
@@ -110,13 +131,11 @@ enum OneTouchResolver {
             if drafts.count > 1 {
                 return .choose(title: "Ảnh có nhiều mã QR", options: drafts.map(OneTouchChoice.bank))
             }
-            // Có mã QR nhưng KHÔNG mã nào là mã chuyển tiền -> rơi xuống OCR thay vì dừng
-            // hẳn: ảnh chụp tin nhắn CK kèm một mã QR không liên quan vẫn phải dùng được.
+            // Có mã QR nhưng KHÔNG mã nào là mã chuyển tiền -> rơi xuống đường đọc chữ thay
+            // vì dừng hẳn: ảnh chụp tin nhắn CK kèm một mã QR không liên quan vẫn phải dùng
+            // được.
         }
 
-        await report(onProgress, "Đang đọc chữ trong ảnh...")
-        let text = await TextRecognizer.recognizeText(in: image)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return .failure("Ảnh không có mã QR và không đọc được chữ")
         }
