@@ -15,10 +15,25 @@ enum TextRecognizer {
     /// Đọc toàn bộ chữ trong ảnh, nối các dòng bằng xuống dòng. Chuỗi rỗng nghĩa là
     /// không đọc được gì.
     static func recognizeText(in image: UIImage) async -> String {
-        guard let cgImage = image.cgImage else { return "" }
+        await recognize(in: image).text
+    }
+
+    /// Chữ đọc được, kèm riêng phần nằm ở VÙNG TIÊU ĐỀ trên cùng ảnh.
+    ///
+    /// Vùng tiêu đề dùng để suy người nhận từ tên cuộc trò chuyện khi tin nhắn không có số
+    /// tài khoản nào. KHÔNG được dùng chữ cả ảnh cho việc đó: ảnh chụp màn hình chat có hàng
+    /// trăm từ (tin nhắn hai bên, nhãn giao diện, chữ trên bàn phím) — dò tên trong đó thì
+    /// sớm muộn cũng trúng bừa một người trong danh bạ và app điền sẵn SAI NGƯỜI NHẬN.
+    static func recognizeWithHeader(in image: UIImage) async -> (text: String, header: String) {
+        let result = await recognize(in: image)
+        return (result.text, result.header)
+    }
+
+    private static func recognize(in image: UIImage) async -> (text: String, header: String) {
+        guard let cgImage = image.cgImage else { return ("", "") }
         let orientation = CGImagePropertyOrientation(image.imageOrientation)
 
-        let raw: String = await withCheckedContinuation { continuation in
+        let raw: (String, String) = await withCheckedContinuation { continuation in
             // `VNRecognizeTextRequest`/`VNImageRequestHandler` là non-Sendable nên phải
             // tạo NGAY TRONG closure của `async`, không capture từ ngoài vào — capture
             // sẽ thành lỗi ở Swift 6 (`@Sendable` closure không nhận non-Sendable).
@@ -30,13 +45,23 @@ enum TextRecognizer {
                     // (số tài khoản ở dòng này, tên ngân hàng ở dòng kia). Trả lộn xộn thì
                     // backend ghép nhầm ngân hàng với số tài khoản khác dòng.
                     // `boundingBox` gốc toạ độ ở ĐÁY ảnh nên y lớn = dòng trên.
-                    let lines = observations
+                    let sorted = observations
                         .sorted { lhs, rhs in
                             let dy = lhs.boundingBox.origin.y - rhs.boundingBox.origin.y
                             // Cùng một dòng (lệch dưới 1% chiều cao) thì xếp trái sang phải.
                             if abs(dy) > 0.01 { return dy > 0 }
                             return lhs.boundingBox.origin.x < rhs.boundingBox.origin.x
                         }
+
+                    // Vùng tiêu đề = 15% TRÊN CÙNG ảnh. Vision dùng toạ độ CHUẨN HOÁ 0–1 với
+                    // gốc ở ĐÁY, nên "trên cùng" là `maxY` lớn — ngược hẳn với ML Kit bên
+                    // Android (pixel, gốc trên-trái, điều kiện là `top < 15%`). Bê nguyên
+                    // ngưỡng của Android sang đây sẽ lấy trúng đáy ảnh mà vẫn "chạy".
+                    let headerLines = sorted
+                        .filter { $0.boundingBox.maxY > 1 - Self.headerBand }
+                        .compactMap { $0.topCandidates(1).first?.string }
+
+                    let lines = sorted
                         .compactMap { $0.topCandidates(1).first?.string }
                         // Bỏ dòng chỉ ĐÚNG MỘT chữ cái đứng riêng: ảnh chụp màn hình có bàn
                         // phím ảo thì mỗi phím (Q, W, E, R, T...) là một block riêng, Vision
@@ -51,7 +76,9 @@ enum TextRecognizer {
                             guard trimmed.count == 1, let char = trimmed.first else { return true }
                             return !char.isLetter
                         }
-                    continuation.resume(returning: lines.joined(separator: "\n"))
+                    continuation.resume(
+                        returning: (lines.joined(separator: "\n"), headerLines.joined(separator: " "))
+                    )
                 }
                 // `accurate` vì tin nhắn CK có số tài khoản dài, nhận nhầm 1 chữ số là
                 // chuyển sai người. Chậm hơn `fast` nhưng đây là thao tác một lần.
@@ -73,13 +100,17 @@ enum TextRecognizer {
                         options: [:]
                     ).perform([request])
                 } catch {
-                    continuation.resume(returning: "")
+                    continuation.resume(returning: ("", ""))
                 }
             }
         }
 
-        return normalize(raw)
+        // Chuẩn hoá CẢ HAI: tên trong tiêu đề cũng có thể bị OCR chèn khoảng trắng lạ.
+        return (normalize(raw.0), normalize(raw.1))
     }
+
+    /// Phần trên cùng ảnh được coi là vùng tiêu đề (tên cuộc trò chuyện).
+    private static let headerBand: CGFloat = 0.15
 
     /// Ngôn ngữ nhận dạng, hỏi hệ thống lúc chạy thay vì ghim cứng: danh sách Vision hỗ trợ
     /// thay đổi theo phiên bản iOS, ghim `vi-VN` trên máy chưa có sẽ làm request hỏng hẳn.

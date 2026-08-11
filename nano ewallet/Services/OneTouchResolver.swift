@@ -105,8 +105,8 @@ enum OneTouchResolver {
         // `recognizeText` đã tự chuyển sang luồng nền bên trong nên không chặn giao diện;
         // `qrPayloads` chạy đồng bộ nhưng nhanh hơn OCR nhiều nên đặt trước.
         let payloads = qrPayloads(in: image)
-        let text = await TextRecognizer.recognizeText(in: image)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let recognized = await TextRecognizer.recognizeWithHeader(in: image)
+        let text = recognized.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !payloads.isEmpty {
             // Bóc SONG SONG từng mã: mỗi mã một lượt gọi API độc lập nên mã không phải QR
@@ -139,13 +139,17 @@ enum OneTouchResolver {
         guard !text.isEmpty else {
             return .failure("Ảnh không có mã QR và không đọc được chữ")
         }
-        return await resolve(text: text, onProgress: onProgress)
+        return await resolve(text: text, header: recognized.header, onProgress: onProgress)
     }
 
     /// Nhận diện text là VÍ nội bộ hay NGÂN HÀNG.
-    static func resolve(text: String, onProgress: ProgressHandler? = nil) async -> OneTouchResult {
+    /// - Parameter header: chữ ở VÙNG TIÊU ĐỀ ảnh (tên cuộc trò chuyện). Chỉ có khi nguồn là
+    ///   ảnh; dán chữ trực tiếp thì rỗng, và nhánh suy người nhận từ danh bạ sẽ bỏ qua.
+    static func resolve(
+        text: String, header: String = "", onProgress: ProgressHandler? = nil
+    ) async -> OneTouchResult {
         await report(onProgress, "Đang bóc tách nội dung...")
-        return await resolveTextInner(text)
+        return await resolveTextInner(text, header: header)
     }
 
     private static func report(_ handler: ProgressHandler?, _ message: String) async {
@@ -153,7 +157,7 @@ enum OneTouchResolver {
         await MainActor.run { handler(message) }
     }
 
-    private static func resolveTextInner(_ text: String) async -> OneTouchResult {
+    private static func resolveTextInner(_ text: String, header: String) async -> OneTouchResult {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Số trơn -> thử verify là ví. Không phải ví thì báo rõ, KHÔNG thử bóc ngân hàng:
@@ -262,8 +266,88 @@ enum OneTouchResolver {
             }
             return .choose(title: "Ảnh có nhiều số ví", options: options)
         }
+
+        // Không có SỐ nào trong tin nhắn -> thử suy người nhận từ TÊN CUỘC TRÒ CHUYỆN.
+        //
+        // Ca thật: đã lưu "Linh", Linh nhắn "chuyển tao 20k" — tin nhắn không có số nào cả.
+        // Trước đây đây là đường cụt: báo lỗi và MẤT luôn những gì đã bóc được (số tiền).
+        //
+        // Chỉ dùng chữ ở VÙNG TIÊU ĐỀ, không dùng chữ cả ảnh — xem `recognizeWithHeader`.
+        if let result = await matchFromContacts(header: header, amount: AmountParser.parseVnd(from: text)) {
+            return result
+        }
+
         // Ưu tiên câu backend trả về — nó nói đúng chuyện gì đã xảy ra.
         return .failure(parseError ?? "Không nhận diện được ngân hàng hoặc ví từ nội dung dán")
+    }
+
+    /// Suy người nhận từ tên cuộc trò chuyện, đối chiếu danh bạ.
+    ///
+    /// `nil` khi không có tiêu đề, danh bạ rỗng, hoặc không khớp ai — nơi gọi giữ nguyên lỗi
+    /// gốc thay vì đổi thành câu khác gây hiểu nhầm.
+    /// `@MainActor` vì cả `BeneficiaryStore` lẫn `BankCache` đều bị cô lập ở main actor.
+    /// Toàn bộ hàm chỉ đọc dữ liệu đã có sẵn trong bộ nhớ nên không chặn giao diện.
+    @MainActor
+    private static func matchFromContacts(header: String, amount: Int64?) async -> OneTouchResult? {
+        let header = header.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !header.isEmpty else { return nil }
+
+        let contacts = await BeneficiaryStore.shared.get()
+        guard !contacts.isEmpty else { return nil }
+
+        // Bỏ contact thiếu dữ liệu để chuyển: ví cần username, ngân hàng cần cả BIN lẫn số TK.
+        let usable = contacts.filter { contact in
+            switch contact.type {
+            case .wallet: return !(contact.benUsername ?? "").isEmpty
+            case .bankAccount:
+                return !(contact.bankNo ?? "").isEmpty && !(contact.accNo ?? "").isEmpty
+            }
+        }
+        let matches = RecipientMatcher.top(RecipientMatcher.match([header], in: usable))
+        guard !matches.isEmpty else { return nil }
+
+        let choices = matches.compactMap { choice(for: $0.contact, amount: amount) }
+        guard !choices.isEmpty else { return nil }
+        if choices.count == 1 { return single(choices[0]) }
+        // Nhiều người cùng khớp (hai người cùng đặt tên gợi nhớ "Linh") -> phải hỏi.
+        return .choose(title: "Có \(choices.count) người trùng tên", options: choices)
+    }
+
+    /// `@MainActor` vì `BankCache` (tra tên ngân hàng theo BIN) bị cô lập ở main actor.
+    @MainActor
+    private static func choice(for contact: Beneficiary, amount: Int64?) -> OneTouchChoice? {
+        switch contact.type {
+        case .wallet:
+            guard let username = contact.benUsername, !username.isEmpty else { return nil }
+            return .wallet(WalletTransferDraft(
+                username: username,
+                holderName: contact.displayName,
+                payLinkToken: nil,
+                prefillAmount: amount
+            ))
+        case .bankAccount:
+            guard let bin = contact.bankNo, !bin.isEmpty,
+                  let accNo = contact.accNo, !accNo.isEmpty else { return nil }
+            return .bank(BankTransferDraft(
+                bin: bin,
+                bankName: BankCache.shared.bank(bin: bin)?.shortName ?? "Ngân hàng",
+                accNo: accNo,
+                accType: 0,
+                holderName: contact.accName ?? contact.displayName,
+                prefillAmount: amount.map(Int.init),
+                prefillContent: nil,
+                // Số tiền suy từ chữ là phỏng đoán -> luôn cho sửa.
+                amountEditable: true,
+                contentEditable: true
+            ))
+        }
+    }
+
+    private static func single(_ choice: OneTouchChoice) -> OneTouchResult {
+        switch choice {
+        case .bank(let draft): return .bank(draft)
+        case .wallet(let draft): return .wallet(draft)
+        }
     }
 
     /// Mã QR (quét camera hoặc tìm thấy trong ảnh) -> nhờ backend verify CRC + tra chủ TK.
@@ -389,5 +473,102 @@ enum OneTouchResolver {
             amountEditable: amount == nil ? true : info.isAmountEditable,
             contentEditable: true
         )
+    }
+}
+
+// MARK: - Khớp người nhận từ danh bạ
+
+/// Một người trong danh bạ khớp được với mẩu chữ.
+struct ContactMatch {
+    let contact: Beneficiary
+    /// Khớp vào TÊN GỢI NHỚ (không phải tên chủ tài khoản).
+    let viaNickname: Bool
+    /// Số TỪ của tên khớp được — tên khớp trọn vẹn hơn thì đáng tin hơn.
+    let tokens: Int
+    /// Tổng ký tự khớp, dùng phân định khi bằng số từ.
+    let chars: Int
+}
+
+/// Khớp người nhận trong danh bạ từ một mẩu chữ (tên cuộc trò chuyện đọc được ở đầu ảnh chụp
+/// màn hình) — mirror `matchRecipients`/`topContactMatches` bên Android.
+///
+/// Chỉ dùng khi tin nhắn KHÔNG có số tài khoản nào: số tài khoản là thứ ĐỌC được nên luôn
+/// thắng cái tên SUY ra.
+enum RecipientMatcher {
+
+    /// Khớp theo TỪ, xét cả tên gợi nhớ lẫn từng từ của tên chủ tài khoản.
+    ///
+    /// Khớp theo TỪ chứ không phải chuỗi con, nên không nhầm "mẹ" (me) với "mến" (men).
+    /// Không phân biệt loại danh bạ: ví và ngân hàng đều xét, vì tên một tài khoản ngân hàng
+    /// đã lưu (vd "chủ nhà") cũng là cái người dùng nhận ra.
+    static func match(_ candidates: [String], in contacts: [Beneficiary]) -> [ContactMatch] {
+        let said = Set(candidates.flatMap(words))
+        guard !said.isEmpty else { return [] }
+
+        var out: [ContactMatch] = []
+        for contact in contacts {
+            // Tính RIÊNG hai nguồn tên để biết khớp vào đâu — gộp chung thì mất thông tin đó
+            // và không thể cho tên gợi nhớ thắng tên chủ tài khoản.
+            let nick = words(contact.nickname ?? "")
+            if !nick.isEmpty, nick.allSatisfy(said.contains) {
+                out.append(ContactMatch(
+                    contact: contact, viaNickname: true,
+                    tokens: nick.count, chars: nick.reduce(0) { $0 + $1.count }
+                ))
+                continue
+            }
+
+            let acc = words(contact.accName ?? "")
+            // Đòi từ CUỐI (tên riêng) phải có mặt: khớp mỗi họ/đệm ("nguyen", "van") thì gần
+            // như cả danh bạ đều trúng.
+            if let last = acc.last, said.contains(last) {
+                let hit = acc.filter(said.contains)
+                out.append(ContactMatch(
+                    contact: contact, viaNickname: false,
+                    tokens: hit.count, chars: hit.reduce(0) { $0 + $1.count }
+                ))
+            }
+        }
+        return out
+    }
+
+    /// Lọc còn nhóm ưu tiên CAO NHẤT rồi giữ các contact ĐỒNG ĐIỂM ở nhóm đó.
+    ///
+    /// Còn nhiều hơn một tức là thật sự không phân định được (vd hai người cùng đặt tên gợi
+    /// nhớ "Linh") — lúc đó nơi gọi phải HỎI chứ không được chọn hộ.
+    ///
+    /// TÊN GỢI NHỚ THẮNG TÊN CHỦ TÀI KHOẢN, rồi mới xét độ dài từ khớp. Vì tên gợi nhớ là do
+    /// NGƯỜI DÙNG TỰ ĐẶT cho người này, còn tên chủ tài khoản là do ngân hàng trả về.
+    ///
+    /// Ca hỏng nếu không có thứ bậc này: "NGUYỄN THÙY LINH" lưu là "Yến", và "Nguyễn Thị Yến"
+    /// lưu là "Linh". Nhắc "Yến" thì cả hai cùng khớp với ĐIỂM BẰNG NHAU (3 ký tự) -> chọn
+    /// theo thứ tự API trả về, tức tuỳ may.
+    static func top(_ matches: [ContactMatch]) -> [ContactMatch] {
+        guard !matches.isEmpty else { return [] }
+        let tier = matches.contains(where: \.viaNickname)
+            ? matches.filter(\.viaNickname)
+            : matches
+        guard let bestTokens = tier.map(\.tokens).max() else { return [] }
+        let sameTokens = tier.filter { $0.tokens == bestTokens }
+        guard let bestChars = sameTokens.map(\.chars).max() else { return [] }
+        return sameTokens.filter { $0.chars == bestChars }
+    }
+
+    /// Tách chuỗi thành các TỪ đã bỏ dấu + viết thường, bỏ từ quá ngắn (<2) để tránh nhiễu.
+    private static func words(_ s: String) -> [String] {
+        normalizeName(s)
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+            .filter { $0.count >= 2 }
+    }
+
+    /// Bỏ dấu tiếng Việt + viết thường. `đ`/`Đ` phải thay tay vì không tách ra được như các
+    /// dấu khác.
+    private static func normalizeName(_ s: String) -> String {
+        s.folding(options: .diacriticInsensitive, locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "d")
+            .lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
