@@ -409,8 +409,17 @@ struct HomeView: View {
         // dựa vào push (APNs/FCM) + hành động chủ động này để cập nhật số dư/giao dịch/
         // thông báo khi đang ở Home.
         .refreshable { await reloadWalletData() }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
+        // THỨ TỰ quan trọng: `screenBackground` phải chạy TRƯỚC `safeAreaInset`.
+        //
+        // `safeAreaInset` co khung của view nó bọc lại 24pt. Đặt nó trước thì `screenBackground`
+        // nhận khung đã co, lớp nền bị bó theo và `ignoresSafeArea()` của nền chẳng còn gì để
+        // giãn — hở một dải khác màu ở đáy, ngay trên home indicator. Đặt sau thì nền tô theo
+        // khung đầy đủ, tràn kín, còn phần chừa 24pt chỉ áp cho nội dung.
+        //
+        // `SettingsView` vốn không dính vì bên đó `safeAreaInset` gắn vào
+        // `settingsScrollContent` còn `screenBackground` bọc ở ngoài — cùng thứ tự này.
         .screenBackground(Color(hex: 0xF3F5F7))
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .task {
             // Home luôn revalidate số dư (force: true) — mirror WalletCache.refresh
@@ -446,6 +455,15 @@ struct HomeView: View {
         .padding(.top, 40)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white, in: WhiteTopShape())
+        // Kéo nền trắng xuống thêm một quãng dài, PHÍA SAU khối trên (`background` không
+        // tham gia tính layout nên không làm vùng cuộn dài ra).
+        //
+        // Cần vì `WhiteTopShape` chỉ tô hết chiều cao khối; cuộn tới đáy là hết nền trắng và
+        // lộ nền xám của màn ở dải dưới cùng. 400pt là dư cho mọi cỡ máy — không lấy đúng
+        // chiều cao vùng an toàn vì phần dôi ra nằm ngoài màn, không ai thấy.
+        .background(alignment: .bottom) {
+            Color.white.frame(height: 400).offset(y: 400)
+        }
     }
 
     // MARK: - Header
