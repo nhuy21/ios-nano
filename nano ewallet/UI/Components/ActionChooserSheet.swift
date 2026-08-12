@@ -22,25 +22,35 @@ struct QuickTopUpSheet: View {
     /// Đã mở app ngân hàng — nơi gọi bắt đầu theo dõi tiền về.
     let onOpenedBankApp: () -> Void
 
-    @State private var pickedAppId: String?
+    /// Bước đang đứng. Hai bước RỜI NHAU như Kotlin (`QuickTopUpBankPickerDialog`): chọn
+    /// bank xong mới sang ô nhập tiền, không bày cả hai trong một thẻ.
+    ///
+    /// Gộp bank đã chọn vào chính case `.amount` thay vì để một biến `pickedAppId` riêng —
+    /// nhờ vậy không tồn tại trạng thái "đang ở bước nhập tiền mà chưa có bank".
+    private enum Step: Equatable {
+        case pickBank
+        case amount(appId: String)
+    }
+
+    @State private var step: Step = .pickBank
     @State private var amountText = ""
     @State private var errorMessage: String?
-    /// Bàn phím số tự vẽ (giống màn chuyển tiền ví) thay bàn phím hệ thống — ô tiền chỉ
-    /// là Text bấm vào để mở, không phải TextField thật.
-    @State private var isAmountFocused = false
 
     @Environment(\.openURL) private var openURL
 
     private static let brand = Color(hex: 0x00A85E)
 
     private var amount: Int64 { amountText.amountValue }
-    private var canContinue: Bool { pickedAppId != nil && amount > 0 }
+    private var canContinue: Bool { amount > 0 }
 
     var body: some View {
         ZStack {
+            // Chạm nền mờ ở bước nhập tiền thì LÙI về chọn bank, không đóng hẳn — mirror
+            // Kotlin (`onDismiss` của `AmountInputDialog` chỉ xoá bank đã chọn). Đóng thẳng
+            // thì lỡ tay một cái là mất luôn bank vừa chọn.
             Color.black.opacity(0.35)
                 .ignoresSafeArea()
-                .onTapGesture { onDismiss() }
+                .onTapGesture { backOrDismiss() }
 
             // Thẻ trắng canh GIỮA phần màn còn lại (phần chưa bị bàn phím chiếm) — nhờ
             // `safeAreaInset` bên dưới nên nó không bao giờ bị bàn phím đè.
@@ -51,8 +61,11 @@ struct QuickTopUpSheet: View {
         // Bàn phím số nằm NGOÀI thẻ trắng và ghim đáy màn, full width — giống ô số tiền ở màn
         // chuyển ví/chuyển khoản. Để bên trong thẻ thì nó bị thẻ kéo lên giữa màn và thụt vào
         // 28pt hai bên, trông như một khối trôi lơ lửng.
+        //
+        // Hiện suốt bước nhập tiền, không cần bấm vào ô mới mở: cả bước này chỉ có mỗi việc
+        // nhập số.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isAmountFocused {
+            if case .amount = step {
                 NumericKeypad(
                     onDigit: appendDigits,
                     onBackspace: backspaceDigit,
@@ -64,20 +77,29 @@ struct QuickTopUpSheet: View {
         }
     }
 
+    @ViewBuilder
     private var card: some View {
+        switch step {
+        case .pickBank: bankPickerCard
+        case .amount: amountCard
+        }
+    }
+
+    // MARK: - Bước 1: chọn ngân hàng
+
+    private var bankPickerCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Nạp ví nhanh")
                 .font(AppFont.beVietnamPro(16, .bold))
                 .foregroundStyle(AppColor.payInk)
                 .padding(.horizontal, 20)
 
-            Text("Chọn ngân hàng bạn đang có tiền")
+            Text("Chọn app ngân hàng bạn đang có tiền để chuyển vào ví")
                 .font(AppFont.beVietnamPro(12))
                 .foregroundStyle(AppColor.payMuted)
                 .padding(.horizontal, 20)
-                .padding(.vertical, 2)
-
-            Spacer().frame(height: 10)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
 
             ScrollView {
                 VStack(spacing: 0) {
@@ -86,24 +108,8 @@ struct QuickTopUpSheet: View {
                     }
                 }
             }
-            // Trần chiều cao để danh sách + ô tiền + nút vẫn nằm gọn trong màn máy nhỏ.
-            .frame(maxHeight: 320)
-
-            amountField
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(AppFont.beVietnamPro(12, .medium))
-                    .foregroundStyle(AppColor.error)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-            }
-
-            // Bàn phím đang mở thì phím hành động của nó đã là "Mở app ngân hàng" — hiện thêm
-            // nút rời ngay dưới là hai chỗ cho cùng một việc.
-            if !isAmountFocused {
-                continueButton
-            }
+            // Trần chiều cao để danh sách vẫn nằm gọn trong màn máy nhỏ.
+            .frame(maxHeight: 360)
         }
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,8 +118,7 @@ struct QuickTopUpSheet: View {
     }
 
     private func bankRow(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
-        let isPicked = pickedAppId == bank.appId
-        return HStack(spacing: 14) {
+        HStack(spacing: 14) {
             BankAppIcon(bank: bank)
 
             Text(bank.displayName)
@@ -121,32 +126,34 @@ struct QuickTopUpSheet: View {
                 .foregroundStyle(AppColor.payInk)
 
             Spacer(minLength: 0)
-
-            if isPicked {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Self.brand)
-            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(isPicked ? Self.brand.opacity(0.08) : Color.clear)
         .contentShape(Rectangle())
+        // Sang thẳng bước nhập tiền, KHÔNG đánh dấu chọn rồi chờ bấm nút: bước này chỉ có
+        // đúng một việc, thêm một nhịp xác nhận là thừa. Mirror Kotlin.
         .pressable {
-            pickedAppId = bank.appId
             errorMessage = nil
+            step = .amount(appId: bank.appId)
         }
     }
 
-    private var amountField: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Số tiền")
-                .font(AppFont.beVietnamPro(12, .semibold))
+    // MARK: - Bước 2: nhập số tiền
+
+    private var amountCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Số tiền nạp")
+                .font(AppFont.beVietnamPro(16, .bold))
+                .foregroundStyle(AppColor.payInk)
+
+            Text("Số tiền sẽ được điền sẵn trong app ngân hàng")
+                .font(AppFont.beVietnamPro(12))
                 .foregroundStyle(AppColor.payMuted)
+                .padding(.top, 4)
 
             HStack(spacing: 8) {
                 Text(amountText.isEmpty ? "0" : Int(amount).vndGrouped)
-                    .font(AppFont.beVietnamPro(18, .bold))
+                    .font(AppFont.beVietnamPro(22, .bold))
                     .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)
 
                 Spacer(minLength: 0)
@@ -156,18 +163,40 @@ struct QuickTopUpSheet: View {
                     .foregroundStyle(AppColor.payMuted)
             }
             .padding(.horizontal, 14)
-            .frame(height: 48)
+            .frame(height: 52)
             .background(AppColor.bgSoft)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(isAmountFocused ? Self.brand : Color.clear, lineWidth: 1.5)
+                    .strokeBorder(Self.brand, lineWidth: 1.5)
             }
-            .contentShape(Rectangle())
-            .pressable { isAmountFocused = true }
+            .padding(.top, 16)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(AppFont.beVietnamPro(12, .medium))
+                    .foregroundStyle(AppColor.error)
+                    .padding(.top, 8)
+            }
+
+            // Quay lại chọn bank khác. Phím hành động "Mở app ngân hàng" nằm trên bàn phím
+            // số nên ở đây chỉ cần đúng nút lùi này.
+            Button(action: backOrDismiss) {
+                Text("Chọn ngân hàng khác")
+                    .font(AppFont.beVietnamPro(14, .semibold))
+                    .foregroundStyle(AppColor.payMuted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableButtonStyle())
+            .padding(.top, 6)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 12)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Nhập số
@@ -186,26 +215,20 @@ struct QuickTopUpSheet: View {
         amountText.removeLast()
     }
 
-    private var continueButton: some View {
-        Button(action: openBankApp) {
-            Text("Mở app ngân hàng")
-                .font(AppFont.beVietnamPro(15, .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Self.brand.opacity(canContinue ? 1 : 0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    /// Ở bước nhập tiền thì lùi về chọn bank; đang ở bước chọn bank rồi thì đóng hẳn.
+    private func backOrDismiss() {
+        guard case .amount = step else {
+            onDismiss()
+            return
         }
-        .buttonStyle(PressableButtonStyle())
-        .disabled(!canContinue)
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
+        amountText = ""
+        errorMessage = nil
+        step = .pickBank
     }
 
     private func openBankApp() {
-        guard let pickedAppId, amount > 0 else { return }
-        guard let url = QuickTopUpDeeplink.buildURL(sourceAppId: pickedAppId, amount: amount) else {
+        guard case .amount(let appId) = step, amount > 0 else { return }
+        guard let url = QuickTopUpDeeplink.buildURL(sourceAppId: appId, amount: amount) else {
             // Chỉ xảy ra khi ví chưa có số tài khoản VA — báo thẳng thay vì mở app ngân hàng
             // rồi để người dùng đối diện một màn trống không hiểu vì sao.
             errorMessage = "Ví chưa có số tài khoản nhận tiền. Vui lòng thử lại sau."
