@@ -83,6 +83,9 @@ struct TransferSuccessView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        // Nền là GRADIENT nên không đi qua `screenBackground` — tự khai màu ở mép TRÊN của
+        // gradient để `MainTabView` tô dải status bar cho khớp. Xem `ScreenTopBackdropKey`.
+        .screenTopBackdrop(Color(hex: info.isProcessing ? 0xF6B93B : 0x2ECB6E))
         .onAppear {
             let formatter = DateFormatter.app("dd/MM/yyyy - HH:mm")
             timeText = formatter.string(from: Date())
