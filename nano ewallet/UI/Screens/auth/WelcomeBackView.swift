@@ -18,6 +18,10 @@ struct WelcomeBackView: View {
 
     @StateObject private var vm = WelcomeBackViewModel()
 
+    /// Ô mật khẩu có đang nhận phím không. Màn này chỉ có ĐÚNG một ô nên bật sẵn lúc vào —
+    /// vào đây là để nhập mật khẩu, bắt chạm thêm một cái nữa là thừa.
+    @State private var isEditing = true
+
     private var maskedPhone: String {
         phone.count >= 10 ? "\(phone.prefix(3))****\(phone.suffix(3))" : phone
     }
@@ -52,7 +56,10 @@ struct WelcomeBackView: View {
                     hasError: vm.errorMsg != nil,
                     dotsAlignment: .center,
                     submitLabel: .done,
-                    onSubmit: submit
+                    onSubmit: submit,
+                    usesCustomKeypad: true,
+                    externalFocus: isEditing,
+                    onTapWhenCustom: { isEditing = true }
                 )
 
                 if let errorMsg = vm.errorMsg {
@@ -123,7 +130,24 @@ struct WelcomeBackView: View {
             }
             .padding(.horizontal, 24)
         }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
+        // Bàn phím tự vẽ thay chỗ dải chừa 24pt khi đang nhập. Bản KHÔNG có phím "000":
+        // mật khẩu là 6 chữ số rời, gõ tắt hàng nghìn là vô nghĩa.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isEditing {
+                PlainNumericKeypad(
+                    onDigit: appendDigit,
+                    onBackspace: backspace,
+                    onNext: {
+                        isEditing = false
+                        submit()
+                    },
+                    nextTitle: "Xong",
+                    nextEnabled: vm.password.count == 6
+                )
+            } else {
+                Color.clear.frame(height: 24)
+            }
+        }
         .screenBackground(Color.white)
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $vm.showDeviceConflict) {
@@ -179,6 +203,17 @@ struct WelcomeBackView: View {
         case "Face ID": return "faceid"
         default: return "lock.shield"
         }
+    }
+
+    private func appendDigit(_ digit: String) {
+        // 6 số như `PinDotsField.maxLength`; đủ 6 thì dừng nhận thêm.
+        guard vm.password.count < 6 else { return }
+        vm.password += digit
+    }
+
+    private func backspace() {
+        guard !vm.password.isEmpty else { return }
+        vm.password.removeLast()
     }
 
     private func submit() {

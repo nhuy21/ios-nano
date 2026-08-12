@@ -37,9 +37,22 @@ struct PinDotsField: View {
     /// Độ dài cố định 6 nên cứ đủ số là biết đã xong.
     var onFilled: () -> Void = {}
 
+    /// `true` = KHÔNG dựng `TextField` ẩn, ô chỉ hiển thị và nơi gọi tự bơm số vào `value`
+    /// bằng bàn phím tự vẽ (`PlainNumericKeypad`). Lúc đó tiêu điểm do `externalFocus` quyết
+    /// định chứ không phải `@FocusState` bên trong — có `TextField` là iOS bật bàn phím hệ
+    /// thống lên, hai bàn phím chồng nhau.
+    var usesCustomKeypad: Bool = false
+    /// Chỉ dùng khi `usesCustomKeypad`: ô này có đang được chọn không (để vẽ caret nháy).
+    var externalFocus: Bool = false
+    /// Chỉ dùng khi `usesCustomKeypad`: chạm vào ô, nơi gọi chuyển tiêu điểm sang đây.
+    var onTapWhenCustom: () -> Void = {}
+
     @State private var showValue = false
-    @FocusState private var isFocused: Bool
+    @FocusState private var internalFocus: Bool
     @State private var caretVisible = true
+
+    /// Tiêu điểm thật, gộp hai chế độ để phần vẽ bên dưới không phải phân biệt.
+    private var isFocused: Bool { usesCustomKeypad ? externalFocus : internalFocus }
 
     /// Nhịp nháy chạy độc lập với vòng đời view. Không dùng
     /// `withAnimation(.repeatForever)` vì animation đó bị huỷ mỗi lần view render
@@ -52,24 +65,29 @@ struct PinDotsField: View {
     var body: some View {
         ZStack(alignment: .leading) {
             // Field ẩn nhận input. `.keyboardType(.numberPad)` + filter số ở onChange.
-            TextField("", text: $value)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .submitLabel(submitLabel)
-                .focused($isFocused)
-                .opacity(0)
-                .frame(width: 1, height: 1)
-                .onChangeNewCompat(of: value) { newValue in
-                    let filtered = String(newValue.filter(\.isNumber).prefix(maxLength))
-                    if filtered != newValue {
-                        value = filtered
-                        // Đổi `value` sẽ bắn lại `onChange`, để lượt sau báo `onFilled` —
-                        // báo ở đây nữa là gọi hai lần cho cùng một lần gõ.
-                        return
+            //
+            // Bỏ hẳn khi dùng bàn phím tự vẽ: chỉ cần `TextField` tồn tại và được focus là
+            // iOS bật bàn phím hệ thống, chồng lên bàn phím tự vẽ.
+            if !usesCustomKeypad {
+                TextField("", text: $value)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .submitLabel(submitLabel)
+                    .focused($internalFocus)
+                    .opacity(0)
+                    .frame(width: 1, height: 1)
+                    .onChangeNewCompat(of: value) { newValue in
+                        let filtered = String(newValue.filter(\.isNumber).prefix(maxLength))
+                        if filtered != newValue {
+                            value = filtered
+                            // Đổi `value` sẽ bắn lại `onChange`, để lượt sau báo `onFilled` —
+                            // báo ở đây nữa là gọi hai lần cho cùng một lần gõ.
+                            return
+                        }
+                        if filtered.count == maxLength { onFilled() }
                     }
-                    if filtered.count == maxLength { onFilled() }
-                }
-                .onSubmit(onSubmit)
+                    .onSubmit(onSubmit)
+            }
 
             if !isFocused && value.isEmpty {
                 Text(placeholder)
@@ -114,7 +132,13 @@ struct PinDotsField: View {
         }
         .inputShadow()
         .contentShape(Rectangle())
-        .onTapGesture { isFocused = true }
+        .onTapGesture {
+            if usesCustomKeypad {
+                onTapWhenCustom()
+            } else {
+                internalFocus = true
+            }
+        }
         .onReceive(caretTimer) { _ in
             guard isFocused else {
                 caretVisible = false
