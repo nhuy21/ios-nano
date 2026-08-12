@@ -53,7 +53,10 @@ struct BankTransferView: View {
     @State private var lookupError: String?
     @State private var lastLookedUp: (bin: String, account: String, accType: Int)?
     @State private var showBankSheet = false
-    @FocusState private var isAccountFocused: Bool
+    /// Bàn phím số tự vẽ của ô SỐ TÀI KHOẢN đang hiện hay không. Không phải `@FocusState` vì
+    /// bàn phím này là SwiftUI thuần — `endEditing` ở tầng UIWindow không đụng tới được.
+    /// Dùng bàn phím tự vẽ thay bàn phím hệ thống để có phím "Tiếp" ngay trong bàn phím.
+    @State private var isAccountFocused = false
     /// Hẹn giờ tra cứu sau khi ngừng gõ số tài khoản — xem `scheduleLookup`.
     @State private var lookupDebounce: Task<Void, Never>?
 
@@ -243,11 +246,14 @@ struct BankTransferView: View {
             footer
         }
         .screenBackground(Color.white)
-        // Bàn phím HỆ THỐNG (ô số TK / nội dung) đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow
-        // (xem DismissKeyboardOnTap) — nó cũng nhả @FocusState nên tra cứu tên chủ TK
-        // vẫn chạy qua onChange sẵn có. Ở đây chỉ cần lo bàn phím số tự vẽ.
+        // Bàn phím HỆ THỐNG (ô nội dung) đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow (xem
+        // DismissKeyboardOnTap). Ở đây lo hai bàn phím số tự vẽ: ô số TK và ô số tiền.
+        // Cất bàn phím ô số TK cũng là lúc tra tên (xem onChange của `isAccountFocused`).
         .contentShape(Rectangle())
-        .onTapGesture { isAmountFocused = false }
+        .onTapGesture {
+            isAmountFocused = false
+            isAccountFocused = false
+        }
         .task { _ = await bankCache.get() }
         .task {
             // Người nhận đã khoá sẵn (QR / danh bạ / pay link) thì vào là đọc số tiền ngay.
@@ -274,11 +280,13 @@ struct BankTransferView: View {
         }
         .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
             if wasFocused && !isFocused { runLookupIfNeeded() }
-            // Quay lại sửa số TK thì cất bàn phím số tự vẽ đi, không thì hai bàn phím
-            // chồng nhau. Mic cũng tắt vì người nhận đang được nhập lại — tra cứu xong
-            // `startVoiceIfReady` sẽ bật lại.
+            // Quay lại sửa số TK thì cất bàn phím số của ô TIỀN đi, không thì hai bàn phím
+            // chồng nhau. Ô nội dung dùng bàn phím HỆ THỐNG nên cũng phải nhả focus, nếu
+            // không nó nằm đè lên bàn phím tự vẽ. Mic tắt vì người nhận đang được nhập lại —
+            // tra cứu xong `startVoiceIfReady` sẽ bật lại.
             if isFocused {
                 isAmountFocused = false
+                isContentFocused = false
                 stopListening()
             }
         }
@@ -541,28 +549,38 @@ struct BankTransferView: View {
     /// tra cứu tên chủ TK chạy khi rời focus (`onChange(isAccountFocused)`) hoặc bấm Done.
     private var accountRow: some View {
         HStack(spacing: 8) {
-            TextField(
-                "",
-                text: $accountNumber,
-                prompt: .appPlaceholder(
-                    accType == 1 ? "Nhập số thẻ" : "Nhập số tài khoản",
-                    size: 17
-                )
-            )
-            .font(AppFont.beVietnamPro(17, .bold))
-            .foregroundStyle(AppColor.payInk)
-            .tint(AppColor.brand)
-            .keyboardType(.numberPad)
-            .submitLabel(.done)
-            .focused($isAccountFocused)
-            .onSubmit { runLookupIfNeeded() }
+            // Ô hiển thị + con trỏ nháy tự vẽ, KHÔNG phải `TextField`: ô này dùng bàn phím số
+            // tự vẽ (có phím "Tiếp") nên không được để bàn phím hệ thống bật lên.
+            HStack(spacing: 1) {
+                if accountNumber.isEmpty {
+                    Text(accType == 1 ? "Nhập số thẻ" : "Nhập số tài khoản")
+                        .font(AppFont.beVietnamPro(17, .bold))
+                        .foregroundStyle(AppColor.payMuted)
+                } else {
+                    Text(accountNumber)
+                        .font(AppFont.beVietnamPro(17, .bold))
+                        .foregroundStyle(AppColor.payInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                if isAccountFocused {
+                    BlinkingCaret(color: AppColor.payInk, height: 19)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { isAccountFocused = true }
             .onChangeCompat(of: accountNumber) { _, newValue in
                 let filtered = String(newValue.filter(\.isNumber).prefix(19))
                 if filtered != newValue {
                     // Gán lại sẽ kích hoạt `onChange` lần nữa với giá trị đã lọc — lượt đó mới
                     // hẹn tra cứu, nên ở đây không cần gọi.
                     accountNumber = filtered
-                } else if !filtered.isEmpty {
+                } else {
+                    // Gọi CẢ KHI ô vừa bị xoá trắng: `scheduleLookup` dọn tên rồi tự chặn ở
+                    // mốc 4 chữ số nên không gọi API. Trước đây bỏ qua trường hợp rỗng nên
+                    // xoá hết số mà tên chủ tài khoản cũ vẫn còn nằm đó.
                     scheduleLookup()
                 }
             }
@@ -759,10 +777,13 @@ struct BankTransferView: View {
                     .lineLimit(1...4)
                     .focused($isContentFocused)
                     .onChangeCompat(of: isContentFocused) { _, focused in
-                        // Sang ô nội dung thì cất bàn phím số và tắt mic — đang nghe mà
-                        // gõ nội dung thì số tiền tự nhảy, người dùng không hiểu vì sao.
+                        // Sang ô nội dung thì cất CẢ HAI bàn phím số tự vẽ và tắt mic. Thiếu
+                        // `isAccountFocused` thì bàn phím ô số TK (nhánh xét trước ở footer)
+                        // vẫn nằm đó, đè lên bàn phím hệ thống của ô này. Mic tắt vì đang nghe
+                        // mà gõ nội dung thì số tiền tự nhảy, người dùng không hiểu vì sao.
                         if focused {
                             isAmountFocused = false
+                            isAccountFocused = false
                             stopListening()
                         }
                     }
@@ -805,7 +826,23 @@ struct BankTransferView: View {
 
     private var footer: some View {
         Group {
-            if amountEditable && isAmountFocused {
+            if isAccountFocused {
+                // Bàn phím của ô SỐ TÀI KHOẢN. Phím "Tiếp" tra tên chủ tài khoản rồi chuyển
+                // sang ô số tiền — trước đây phải chạm ra ngoài mới tra được.
+                //
+                // KHÔNG chèn số 0 dẫn đầu như ô tiền: số tài khoản có thể bắt đầu bằng 0.
+                NumericKeypad(
+                    onDigit: pushAccountDigit,
+                    onBackspace: backspaceAccountDigit,
+                    onNext: {
+                        isAccountFocused = false
+                        runLookupIfNeeded()
+                        isAmountFocused = amountEditable
+                    },
+                    nextTitle: "Tiếp",
+                    nextEnabled: selectedBin != nil && accountNumber.count >= 4
+                )
+            } else if amountEditable && isAmountFocused {
                 // Nút trên bàn phím gửi giao dịch LUÔN, không chỉ ẩn bàn phím — giống màn
                 // chuyển ví. Chỉ ẩn bàn phím thì người dùng phải bấm thêm "TIẾP TỤC" ngay
                 // bên dưới, thành hai bước cho cùng một ý định.
@@ -970,6 +1007,20 @@ struct BankTransferView: View {
     }
 
     // MARK: - Tra cứu tên chủ tài khoản
+
+    // MARK: - Nhập số tài khoản (bàn phím tự vẽ)
+
+    /// Giới hạn 19 chữ số như bản `TextField` cũ. KHÔNG chặn số 0 dẫn đầu — khác ô số tiền,
+    /// số tài khoản/số thẻ bắt đầu bằng 0 là bình thường.
+    private func pushAccountDigit(_ digits: String) {
+        guard !recipientLocked else { return }
+        accountNumber = String((accountNumber + digits).prefix(19))
+    }
+
+    private func backspaceAccountDigit() {
+        guard !recipientLocked, !accountNumber.isEmpty else { return }
+        accountNumber.removeLast()
+    }
 
     /// Vừa sửa số tài khoản -> hẹn tra cứu sau khi ngừng gõ 500ms.
     ///
@@ -1154,24 +1205,8 @@ struct BankTransferView: View {
 
 }
 
-/// Con trỏ nhấp nháy tự vẽ cho ô STK/số tiền (không còn `TextField` hệ thống nên
-/// không có con trỏ thật). Timer chạy độc lập với vòng đời view — không dùng
-/// `withAnimation(.repeatForever)` vì bị huỷ mỗi lần view render lại khi gõ số.
-private struct BlinkingCaret: View {
-    let color: Color
-    var height: CGFloat = 20
-
-    @State private var visible = true
-    private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        Rectangle()
-            .fill(color)
-            .frame(width: 2, height: height)
-            .opacity(visible ? 1 : 0)
-            .onReceive(timer) { _ in visible.toggle() }
-    }
-}
+// `BlinkingCaret` chuyển sang UI/Components để màn chuyển ví dùng chung — ô số ví bên đó cũng
+// dùng bàn phím số tự vẽ nên cũng cần con trỏ.
 
 /// Logo ngân hàng thật (ảnh mạng) kèm fallback khối màu brand + tên viết tắt.
 /// Không `private` — dùng lại ở lưới chọn ngân hàng của màn bổ sung thông tin eKYC.
