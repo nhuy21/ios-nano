@@ -188,6 +188,18 @@ enum EkycLauncher {
         store.expireDate = pick(
             nfc?.dateOfExpiry, front?.dateOfExpiry, raw("doe", "date_of_expiry", "expiry_date")
         ) ?? store.expireDate
+        // Ảnh chân dung ĐỌC TỪ CHIP — khác ảnh selfie và khác ảnh chụp mặt trước thẻ. Trước
+        // đây iOS không gán trường này nên mọi hồ sơ đều gửi lên `null`.
+        //
+        // Tương ứng `nfc_data.face_image` bên Android: cùng đến từ callback kết quả của SDK,
+        // không phải từ `rawDataDelegate` (chỗ đó chỉ mang 3 ảnh chụp front/back/selfie).
+        //
+        // `faceImageBase64` là computed property dẫn xuất từ `faceImage` (kiểm chứng trong
+        // `KLPNfcModel` của KalapaSDK — lớp nằm dưới CMC), nên hai trường là MỘT nguồn; lấy
+        // bản base64 trước, thiếu thì rơi về bản thô.
+        store.portraitInCardBase64 = pick(
+            nfc?.faceImageBase64, nfc?.faceImage
+        ) ?? store.portraitInCardBase64
         store.placeOfIssues = pick(
             front?.placeOfIssue, raw("poi", "place_of_issue", "issue_place")
         ) ?? store.placeOfIssues
