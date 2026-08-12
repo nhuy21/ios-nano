@@ -134,6 +134,8 @@ struct PinDotsField: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if usesCustomKeypad {
+                // Đặt dấu trước — xem `KeypadDismissGuard`.
+                KeypadDismissGuard.markHandled()
                 onTapWhenCustom()
             } else {
                 internalFocus = true

@@ -172,13 +172,22 @@ struct RegisterView: View {
         // Chạm vào ô email khi bàn phím tự vẽ đang mở: tắt nó đi, nếu không hai bàn phím
         // cùng nằm ở đáy màn.
         .onChangeNewCompat(of: emailFocused) { focused in
-            if focused { focusedField = nil }
+            guard focused else { return }
+            focusedField = nil
+            // Ô email vừa nhận tiêu điểm: đánh dấu để cử chỉ chạm-ra-ngoài (chạy song song
+            // với chính cú chạm này) không xoá nó đi ngay. Xem `KeypadDismissGuard`.
+            KeypadDismissGuard.markHandled()
         }
         // Và chiều ngược lại: chọn một ô số khi bàn phím hệ thống của email đang mở.
         .onChangeNewCompat(of: focusedField) { field in
             if field != nil { emailFocused = false }
         }
         .screenBackground(Color.white)
+        // Tắt CẢ HAI: bàn phím tự vẽ của 3 ô số, lẫn bàn phím hệ thống của ô email.
+        .dismissesCustomKeypadOnTap {
+            focusedField = nil
+            emailFocused = false
+        }
         .scrollDismissesKeyboard(.interactively)
     }
 

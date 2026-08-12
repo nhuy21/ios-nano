@@ -192,6 +192,10 @@ struct PlainNumericKeypad: View {
 
     private func digitKey(_ label: String) -> some View {
         Button {
+            // Bàn phím này nằm trong `safeAreaInset`, VẪN thuộc phạm vi cử chỉ chạm-ra-ngoài
+            // ở cấp màn — không đánh dấu thì gõ một số là bàn phím tự tắt.
+            // Xem `KeypadDismissGuard`.
+            KeypadDismissGuard.markHandled()
             guard !Self.decorativeKeys.contains(label) else { return }
             onDigit(label)
         } label: {
@@ -207,7 +211,10 @@ struct PlainNumericKeypad: View {
     }
 
     private var backspaceKey: some View {
-        Button(action: onBackspace) {
+        Button {
+            KeypadDismissGuard.markHandled()
+            onBackspace()
+        } label: {
             Image(systemName: "delete.left.fill")
                 .font(.system(size: 22))
                 .foregroundStyle(KpColor.backspaceIcon)
@@ -221,7 +228,14 @@ struct PlainNumericKeypad: View {
     }
 
     private var nextKey: some View {
-        Button(action: onNext) {
+        Button {
+            // Đánh dấu như mọi phím khác. Ban đầu tôi bỏ qua vì nghĩ phím này chỉ để ĐÓNG bàn
+            // phím nên chặn cử chỉ ngoài là thừa — sai: ở màn nhiều ô nó CHUYỂN sang ô kế
+            // (sĐT -> mật khẩu), và cử chỉ ngoài xoá ngay tiêu điểm vừa đặt. Ô mới không tự
+            // đánh dấu được vì nó do phím chọn chứ không do người dùng chạm.
+            KeypadDismissGuard.markHandled()
+            onNext()
+        } label: {
             Text(nextTitle)
                 .font(AppFont.beVietnamPro(17, .semibold))
                 .foregroundStyle(nextEnabled ? .white : KpColor.nextDisabledText)

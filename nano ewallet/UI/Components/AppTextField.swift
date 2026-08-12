@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Ô input 1 dòng — mirror `TextField` ở LoginScreen / `RegisterTextField` bên Android.
 ///
@@ -122,7 +123,12 @@ struct KeypadTextField: View {
         }
         .inputShadow()
         .contentShape(Rectangle())
-        .onTapGesture(perform: onTap)
+        .onTapGesture {
+            // Đặt dấu TRƯỚC khi báo ra ngoài: cử chỉ chạm-ra-ngoài ở cấp màn chạy song song
+            // với cú chạm này, không có dấu thì nó xoá mất tiêu điểm vừa đặt.
+            KeypadDismissGuard.markHandled()
+            onTap()
+        }
         .onReceive(caretTimer) { _ in
             guard isFocused else {
                 caretVisible = false
@@ -134,6 +140,66 @@ struct KeypadTextField: View {
             // Vừa gõ/xoá thì caret sáng lại ngay, không phải chờ nhịp timer kế tiếp.
             if isFocused { caretVisible = true }
         }
+    }
+}
+
+extension View {
+    /// Chạm ra ngoài ô nhập thì ẩn bàn phím tự vẽ — gắn ở modifier NGOÀI CÙNG của màn.
+    ///
+    /// Bàn phím hệ thống tự ẩn khi chạm ra ngoài; bàn phím tự vẽ thì không, nó chỉ là một
+    /// view ở đáy màn nên phải tự tắt.
+    ///
+    /// Dùng `simultaneousGesture` chứ KHÔNG phải `onTapGesture` hay một lớp nền bắt chạm:
+    ///
+    /// - `onTapGesture` bọc ngoài sẽ NUỐT chạm của mọi nút và ô bên trong.
+    /// - Lớp nền phía sau thì không bao giờ tới lượt: `screenBackground(_:)` tô một `Color`
+    ///   đục kín toàn màn, mà `Color` nhận chạm, nên nó chặn hết trước khi chạm rơi xuống.
+    ///
+    /// `simultaneousGesture` chạy SONG SONG với cử chỉ của view con nên nút vẫn bấm được, ô
+    /// vẫn chọn được, mà cú chạm nào cũng đi qua đây.
+    ///
+    /// Đổi lại là nó bắn cả khi chạm TRÚNG ô nhập, tranh chấp với chính cử chỉ mở bàn phím
+    /// của ô đó — một bên đặt tiêu điểm, một bên xoá, mà thứ tự chạy không đảm bảo. Xử lý
+    /// bằng `KeypadDismissGuard`: ô nào mở bàn phím thì gọi `markHandled()` trước, cử
+    /// chỉ này thấy dấu đó thì bỏ qua đúng một lượt.
+    ///
+    /// Cùng lý do đó, mọi phím trên bàn phím tự vẽ cũng phải đánh dấu: `safeAreaInset` KHÔNG
+    /// nằm ngoài phạm vi cử chỉ này, nên không đánh dấu thì gõ một số là bàn phím tự tắt.
+    func dismissesCustomKeypadOnTap(_ dismiss: @escaping () -> Void) -> some View {
+        simultaneousGesture(
+            TapGesture().onEnded {
+                // Hoãn một nhịp để cử chỉ của view con (nếu có) chạy xong và kịp đặt dấu.
+                DispatchQueue.main.async {
+                    guard !KeypadDismissGuard.consumeHandledTap() else { return }
+                    dismiss()
+                }
+            }
+        )
+    }
+}
+
+/// Cầu nối giữa "cú chạm này đã có nơi xử lý rồi" và cử chỉ chạm-ra-ngoài ở cấp màn.
+///
+/// Cần vì cử chỉ ở cấp màn chạy SONG SONG với cử chỉ của view con cho CÙNG một cú chạm. Không
+/// có dấu này thì:
+///
+/// - chạm vào ô nhập: ô đặt tiêu điểm xong thì cử chỉ ngoài xoá ngay, bàn phím không mở nổi;
+/// - gõ một phím số: phím nhập xong thì cử chỉ ngoài tắt luôn bàn phím.
+///
+/// `@MainActor` nên không cần khoá; mọi cử chỉ SwiftUI đều chạy trên main.
+@MainActor
+enum KeypadDismissGuard {
+    private static var handled = false
+
+    /// Gọi NGAY trong hành động của view con — chạm mở bàn phím, hoặc bấm một phím.
+    static func markHandled() {
+        handled = true
+    }
+
+    /// Trả `true` đúng MỘT lần sau mỗi `markHandled()`, rồi tự xoá dấu.
+    static func consumeHandledTap() -> Bool {
+        defer { handled = false }
+        return handled
     }
 }
 

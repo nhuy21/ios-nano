@@ -86,6 +86,7 @@ struct FixEkycFieldsView: View {
             }
         }
         .screenBackground(Color.white)
+        .dismissesCustomKeypadOnTap { focusedNumericKey = nil }
         .onAppear {
             // Điền sẵn giá trị Bảo Kim đang giữ để người dùng sửa chứ không gõ lại từ đầu.
             for field in fields where values[field.key] == nil {
@@ -148,7 +149,10 @@ struct FixEkycFieldsView: View {
                             .foregroundStyle(value.isEmpty ? AppColor.payPlaceholder : AppColor.payInk)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
-                            .onTapGesture { focusedNumericKey = field.key }
+                            .onTapGesture {
+                                KeypadDismissGuard.markHandled()
+                                focusedNumericKey = field.key
+                            }
                     } else {
                         TextField(
                             "",
@@ -162,8 +166,9 @@ struct FixEkycFieldsView: View {
                         .foregroundStyle(AppColor.payInk)
                         .tint(AppColor.brand)
                         .autocorrectionDisabled()
-                        // Chạm ô chữ thì tắt bàn phím tự vẽ, không thì hai bàn phím cùng ở đáy.
-                        .onTapGesture { focusedNumericKey = nil }
+                        // KHÔNG gắn `onTapGesture` để tắt bàn phím tự vẽ: cử chỉ đó nuốt chạm
+                        // nên `TextField` không nhận được tiêu điểm nữa. Việc tắt đã có cử chỉ
+                        // ở cấp màn lo — xem `dismissesCustomKeypadOnTap`.
                     }
 
                     if meta.isNumeric, isLookingUpAccount, field.key == Self.accNoKey {

@@ -127,6 +127,7 @@ struct LoginView: View {
             }
         }
         .screenBackground(Color.white)
+        .dismissesCustomKeypadOnTap { focusedField = nil }
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $vm.showDeviceConflict) {
             DeviceConflictDialog(

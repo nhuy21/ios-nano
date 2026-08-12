@@ -149,6 +149,7 @@ struct WelcomeBackView: View {
             }
         }
         .screenBackground(Color.white)
+        .dismissesCustomKeypadOnTap { isEditing = false }
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $vm.showDeviceConflict) {
             DeviceConflictDialog(

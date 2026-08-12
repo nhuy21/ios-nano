@@ -85,6 +85,7 @@ struct ForgotPasswordView: View {
                 }
             }
             .screenBackground(Color.white)
+            .dismissesCustomKeypadOnTap { focusedField = nil }
             .scrollDismissesKeyboard(.interactively)
 
             Button(action: onBack) {

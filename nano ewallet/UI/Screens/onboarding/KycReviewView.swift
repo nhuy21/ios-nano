@@ -91,17 +91,6 @@ struct KycReviewView: View {
 
     var body: some View {
         ZStack {
-            // Chạm vào BẤT KỲ chỗ nào ngoài ô số tài khoản thì ẩn bàn phím tự vẽ. Đặt một lớp
-            // nền bắt chạm ở đây thay vì gắn `onTapGesture` lên từng ô/từng danh sách: kiểu
-            // kia sót một chỗ là bàn phím còn treo lại, mà màn này có ô chữ, ô chọn ngân
-            // hàng, sheet tìm kiếm...
-            //
-            // Nằm DƯỚI `content` trong `ZStack` nên không chắn nút nào — chạm vào nút thì nút
-            // nhận trước, chạm vào khoảng trống mới rơi xuống lớp này.
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { isAccountFocused = false }
-
             content
 
             if isVerifyingC06 {
@@ -130,13 +119,24 @@ struct KycReviewView: View {
         // Chọn ô địa chỉ (bàn phím hệ thống) thì tắt bàn phím tự vẽ, không thì hai bàn phím
         // cùng nằm ở đáy màn.
         .onChangeNewCompat(of: isAddressFocused) { focused in
-            if focused { isAccountFocused = false }
+            guard focused else { return }
+            isAccountFocused = false
+            // Xem `KeypadDismissGuard` — chạm vào ô địa chỉ không được để cử chỉ ngoài xoá
+            // mất tiêu điểm vừa đặt.
+            KeypadDismissGuard.markHandled()
         }
         // Và chiều ngược lại.
         .onChangeNewCompat(of: isAccountFocused) { focused in
             if focused { isAddressFocused = false }
         }
         .screenBackground(Color.white)
+        // Chạm ra khoảng trống thì tắt CẢ bàn phím tự vẽ lẫn bàn phím hệ thống của ô địa chỉ.
+        // Gắn sau `screenBackground` để phủ được cả vùng ngoài `ScrollView` — xem
+        // `dismissesCustomKeypadOnTap`.
+        .dismissesCustomKeypadOnTap {
+            isAccountFocused = false
+            isAddressFocused = false
+        }
         .task { await verifyC06() }
         .task { _ = await bankCache.get() }
         .alert(
@@ -466,7 +466,10 @@ struct KycReviewView: View {
                     .foregroundStyle(accNo.isEmpty ? AppColor.payPlaceholder : AppColor.payInk)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    .onTapGesture { isAccountFocused = true }
+                    .onTapGesture {
+                        KeypadDismissGuard.markHandled()
+                        isAccountFocused = true
+                    }
 
                 // Nút "Dán" như luồng chuyển khoản: ô này dùng bàn phím SỐ, mà bàn phím số
                 // không có menu Paste khi long-press — không có nút thì chỉ còn cách gõ tay
