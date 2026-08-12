@@ -27,9 +27,30 @@ final class OtpViewModel: ObservableObject {
     @Published var isVerifying = false
     @Published var isResending = false
 
+    /// BE giữ thông tin đăng ký tạm 5 phút (chưa ghi DB); quá hạn mà chưa verify thì phiên mất hẳn
+    /// và mọi lần nhập OTP sau đều vô nghĩa. View quan sát cờ này để đưa người dùng về màn đăng ký
+    /// thay vì để họ nhập mãi ở màn OTP không bao giờ qua được.
+    @Published var sessionExpiredMessage: String?
+
     var hasError: Bool { !errorMsg.isEmpty }
 
     private var countdownTask: Task<Void, Never>?
+
+    /// Nhận diện lỗi "phiên đăng ký đã hết hạn" — gồm cả message BE trả về và lỗi AuthService tự
+    /// ném khi pendingPhone không còn (app bị xoá dữ liệu, hoặc đã dọn ở lần lỗi trước).
+    private func isSessionExpired(_ message: String?) -> Bool {
+        guard let message else { return false }
+        return message.localizedCaseInsensitiveContains("Phiên đăng ký đã hết hạn")
+            || message.localizedCaseInsensitiveContains("Không tìm thấy số điện thoại đang chờ xác thực")
+    }
+
+    /// Dọn số đang chờ + báo View điều hướng về màn đăng ký. Trả true nếu đã xử lý.
+    private func handleIfSessionExpired(_ message: String?) -> Bool {
+        guard isSessionExpired(message) else { return false }
+        AuthStore.shared.clearPendingPhone()
+        sessionExpiredMessage = message ?? "Phiên đăng ký đã hết hạn, vui lòng đăng ký lại"
+        return true
+    }
 
     /// Trả true nếu verify thành công (dùng để View gọi onVerified và dừng shake).
     func verify(phone: String) async -> Bool {
@@ -54,7 +75,9 @@ final class OtpViewModel: ObservableObject {
                 return false
             }
         } catch {
-            errorMsg = (error as? APIError)?.message ?? "Mã OTP không đúng. Vui lòng kiểm tra lại."
+            let message = (error as? APIError)?.message
+            if handleIfSessionExpired(message) { return false }
+            errorMsg = message ?? "Mã OTP không đúng. Vui lòng kiểm tra lại."
             otp = ""
             return false
         }
@@ -70,7 +93,9 @@ final class OtpViewModel: ObservableObject {
             otp = ""
             errorMsg = ""
         } catch {
-            errorMsg = (error as? APIError)?.message ?? "Gửi lại OTP thất bại, vui lòng thử lại"
+            let message = (error as? APIError)?.message
+            if handleIfSessionExpired(message) { return }
+            errorMsg = message ?? "Gửi lại OTP thất bại, vui lòng thử lại"
         }
     }
 

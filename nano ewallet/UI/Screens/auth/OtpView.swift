@@ -34,6 +34,22 @@ struct OtpView: View {
                 submit()
             }
         }
+        // Phiên đăng ký hết hạn (BE chỉ giữ 5 phút, chưa ghi DB) — báo rồi đưa về màn đăng ký,
+        // không để người dùng kẹt ở màn OTP nhập mãi không qua được.
+        .alert(
+            "Phiên đăng ký đã hết hạn",
+            isPresented: Binding(
+                get: { vm.sessionExpiredMessage != nil },
+                set: { if !$0 { vm.sessionExpiredMessage = nil } }
+            )
+        ) {
+            Button("Đăng ký lại") {
+                vm.sessionExpiredMessage = nil
+                onBack()
+            }
+        } message: {
+            Text(vm.sessionExpiredMessage ?? "")
+        }
     }
 
     private var header: some View {
@@ -247,6 +263,10 @@ struct OtpView: View {
             let ok = await vm.verify(phone: phone)
             if ok {
                 onVerified()
+            } else if vm.sessionExpiredMessage != nil {
+                // Phiên đăng ký hết hạn -> không shake/không cho nhập lại, quay về màn đăng ký
+                // (ViewModel đã dọn pendingPhone). Alert hiện ở body qua sessionExpiredMessage.
+                return
             } else {
                 await shake()
                 try? await Task.sleep(nanoseconds: 150_000_000)

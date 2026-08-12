@@ -250,8 +250,11 @@ enum AuthService {
         }
 
         // Nhánh A: PENDING — BE không cấp token, đã gửi lại OTP.
+        //
+        // KHÔNG lưu lastPhone ở đây: tài khoản CHƯA xác thực OTP nên chưa dùng được, mà lastPhone
+        // là thứ khiến lần mở app sau vào thẳng màn "Chào mừng trở lại" với số đó — người dùng
+        // thấy như đã có tài khoản dù chưa hoàn tất. Chỉ lưu khi verify/login THÀNH CÔNG.
         if data.requireOtp == true || data.accessToken == nil {
-            if rememberPhone, let phone { store.saveLastPhone(phone) }
             if isRegisterOtp, let phone { store.savePendingPhone(phone) }
             return .requireOtp(data.user)
         }
