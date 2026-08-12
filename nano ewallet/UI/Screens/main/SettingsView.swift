@@ -67,10 +67,15 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
+            // `settingsContent` KHÔNG bù: nó tự `ignoresSafeArea(edges: .top)` rồi tự cộng
+            // `topSafeAreaInset` vào chiều cao banner (xem `profileHeader`) — bù thêm ở đây là
+            // cộng hai lần. Các màn con thì không tự lo nên phải bù, nếu không header của
+            // chúng đè lên đồng hồ trên iOS 16→18.x.
             settingsContent
                 .hidesSystemNavigationBar()
                 .navigationDestination(for: SettingsRoute.self) { route in
                     destination(for: route)
+                        .fillsMissingTopSafeArea()
                         .hidesSystemNavigationBar()
                 }
         }

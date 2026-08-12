@@ -118,18 +118,18 @@ struct MainTabView: View {
             // TabView như Login không dính vì không bị clip như vậy).
             .ignoresSafeArea(.container, edges: [.top, .bottom])
             // Mở safe area trên thì phải TRẢ LẠI vùng đó cho nội dung, nếu không header của
-            // mọi màn bên trong (Home và cả chục màn push từ nó) đè lên đồng hồ/pin — rõ nhất
-            // trên máy tai thỏ vì safe area trên mỏng hơn Dynamic Island.
+            // mọi màn bên trong (Home và cả chục màn push từ nó) đè lên đồng hồ/pin.
             //
-            // Trả bằng `safeAreaInset` chứ không `padding`: nó dựng lại đúng khái niệm vùng
-            // an toàn nên `ScrollView` bên trong vẫn cuộn được lên dưới status bar, còn
-            // `padding` thì đẩy cả khung xuống, để lộ một dải trống ở trên.
+            // KHÔNG trả ở đây bằng `safeAreaInset`: `NavigationStack` của mỗi tab bọc
+            // `UINavigationController`, mà UIKit không thấy modifier safe area của SwiftUI —
+            // trên iOS 16→18.x phần trả lại bị bỏ qua hoàn toàn và header vẫn đè lên đồng hồ
+            // (iOS 26 thì lại nhận, nên chỗ này còn che mất lỗi khi test máy mới).
+            //
+            // Việc bù chuyển vào TRONG từng `NavigationStack` bằng `fillsMissingTopSafeArea()`
+            // — nó đo phần còn thiếu nên đúng ở mọi phiên bản. Xem HomeView/SettingsView.
             //
             // Màn nào MUỐN tràn lên status bar (banner tab Cá nhân) thì tự
             // `.ignoresSafeArea(edges: .top)` ở màn đó và tự bù — chỗ này không cản.
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear.frame(height: UIApplication.shared.topSafeAreaInset)
-            }
         }
         // Hộp chọn của Home/Cá nhân vẽ Ở ĐÂY chứ không trong màn phát ra chúng: thanh tab nổi
         // được xếp SAU nội dung trong `ZStack` của `page()`, nên `.overlay` gắn bên trong màn
