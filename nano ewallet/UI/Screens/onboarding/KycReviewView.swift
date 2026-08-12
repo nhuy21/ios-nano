@@ -49,7 +49,14 @@ struct KycReviewView: View {
     @State private var lookupError: String?
     /// Cặp (bin, số TK) vừa tra — rời focus nhiều lần mà không sửa gì thì khỏi gọi lại.
     @State private var lastLookedUp: String?
-    @FocusState private var isAccountFocused: Bool
+    /// `@State` chứ không `@FocusState`: ô số tài khoản dùng bàn phím TỰ VẼ nên không có
+    /// `TextField` thật để focus — chỉ cần một `TextField` được focus là iOS bật bàn phím hệ
+    /// thống lên chồng lên. Ô địa chỉ tạm trú là ô CHỮ nên vẫn dùng bàn phím hệ thống, không
+    /// đi qua biến này.
+    @State private var isAccountFocused = false
+    /// Ô địa chỉ tạm trú (ô CHỮ, bàn phím hệ thống). Cần biết nó có đang được chọn không để
+    /// tắt bàn phím tự vẽ — xem `onChangeCompat` ở dưới.
+    @FocusState private var isAddressFocused: Bool
 
     // Nộp hồ sơ
     @State private var isSubmitting = false
@@ -84,11 +91,50 @@ struct KycReviewView: View {
 
     var body: some View {
         ZStack {
+            // Chạm vào BẤT KỲ chỗ nào ngoài ô số tài khoản thì ẩn bàn phím tự vẽ. Đặt một lớp
+            // nền bắt chạm ở đây thay vì gắn `onTapGesture` lên từng ô/từng danh sách: kiểu
+            // kia sót một chỗ là bàn phím còn treo lại, mà màn này có ô chữ, ô chọn ngân
+            // hàng, sheet tìm kiếm...
+            //
+            // Nằm DƯỚI `content` trong `ZStack` nên không chắn nút nào — chạm vào nút thì nút
+            // nhận trước, chạm vào khoảng trống mới rơi xuống lớp này.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { isAccountFocused = false }
+
             content
 
             if isVerifyingC06 {
                 verifyingOverlay
             }
+        }
+        // Bàn phím tự vẽ cho ô SỐ TÀI KHOẢN. Bản KHÔNG có phím "000": số tài khoản là số đếm
+        // từng chữ, gõ tắt hàng nghìn là sai.
+        //
+        // Phím "Xong" tra tên chủ TK rồi mới ẩn bàn phím — thay cho cơ chế "tra khi rời
+        // focus" trước đây, vì giờ không còn `@FocusState` nào để mà rời.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isAccountFocused {
+                PlainNumericKeypad(
+                    onDigit: appendAccountDigit,
+                    onBackspace: backspaceAccountDigit,
+                    onNext: {
+                        isAccountFocused = false
+                        runLookup()
+                    },
+                    nextTitle: "Xong",
+                    nextEnabled: !accNo.isEmpty
+                )
+            }
+        }
+        // Chọn ô địa chỉ (bàn phím hệ thống) thì tắt bàn phím tự vẽ, không thì hai bàn phím
+        // cùng nằm ở đáy màn.
+        .onChangeNewCompat(of: isAddressFocused) { focused in
+            if focused { isAccountFocused = false }
+        }
+        // Và chiều ngược lại.
+        .onChangeNewCompat(of: isAccountFocused) { focused in
+            if focused { isAddressFocused = false }
         }
         .screenBackground(Color.white)
         .task { await verifyC06() }
@@ -176,14 +222,16 @@ struct KycReviewView: View {
     private var additionalSection: some View {
         sectionCard {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Địa chỉ tạm trú")
-                    .font(AppFont.beVietnamPro(12, .semibold))
-                    .foregroundStyle(AppColor.payInk)
+                requiredLabel("Địa chỉ tạm trú")
 
                 TextField("", text: $temporaryLocation, prompt: .appPlaceholder("Nhập địa chỉ tạm trú"))
                     .font(AppFont.beVietnamPro(14))
                     .foregroundStyle(AppColor.payInk)
                     .tint(AppColor.brand)
+                    // Ô CHỮ nên vẫn dùng bàn phím hệ thống. Theo dõi tiêu điểm để tắt bàn
+                    // phím tự vẽ, KHÔNG dùng `onTapGesture`: cử chỉ đó nuốt chạm nên
+                    // `TextField` không nhận được tiêu điểm nữa.
+                    .focused($isAddressFocused)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                     // Cao đúng bằng ô chọn bên dưới: ô kia có mũi tên 24pt nên phải kê
@@ -207,12 +255,25 @@ struct KycReviewView: View {
         _ label: String, _ options: [KycOption], _ selection: Binding<String?>
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(AppFont.beVietnamPro(12, .semibold))
-                .foregroundStyle(AppColor.payInk)
+            requiredLabel(label)
+            // KHÔNG gắn `onTapGesture` ở đây: `KycOptionDropdown` là một `Button`, thêm cử
+            // chỉ chạm bọc ngoài sẽ nuốt mất chạm và dropdown không mở ra được nữa. Bàn phím
+            // tự vẽ nằm dưới sheet của dropdown nên cũng không che gì.
             KycOptionDropdown(title: label, options: options, selectedCode: selection)
         }
         .padding(.vertical, 6)
+    }
+
+    /// Nhãn ô BẮT BUỘC — dấu `*` đỏ ở cuối. Dùng `FieldLabel` chung thay vì tự nối chuỗi:
+    /// dấu `*` phải là một `Text` màu đỏ RIÊNG, nối thẳng vào chuỗi nhãn thì nó thừa hưởng
+    /// màu chữ nhãn và mắt không nhận ra đó là dấu bắt buộc.
+    ///
+    /// `size: 12` cho khớp cỡ nhãn của màn này (mặc định của `FieldLabel` là 14).
+    private func requiredLabel(_ text: String) -> some View {
+        FieldLabel(text: text, size: 12, required: true)
+            // `FieldLabel` tự chừa 8pt dưới cho các màn auth; ở đây `VStack` đã có
+            // `spacing: 6` nên bỏ đi, không thì nhãn cách ô gần gấp đôi chỗ khác.
+            .padding(.bottom, -8)
     }
 
     // MARK: - Ngân hàng
@@ -251,7 +312,7 @@ struct KycReviewView: View {
                 }
 
                 if searchQuery.isEmpty {
-                    Button { showAllBanks.toggle() } label: {
+                    Button { showAllBanks.toggle(); isAccountFocused = false } label: {
                         Text(showAllBanks ? "Thu gọn" : "Xem tất cả ngân hàng")
                             .font(AppFont.beVietnamPro(13, .semibold))
                             .foregroundStyle(AppColor.brand)
@@ -352,6 +413,9 @@ struct KycReviewView: View {
             selectedBank = bank
             accName = ""
             lookupError = nil
+            // Đổi ngân hàng là đủ dữ kiện để tra lại — đóng bàn phím rồi tra, khỏi bắt người
+            // dùng quay lại ô số tài khoản bấm "Xong" thêm một lần.
+            isAccountFocused = false
             if accNo.count >= 4 { runLookup() }
         } label: {
             VStack(spacing: 6) {
@@ -393,28 +457,16 @@ struct KycReviewView: View {
 
     private var accountField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Số tài khoản")
-                .font(AppFont.beVietnamPro(12, .semibold))
-                .foregroundStyle(AppColor.payInk)
+            requiredLabel("Số tài khoản")
 
             HStack(spacing: 8) {
-                TextField("", text: $accNo, prompt: .appPlaceholder("Nhập số tài khoản"))
+                // Hiển thị thuần, gõ bằng bàn phím tự vẽ — xem `isAccountFocused`.
+                Text(accNo.isEmpty ? "Nhập số tài khoản" : accNo)
                     .font(AppFont.beVietnamPro(14))
-                    .foregroundStyle(AppColor.payInk)
-                    .tint(AppColor.brand)
-                    .keyboardType(.numberPad)
-                    .focused($isAccountFocused)
-                    .onChangeNewCompat(of: accNo) { newValue in
-                        let digits = newValue.filter(\.isNumber)
-                        if digits != newValue { accNo = digits }
-                        accName = ""
-                        lookupError = nil
-                    }
-                    // Chỉ tra khi đã nhập XONG (rời focus) — gọi theo từng ký tự vừa tốn
-                    // request vừa hiện tên sai lúc số còn gõ dở.
-                    .onChangeCompat(of: isAccountFocused) { wasFocused, focused in
-                        if wasFocused && !focused { runLookup() }
-                    }
+                    .foregroundStyle(accNo.isEmpty ? AppColor.payPlaceholder : AppColor.payInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { isAccountFocused = true }
 
                 // Nút "Dán" như luồng chuyển khoản: ô này dùng bàn phím SỐ, mà bàn phím số
                 // không có menu Paste khi long-press — không có nút thì chỉ còn cách gõ tay
@@ -433,6 +485,8 @@ struct KycReviewView: View {
                         // Xoá để lần tra trước không chặn lần này: dán lại đúng số vừa tra
                         // lỗi thì vẫn phải cho tra lại.
                         lastLookedUp = nil
+                        // Dán là đã có cả chuỗi, không còn gì để gõ -> đóng bàn phím rồi tra.
+                        isAccountFocused = false
                         runLookup()
                     } label: {
                         HStack(spacing: 4) {
@@ -464,7 +518,10 @@ struct KycReviewView: View {
     // MARK: - Nút nộp
 
     private var submitButton: some View {
-        Button(action: submit) {
+        Button {
+            isAccountFocused = false
+            submit()
+        } label: {
             Text(isSubmitting ? "Đang nộp hồ sơ..." : "Hoàn tất xác thực")
                 .font(AppFont.beVietnamPro(16, .semibold))
                 .foregroundStyle(.white)
@@ -536,6 +593,22 @@ struct KycReviewView: View {
         } catch {
             c06Error = "Không xác thực được thẻ CCCD, vui lòng thử lại."
         }
+    }
+
+    // MARK: - Nhập số tài khoản bằng bàn phím tự vẽ
+
+    private func appendAccountDigit(_ digit: String) {
+        accNo += digit
+        // Số đổi thì tên vừa tra được không còn đúng nữa.
+        accName = ""
+        lookupError = nil
+    }
+
+    private func backspaceAccountDigit() {
+        guard !accNo.isEmpty else { return }
+        accNo.removeLast()
+        accName = ""
+        lookupError = nil
     }
 
     private func runLookup() {
