@@ -37,6 +37,34 @@ struct QuickTopUpSheet: View {
     private var canContinue: Bool { pickedAppId != nil && amount > 0 }
 
     var body: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { onDismiss() }
+
+            // Thẻ trắng canh GIỮA phần màn còn lại (phần chưa bị bàn phím chiếm) — nhờ
+            // `safeAreaInset` bên dưới nên nó không bao giờ bị bàn phím đè.
+            card
+                .padding(.horizontal, 28)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        // Bàn phím số nằm NGOÀI thẻ trắng và ghim đáy màn, full width — giống ô số tiền ở màn
+        // chuyển ví/chuyển khoản. Để bên trong thẻ thì nó bị thẻ kéo lên giữa màn và thụt vào
+        // 28pt hai bên, trông như một khối trôi lơ lửng.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isAmountFocused {
+                NumericKeypad(
+                    onDigit: appendDigits,
+                    onBackspace: backspaceDigit,
+                    onNext: openBankApp,
+                    nextTitle: "Mở app ngân hàng",
+                    nextEnabled: canContinue
+                )
+            }
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Nạp ví nhanh")
                 .font(AppFont.beVietnamPro(16, .bold))
@@ -71,32 +99,16 @@ struct QuickTopUpSheet: View {
                     .padding(.top, 8)
             }
 
-            // Bàn phím số tự vẽ thay nút "Mở app ngân hàng" rời — bấm phím hành động
-            // trong bàn phím là mở app luôn, không cần đóng bàn phím rồi bấm thêm nút nữa.
-            if isAmountFocused {
-                NumericKeypad(
-                    onDigit: appendDigits,
-                    onBackspace: backspaceDigit,
-                    onNext: openBankApp,
-                    nextTitle: "Mở app ngân hàng",
-                    nextEnabled: canContinue
-                )
-            } else {
+            // Bàn phím đang mở thì phím hành động của nó đã là "Mở app ngân hàng" — hiện thêm
+            // nút rời ngay dưới là hai chỗ cho cùng một việc.
+            if !isAmountFocused {
                 continueButton
             }
         }
-        .padding(.top, 18)
-        .padding(.bottom, isAmountFocused ? 0 : 18)
+        .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .padding(.horizontal, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            Color.black.opacity(0.35)
-                .ignoresSafeArea()
-                .onTapGesture { onDismiss() }
-        )
     }
 
     private func bankRow(_ bank: QuickTopUpDeeplink.SourceBank) -> some View {
