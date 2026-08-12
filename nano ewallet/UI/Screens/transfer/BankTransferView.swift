@@ -54,6 +54,8 @@ struct BankTransferView: View {
     @State private var lastLookedUp: (bin: String, account: String, accType: Int)?
     @State private var showBankSheet = false
     @FocusState private var isAccountFocused: Bool
+    /// Hẹn giờ tra cứu sau khi ngừng gõ số tài khoản — xem `scheduleLookup`.
+    @State private var lookupDebounce: Task<Void, Never>?
 
     /// Chỉ điều khiển bàn phím số tự vẽ của Ô SỐ TIỀN — số tài khoản dùng bàn
     /// phím hệ thống qua `isAccountFocused` riêng, không dùng chung bàn phím này.
@@ -557,9 +559,11 @@ struct BankTransferView: View {
             .onChangeCompat(of: accountNumber) { _, newValue in
                 let filtered = String(newValue.filter(\.isNumber).prefix(19))
                 if filtered != newValue {
+                    // Gán lại sẽ kích hoạt `onChange` lần nữa với giá trị đã lọc — lượt đó mới
+                    // hẹn tra cứu, nên ở đây không cần gọi.
                     accountNumber = filtered
                 } else if !filtered.isEmpty {
-                    holderName = ""; lookupError = nil
+                    scheduleLookup()
                 }
             }
 
@@ -967,7 +971,37 @@ struct BankTransferView: View {
 
     // MARK: - Tra cứu tên chủ tài khoản
 
-    private func runLookupIfNeeded() {
+    /// Vừa sửa số tài khoản -> hẹn tra cứu sau khi ngừng gõ 500ms.
+    ///
+    /// Trước đây chỉ tra khi rời ô (`onChange(isAccountFocused)`) hoặc bấm Done, nên gõ xong mà
+    /// bàn phím còn đó thì không bao giờ thấy tên chủ tài khoản.
+    private func scheduleLookup() {
+        // Người nhận đã khoá (vào từ QR/OneTouch/link) thì tên đã có sẵn và đúng — không được
+        // xoá. Chặn TRƯỚC khi dọn, không thì tên điền sẵn bị mất mà không có gì tra lại.
+        guard !recipientLocked else { return }
+        // Đúng số đang tra / vừa tra xong: nút "Dán" gán text RỒI gọi tra ngay, mà `onChange`
+        // chỉ chạy ở vòng cập nhật sau — không chặn ở đây thì lượt đó xoá tên vừa hiện và tra
+        // lại lần hai (tên nhá lên rồi mất, thêm một lượt gọi API vô ích).
+        if let bin = selectedBin, let lastLookedUp, lastLookedUp == (bin, accountNumber, accType) {
+            return
+        }
+        lookupDebounce?.cancel()
+        // Số đổi thì tên cũ không còn thuộc số này — xoá cả tên lẫn mốc chống tra trùng, nếu
+        // giữ mốc thì xoá lùi về đúng số vừa tra sẽ bị bỏ qua và ô tên trống vĩnh viễn.
+        holderName = ""; lookupError = nil; lastLookedUp = nil
+        guard selectedBin != nil, accountNumber.count >= 4 else { return }
+        lookupDebounce = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            // `advanceFocus: false`: tra tự động thì chỉ hiện tên, KHÔNG đóng bàn phím và không
+            // bật mic — người dùng có thể còn đang gõ dở số tài khoản.
+            runLookupIfNeeded(advanceFocus: false)
+        }
+    }
+
+    /// - Parameter advanceFocus: tra ra tên thì đóng bàn phím + bật mic để nhập số tiền. `false`
+    ///   khi tra tự động lúc đang gõ — xem `scheduleLookup`.
+    private func runLookupIfNeeded(advanceFocus: Bool = true) {
         guard !recipientLocked, let bin = selectedBin, accountNumber.count >= 4 else { return }
         guard let bankNo = Int(bin) else {
             lookupError = "Mã ngân hàng không hợp lệ"
@@ -984,6 +1018,7 @@ struct BankTransferView: View {
                 holderName = try await TransferService.verifyBeneficiary(
                     VerifyBeneficiaryRequest(accNo: accountNumber, bankNo: bankNo, accType: accType)
                 )
+                guard advanceFocus else { return }
                 // Tra ra tên là bước cuối của phần người nhận -> việc tiếp theo chắc chắn
                 // là nhập số tiền, nên bật mic luôn cho đọc ngay.
                 isAccountFocused = false

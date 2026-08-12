@@ -76,6 +76,9 @@ struct WalletTransferAmountView: View {
     @State private var lookupError: String?
     @State private var lastVerified: String?
     @FocusState private var isUsernameFocused: Bool
+    /// Hẹn giờ tra cứu sau khi ngừng gõ. Giữ `Task` để lượt gõ tiếp theo huỷ lượt đang chờ —
+    /// mirror cách `HistoryView` debounce ô tìm kiếm.
+    @State private var verifyDebounce: Task<Void, Never>?
 
     /// Popup hotline — Kotlin để nút Hỗ trợ ở header màn này.
     @State private var showSupport = false
@@ -498,6 +501,12 @@ struct WalletTransferAmountView: View {
                     .onChangeCompat(of: isUsernameFocused) { wasFocused, focusedNow in
                         if wasFocused && !focusedNow { runVerifyIfNeeded() }
                     }
+                    // Tra cứu NGAY trong lúc gõ (ngừng gõ 500ms là tra), không đợi rời ô.
+                    // Trước đây chỉ tra khi mất focus nên người dùng gõ xong mà bàn phím còn
+                    // đó thì không bao giờ thấy tên — phải chạm ra ngoài mới hiện.
+                    .onChangeNewCompat(of: username) { newValue in
+                        scheduleVerify(for: newValue)
+                    }
 
                 Button {
                     guard let clip = UIPasteboard.general.string else { return }
@@ -573,8 +582,42 @@ struct WalletTransferAmountView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    /// Tra cứu tên chủ ví. Xong thì mở bàn phím số + bật mic để đi tiếp ngay.
-    private func runVerifyIfNeeded() {
+    /// Người dùng vừa sửa số ví -> hẹn tra cứu sau khi ngừng gõ.
+    ///
+    /// Mốc 6 chữ số lấy theo `AmountParser.isBareNumber` — quy ước sẵn có của app cho "số trơn
+    /// có thể là số ví", nên không gọi API cho những chuỗi chắc chắn chưa phải số ví.
+    private func scheduleVerify(for newValue: String) {
+        let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+        // Đúng số đang tra / vừa tra xong: nút "Dán" gán text RỒI gọi tra ngay, mà `onChange`
+        // chỉ chạy ở vòng cập nhật sau — không chặn ở đây thì lượt đó xoá tên vừa hiện và tra
+        // lại lần hai (tên nhá lên rồi mất, thêm một lượt gọi API vô ích).
+        guard trimmed != lastVerified else { return }
+
+        verifyDebounce?.cancel()
+        // Số vừa đổi thì tên đang hiện KHÔNG còn thuộc số này nữa — xoá ngay, đừng để tên cũ
+        // treo trên số mới (người dùng tin là đã tra đúng người).
+        verifiedName = nil
+        lookupError = nil
+        // Xoá luôn mốc chống tra trùng: số đổi là coi như chưa tra gì. Giữ lại thì lúc người
+        // dùng xoá lùi về đúng số vừa tra, `runVerifyIfNeeded` thấy trùng mốc nên bỏ qua —
+        // tên đã bị xoá ở trên mà không có gì điền lại, ô tên trống vĩnh viễn.
+        lastVerified = nil
+
+        guard trimmed.count >= 6 else { return }
+        verifyDebounce = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            // `advanceFocus: false` — tra tự động thì CHỈ hiện tên, không nhảy sang bàn phím
+            // số. Giật focus khi người dùng còn đang gõ dở sẽ khiến những chữ số tiếp theo rơi
+            // vào ô SỐ TIỀN, tức nhập sai tiền một cách lặng lẽ.
+            runVerifyIfNeeded(advanceFocus: false)
+        }
+    }
+
+    /// Tra cứu tên chủ ví.
+    /// - Parameter advanceFocus: xong thì mở bàn phím số + bật mic để đi tiếp ngay. `false` khi
+    ///   tra tự động lúc đang gõ — xem `scheduleVerify`.
+    private func runVerifyIfNeeded(advanceFocus: Bool = true) {
         let trimmed = username.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, trimmed != lastVerified else { return }
         lastVerified = trimmed
@@ -587,6 +630,7 @@ struct WalletTransferAmountView: View {
                 verifiedName = try await TransferService.verifyBeneficiary(
                     VerifyBeneficiaryRequest(benUsername: trimmed)
                 )
+                guard advanceFocus else { return }
                 // Có người nhận rồi mới mở bàn phím số (trước đó nó che ô số ví).
                 isAmountFocused = true
                 if amountText.isEmpty, speech.isAvailable { await speech.start() }
