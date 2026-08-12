@@ -77,13 +77,15 @@ struct FieldLabel: View {
 
     /// Dấu `*` để RIÊNG một `Text` màu đỏ chứ không nối vào chuỗi nhãn: nối vào thì nó thừa
     /// hưởng màu chữ nhãn, mắt không nhận ra đó là dấu bắt buộc.
+    /// `foregroundColor` chứ KHÔNG phải `foregroundStyle`: bản trả về `Text` (để nối hai
+    /// `Text` bằng `+`) của `foregroundStyle` chỉ có từ iOS 17, mà app hỗ trợ từ iOS 16.
     @ViewBuilder
     private var label: some View {
         if required {
-            Text(text).foregroundStyle(AppColor.payInk)
-                + Text(" *").foregroundStyle(AppColor.error)
+            Text(text).foregroundColor(AppColor.payInk)
+                + Text(" *").foregroundColor(AppColor.error)
         } else {
-            Text(text).foregroundStyle(AppColor.payInk)
+            Text(text).foregroundColor(AppColor.payInk)
         }
     }
 }

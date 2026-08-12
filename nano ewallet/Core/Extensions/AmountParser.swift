@@ -183,7 +183,10 @@ enum AmountParser {
         // bắt đầu ngay sau dấu chấm của nhóm trước. Đây là mẫu duy nhất không đòi đơn vị tiền
         // nên cũng là mẫu dễ nhầm nhất.
         collect("(?<![\\d.])(\\d{1,3}(?:\\.\\d{3})+)\\s*đ?") { m in
-            group(m, 1)?.replacingOccurrences(of: ".", with: "").flatMap(Int64.init)
+            // Tách hai bước: `replacingOccurrences` trả `String` KHÔNG optional, nên nối
+            // `.flatMap` vào sẽ bị hiểu là duyệt từng ký tự của chuỗi thay vì gỡ optional.
+            guard let raw = group(m, 1) else { return nil }
+            return Int64(raw.replacingOccurrences(of: ".", with: ""))
         }
 
         // 7) Số + "đ": "200000đ" — cũng chặn cắt giữa dãy ("0123.456.789đ" không được ra 789).

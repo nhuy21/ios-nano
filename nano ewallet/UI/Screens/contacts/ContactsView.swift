@@ -10,6 +10,9 @@
 import SwiftUI
 import Combine
 import UIKit
+// Cần cho `CNAuthorizationStatus` ở màn "Tìm bạn trong danh bạ" — kiểu này do Contacts định
+// nghĩa nên không import thì các case (.denied/.authorized...) không dùng được.
+import Contacts
 
 struct ContactsView: View {
     let onBack: () -> Void

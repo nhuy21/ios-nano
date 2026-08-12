@@ -155,24 +155,42 @@ enum EkycLauncher {
     private static func applyTextFields(from result: CmcEkycResult?) {
         guard let result else { return }
         let nfc = result.nfcResult
-        // Ngày cấp/nơi cấp in ở MẶT SAU nên đọc `backResult` trước; các trường còn lại
-        // (tên, ngày sinh, số thẻ) nằm ở mặt trước.
-        let back = result.backResult?.field
+        // KHÁC Android: SDK iOS gộp toàn bộ trường OCR vào `frontResult.field` (kiểu
+        // `CmcEkycField` có cả `dateOfIssue`/`placeOfIssue` vốn in ở mặt sau), còn
+        // `backResult` chỉ mang `rawData` + `mrz` — nó KHÔNG có `field`.
         let front = result.frontResult?.field
+        // Dự phòng: đọc thẳng `rawData` của mặt sau khi `frontResult` không có. Chỉ dùng cho
+        // ngày cấp/nơi cấp vì đó là hai trường in ở mặt sau.
+        let backRaw = result.backResult?.rawData
         let store = PendingKyc.shared
 
         func pick(_ values: String?...) -> String? {
             values.compactMap { $0 }.first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         }
 
-        store.idCardNumber = pick(nfc?.idNumber, front?.idNumber, back?.idNumber) ?? store.idCardNumber
-        store.fullName = pick(nfc?.name, front?.name, back?.name) ?? store.fullName
-        store.dateOfBirth = pick(nfc?.dateOfBirth, front?.birthday, back?.birthday) ?? store.dateOfBirth
-        store.gender = pick(nfc?.gender, front?.gender, back?.gender) ?? store.gender
-        store.address = pick(nfc?.address, front?.resident, back?.resident) ?? store.address
-        store.issueDate = pick(nfc?.dateOfIssuance, back?.dateOfIssue, front?.dateOfIssue) ?? store.issueDate
-        store.expireDate = pick(nfc?.dateOfExpiry, back?.dateOfExpiry, front?.dateOfExpiry) ?? store.expireDate
-        store.placeOfIssues = pick(back?.placeOfIssue, front?.placeOfIssue) ?? store.placeOfIssues
+        /// Lấy chuỗi từ `rawData` — SDK trả dictionary không định kiểu nên phải tự ép.
+        func raw(_ keys: String...) -> String? {
+            guard let backRaw else { return nil }
+            for key in keys {
+                if let value = backRaw[key] as? String, !value.isEmpty { return value }
+            }
+            return nil
+        }
+
+        store.idCardNumber = pick(nfc?.idNumber, front?.idNumber) ?? store.idCardNumber
+        store.fullName = pick(nfc?.name, front?.name) ?? store.fullName
+        store.dateOfBirth = pick(nfc?.dateOfBirth, front?.birthday) ?? store.dateOfBirth
+        store.gender = pick(nfc?.gender, front?.gender) ?? store.gender
+        store.address = pick(nfc?.address, front?.resident) ?? store.address
+        store.issueDate = pick(
+            nfc?.dateOfIssuance, front?.dateOfIssue, raw("doi", "date_of_issue", "issue_date")
+        ) ?? store.issueDate
+        store.expireDate = pick(
+            nfc?.dateOfExpiry, front?.dateOfExpiry, raw("doe", "date_of_expiry", "expiry_date")
+        ) ?? store.expireDate
+        store.placeOfIssues = pick(
+            front?.placeOfIssue, raw("poi", "place_of_issue", "issue_place")
+        ) ?? store.placeOfIssues
     }
 
     /// Lỗi NFC do SDK bắn ra kèm hai closure — dựng hộp thoại để người dùng chọn thử lại

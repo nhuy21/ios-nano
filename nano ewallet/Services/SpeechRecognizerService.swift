@@ -189,7 +189,7 @@ final class SpeechRecognizerService: ObservableObject {
                 // partial RỖNG lúc mới khởi động — nhận nó là hạ mốc chờ từ 6s xuống 0.8s
                 // ngay khi mic vừa mở, tức mất luôn thời gian chờ người dùng bắt đầu nói.
                 if !text.trimmingCharacters(in: .whitespaces).isEmpty {
-                    self.restartSilenceTimer()
+                    self.restartSilenceTimer(timeout: silenceInterval)
                 }
             },
             onFinal: { [weak self] text in
@@ -232,7 +232,7 @@ final class SpeechRecognizerService: ObservableObject {
                     // Xem chú thích cùng chỗ trong `startModern`: partial rỗng KHÔNG được hạ
                     // mốc chờ xuống `silenceInterval`.
                     if !self.partialText.trimmingCharacters(in: .whitespaces).isEmpty {
-                        self.restartSilenceTimer()
+                        self.restartSilenceTimer(timeout: silenceInterval)
                     }
                     if result.isFinal {
                         // Nhiều phương án giúp `SpeechAmountParser` chọn số tiền chính xác hơn.
@@ -282,7 +282,11 @@ final class SpeechRecognizerService: ObservableObject {
     /// - Parameter timeout: `initialSpeechTimeout` cho lần hẹn ĐẦU (chờ người dùng bắt đầu
     ///   nói), `silenceInterval` cho các lần sau (đã nghe được chữ, đang đo khoảng lặng cuối
     ///   câu). Mặc định là mốc ngắn vì đa số lời gọi là từ callback nhận chữ.
-    private func restartSilenceTimer(timeout: TimeInterval = silenceInterval) {
+    ///
+    /// KHÔNG đặt `silenceInterval` làm giá trị mặc định của tham số: hằng cấp file cũng bị
+    /// coi là main-actor-isolated, mà giá trị mặc định lại được đánh giá ở ngữ cảnh
+    /// nonisolated — Swift báo lỗi. Hai nơi gọi tự truyền vào.
+    private func restartSilenceTimer(timeout: TimeInterval) {
         silenceTimer?.invalidate()
         silenceTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
             let service = self

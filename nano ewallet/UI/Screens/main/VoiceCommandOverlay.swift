@@ -240,10 +240,6 @@ struct VoiceCommandOverlay: View {
         case .bank(let draft):
             speech.stop()
             onResolved(.bankTransfer(draft: draft))
-        case .choose:
-            // Không xảy ra ở đây: hộp chọn chỉ sinh ra từ ẢNH có nhiều người nhận, còn luồng
-            // này chỉ nhận giọng nói. Vẫn phải khai để `switch` đủ nhánh.
-            statusMessage = "Không nhận diện được người nhận, vui lòng thử lại"
         case .failure(let message):
             statusMessage = message
         }
