@@ -156,8 +156,11 @@ struct RegisterView: View {
         }
         // Bàn phím tự vẽ cho 3 ô SỐ (sĐT, mật khẩu, nhập lại). Ô email không qua đây — nó
         // cần chữ và "@" nên vẫn dùng bàn phím hệ thống.
+        //
+        // Ẩn khi đang gửi: `safeAreaInset` nằm NGOÀI `.overlay` nên bàn phím vẫn hiện đè lên
+        // lớp chờ, người dùng bấm được phím trong lúc app đang gọi API.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let field = focusedField, field != .email {
+            if let field = focusedField, field != .email, !vm.isSubmitting {
                 PlainNumericKeypad(
                     onDigit: { appendDigit($0, to: field) },
                     onBackspace: { backspace(from: field) },
@@ -187,6 +190,23 @@ struct RegisterView: View {
         .dismissesCustomKeypadOnTap {
             focusedField = nil
             emailFocused = false
+        }
+        // Lớp chờ trong lúc gọi `register()`: bước này phải đi mạng (BE sinh OTP rồi gửi SMS)
+        // nên có khoảng lặng vài giây trước khi sang màn OTP. Trước đây chỉ có chữ trên NÚT
+        // đổi thành "Đang tạo tài khoản...", mà nút nằm ở đáy màn — vừa bấm xong thì mắt
+        // không còn ở đó, nên cảm giác là app không phản ứng gì.
+        //
+        // Dùng ĐÚNG lớp chờ của OneTouch để hai chỗ chờ trong app cùng một nhịp (độ mờ nền,
+        // logo, nhịp animation) — người dùng đọc nó là "app đang xử lý", hai nhịp khác nhau
+        // thành hai cảm giác khác nhau về cùng một việc.
+        //
+        // Nó cũng CHẶN THAO TÁC (nền đục phủ toàn màn): không chặn thì người dùng bấm lại nút
+        // hoặc bấm Quay lại rồi tạo thêm một request thứ hai — tức GỬI OTP HAI LẦN cho cùng
+        // một số.
+        .overlay {
+            if vm.isSubmitting {
+                OneTouchWaitingOverlay(message: "Đang tạo tài khoản...")
+            }
         }
         .scrollDismissesKeyboard(.interactively)
     }
