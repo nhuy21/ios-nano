@@ -84,9 +84,16 @@ enum VoiceCommandResolver {
     }
 
     /// Khớp người nhận theo TỪ (không phải chuỗi con) nên không nhầm "mẹ" với "mến".
-    /// So cả nickname LẪN từng từ của accName: nói "Đức" khớp contact tên "Nguyen Van Duc"
-    /// dù chưa đặt nickname. Chọn contact có từ khớp DÀI nhất — tên riêng ("duc") thắng
-    /// họ/đệm chung ("van", "nguyen").
+    /// So cả tên gợi nhớ LẪN từng từ của tên thật: nói "Đức" khớp contact tên
+    /// "Nguyen Van Duc" dù chưa đặt tên gợi nhớ.
+    ///
+    /// TÊN GỢI NHỚ ĐƯỢC ƯU TIÊN TUYỆT ĐỐI: người dùng tự đặt nó chính là để gọi, nên khớp
+    /// vào đó luôn thắng mọi contact chỉ khớp tên thật — kể cả khi tên thật khớp một từ dài
+    /// hơn. Nói "Mẹ" phải ra contact đặt tên gợi nhớ "Mẹ", không ra người tên
+    /// "Nguyen Thi Me".
+    ///
+    /// Trong cùng một hạng thì chọn từ khớp DÀI nhất — tên riêng ("duc") thắng họ/đệm chung
+    /// ("van", "nguyen").
     nonisolated static func matchRecipient(
         candidates: [String],
         contacts: [Beneficiary]
@@ -94,15 +101,26 @@ enum VoiceCommandResolver {
         let spoken = Set(candidates.flatMap(words))
         guard !spoken.isEmpty else { return nil }
 
+        /// (khớp tên gợi nhớ chưa, độ dài từ khớp dài nhất) — so theo thứ tự này nên mọi
+        /// contact khớp tên gợi nhớ đều đứng trên nhóm chỉ khớp tên thật.
+        func score(_ contact: Beneficiary) -> (Bool, Int) {
+            func longestMatch(_ value: String?) -> Int {
+                guard let value else { return 0 }
+                return words(value).filter(spoken.contains).map(\.count).max() ?? 0
+            }
+            let byNickname = longestMatch(contact.nickname)
+            return (byNickname > 0, max(byNickname, longestMatch(contact.accName)))
+        }
+
         var best: Beneficiary?
-        var bestScore = 0
+        var bestScore = (false, 0)
         for contact in contacts {
-            let nameTokens = [contact.nickname, contact.accName]
-                .compactMap { $0 }
-                .flatMap(words)
-            let score = nameTokens.filter(spoken.contains).map(\.count).max() ?? 0
-            if score > bestScore {
-                bestScore = score
+            let current = score(contact)
+            // Bỏ qua contact không khớp từ nào: `(false, 0)` cũng là giá trị khởi tạo, không
+            // chặn ở đây thì màn hình nói một câu vu vơ vẫn ra người nhận đầu danh sách.
+            guard current.1 > 0 else { continue }
+            if best == nil || current > bestScore {
+                bestScore = current
                 best = contact
             }
         }
