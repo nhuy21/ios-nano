@@ -170,16 +170,24 @@ enum AuthService {
     // MARK: - Phiên
 
     /// `POST auth/refresh` — dùng ở Splash để kiểm tra phiên còn sống + lấy status mới nhất.
-    static func refresh() async throws -> AuthOutcome {
-        guard let refreshToken = store.refreshToken else {
+    ///
+    /// Đi qua `TokenRefresher.shared`, KHÔNG tự gọi thẳng `auth/refresh` nữa. BE cấp refresh
+    /// token mới mỗi lượt và thu hồi token cũ, nên lượt này chạy song song với lượt refresh do
+    /// một request 401 khác kích hoạt (`devices/register` của push, ngay lúc mở app) thì bên
+    /// tới sau gửi token đã bị thay và nhận 401 — Splash tưởng hết phiên và đẩy về màn đăng
+    /// nhập, dù token mới vẫn nằm trong Keychain (thoát vào lại là vào được bình thường).
+    /// Dùng chung hàng đợi thì hai bên chờ cùng MỘT lượt gọi.
+    @discardableResult
+    static func refresh() async throws -> RefreshedSession {
+        guard store.refreshToken != nil else {
             throw APIError.unauthenticated
         }
-        let body = RefreshRequest(
-            deviceId: store.getOrCreateDeviceId(),
-            refreshToken: refreshToken
+        let session = try await TokenRefresher.shared.refreshIfNeeded(
+            previousToken: store.accessToken
         )
-        let data = try await client.request(.post, "auth/refresh", body: body, as: AuthData.self)
-        return try applyAuthData(data, phone: nil, rememberPhone: false, isRegisterOtp: false)
+        // Giữ side effect cũ của `applyAuthData`: có token mới thì đăng ký lại device token.
+        PushRegistrar.shared.syncCurrentToken()
+        return session
     }
 
     /// `POST auth/logout` — best-effort: API lỗi vẫn phải đăng xuất được cục bộ.

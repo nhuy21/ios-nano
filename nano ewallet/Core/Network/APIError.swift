@@ -61,4 +61,44 @@ enum APIError: LocalizedError, Equatable {
         if case .server(let code, _) = self { return code == 401 }
         return false
     }
+
+    /// Server đã TỪ CHỐI phiên — chỉ khi đó mới được bắt đăng nhập lại.
+    ///
+    /// Mọi lỗi khác (mất mạng, timeout, DNS/TLS, BE 5xx, decode sai) là sự cố tạm thời:
+    /// token trên máy vẫn dùng được, nên đẩy người dùng về màn đăng nhập là sai. Đây từng là
+    /// nguyên nhân của lỗi "thỉnh thoảng mở app lại bắt đăng nhập, thoát vào lại thì bình
+    /// thường" — Splash coi mọi lỗi không phải `.offline` là hết phiên.
+    var isSessionEnded: Bool {
+        switch self {
+        case .unauthenticated:
+            return true
+        case .server(let code, _):
+            // 403 tính chung với 401: BE trả 403 khi token bị thu hồi (đăng xuất từ máy khác).
+            return code == 401 || code == 403
+        case .offline, .decoding, .missingData, .unknown:
+            return false
+        }
+    }
+
+    /// Đổi lỗi thô của `URLSession` thành `APIError`.
+    ///
+    /// Dùng chung cho mọi chỗ tự gọi mạng — `APIClient` và `TokenRefresher` (nó gọi
+    /// `auth/refresh` bằng URLSession riêng để không đệ quy). Hai bên phân loại lệch nhau thì
+    /// cùng một sự cố mạng lại dẫn tới hai kết cục khác nhau tuỳ nó xảy ra ở đường nào.
+    static func from(transport error: Error) -> APIError {
+        if let apiError = error as? APIError { return apiError }
+        guard let urlError = error as? URLError else { return .unknown(error.localizedDescription) }
+        switch urlError.code {
+        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+            return .offline
+        case .timedOut:
+            // KHÔNG gộp vào "mất kết nối": timeout thường là server/BE xử lý lâu chứ mạng
+            // vẫn tốt. Báo mất mạng thì người dùng đi kiểm tra WiFi/4G vô ích.
+            return .unknown("Máy chủ phản hồi quá lâu, vui lòng thử lại")
+        default:
+            // Lỗi TLS/DNS/server đóng kết nối giữa chừng — giữ nguyên mô tả gốc để còn
+            // chẩn đoán được, thay vì đè thành một câu chung chung.
+            return .unknown(urlError.localizedDescription)
+        }
+    }
 }

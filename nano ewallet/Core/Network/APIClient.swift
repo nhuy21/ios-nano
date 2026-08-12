@@ -23,7 +23,9 @@ final class APIClient {
     /// (mirror client `slow` bên Android).
     private let slowSession: URLSession
 
-    private let refresher = TokenRefresher()
+    /// Dùng bản CHUNG toàn app: Splash cũng refresh qua đây, hai bên giữ instance riêng thì
+    /// single-flight vô nghĩa và sẽ có hai lượt `auth/refresh` song song — xem `TokenRefresher`.
+    private let refresher = TokenRefresher.shared
 
     private init() {
         func makeSession(timeout: TimeInterval) -> URLSession {
@@ -145,21 +147,9 @@ final class APIClient {
         let response: URLResponse
         do {
             (data, response) = try await (slow ? slowSession : session).data(for: request)
-        } catch let urlError as URLError {
-            switch urlError.code {
-            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
-                throw APIError.offline
-            case .timedOut:
-                // KHÔNG gộp vào "mất kết nối": timeout thường là server/BE xử lý lâu chứ mạng
-                // vẫn tốt. Báo mất mạng thì người dùng đi kiểm tra WiFi/4G vô ích.
-                throw APIError.unknown("Máy chủ phản hồi quá lâu, vui lòng thử lại")
-            default:
-                // Lỗi TLS/DNS/server đóng kết nối giữa chừng — giữ nguyên mô tả gốc để còn
-                // chẩn đoán được, thay vì đè thành một câu chung chung.
-                throw APIError.unknown(urlError.localizedDescription)
-            }
         } catch {
-            throw APIError.unknown(error.localizedDescription)
+            // Phân loại ở `APIError.from(transport:)` — dùng chung với `TokenRefresher`.
+            throw APIError.from(transport: error)
         }
 
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1

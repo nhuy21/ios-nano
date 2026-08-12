@@ -50,38 +50,27 @@ final class AppState: ObservableObject {
         }
 
         do {
-            let outcome = try await AuthService.refresh()
+            let session = try await AuthService.refresh()
             _ = try? await minimumDelay
-            apply(outcome: outcome, fallbackPhone: lastPhone)
-        } catch let error as APIError {
-            _ = try? await minimumDelay
-            if case .offline = error {
-                applyOfflineFallback(lastPhone: lastPhone)
-            } else {
-                // Server từ chối (401/403 — refresh token hết hạn/thu hồi) → về Login/WelcomeBack.
-                root = .unauthenticated(lastPhone: lastPhone)
-            }
+            // Refresh THÀNH CÔNG nghĩa là BE đã nhận refresh token và cấp token mới — phiên
+            // chắc chắn còn sống. Response không kèm `user` thì lấy status đã lưu, KHÔNG để
+            // `route` nhận `nil` rồi rơi vào nhánh "không rõ status" và đẩy về màn đăng nhập.
+            route(
+                status: session.status ?? store.lastKnownStatus,
+                phone: session.phone ?? store.userPhone ?? lastPhone
+            )
         } catch {
             _ = try? await minimumDelay
-            root = .unauthenticated(lastPhone: lastPhone)
-        }
-    }
-
-    /// Gọi sau khi 1 trong các luồng auth (Login/Otp/WelcomeBack/DeviceOtp) hoàn tất.
-    func apply(outcome: AuthService.AuthOutcome, fallbackPhone: String?) {
-        switch outcome {
-        case .authenticated(let user):
-            route(status: user?.status, phone: user?.phone ?? fallbackPhone)
-        case .requireOtp(let user):
-            if let phone = user?.phone ?? fallbackPhone {
-                root = .needOtp(phone: phone)
+            // CHỈ 401/403 mới là hết phiên. Mất mạng, timeout, DNS/TLS lỗi, BE 5xx, decode
+            // sai... đều là sự cố tạm thời: token vẫn dùng được nên vào bằng trạng thái đã
+            // cache, KHÔNG bắt đăng nhập lại. Trước đây mọi lỗi không phải `.offline` đều bị
+            // coi là hết phiên — đó là lý do thỉnh thoảng mở app lại thấy màn đăng nhập, mà
+            // thoát vào lại thì vào bình thường.
+            if APIError.from(transport: error).isSessionEnded {
+                root = .unauthenticated(lastPhone: lastPhone)
             } else {
-                root = .unauthenticated(lastPhone: nil)
+                applyCachedFallback(lastPhone: lastPhone)
             }
-        case .requireDeviceOtp:
-            // UI tầng trên xử lý hộp thoại xác nhận + gửi/verify device OTP;
-            // AppState chỉ nhận kết quả cuối cùng qua `apply` một lần nữa.
-            break
         }
     }
 
@@ -131,12 +120,13 @@ final class AppState: ObservableObject {
 
     // MARK: - Private
 
-    /// Mất mạng lúc refresh — dùng cache đã lưu lúc login/refresh thành công gần nhất
-    /// (mirror nhánh `catch IOException` trong SplashScreen.kt).
+    /// Không gọi được `auth/refresh` vì sự cố tạm thời (mất mạng, timeout, DNS/TLS, BE 5xx) —
+    /// dùng cache đã lưu lúc login/refresh thành công gần nhất (mirror nhánh
+    /// `catch IOException` trong SplashScreen.kt).
     /// Cũng theo quy tắc "chỉ ACTIVE mới vào Home" như `route(status:phone:)`: trước đây
     /// nhánh này chỉ hỏi `cachedStatus != nil`, nên cache `PENDING`/`BLOCKED` gặp lúc mất
     /// mạng là vào thẳng Home.
-    private func applyOfflineFallback(lastPhone: String?) {
+    private func applyCachedFallback(lastPhone: String?) {
         let store = AuthStore.shared
         let cachedStatus = UserStatus(raw: store.lastKnownStatus)
 

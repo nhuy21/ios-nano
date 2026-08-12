@@ -49,7 +49,7 @@ final class PushRegistrar {
             let body = RegisterDeviceRequest(token: token, deviceId: deviceId)
             do {
                 try await APIClient.shared.requestVoid(.post, "devices/register", body: body, auth: true)
-            } catch APIError.unauthenticated {
+            } catch let error as APIError where error.isSessionEnded {
                 // Phiên hết giữa chừng: hoặc user đăng xuất xen vào, hoặc refresh token đã
                 // hết hạn (hay gặp khi cài đè build mới sau thời gian dài không mở app).
                 //
@@ -61,7 +61,7 @@ final class PushRegistrar {
                 // nuốt lỗi rồi mất luôn dấu vết.
                 let stillSignedIn = AuthStore.shared.accessToken != nil
                 print(
-                    "[Push] Đăng ký device token lỗi: unauthenticated "
+                    "[Push] Đăng ký device token lỗi: \(error.message) "
                         + "(phiên \(stillSignedIn ? "VẪN CÒN — cần xem lại" : "đã hết, sẽ đăng ký lại sau khi đăng nhập"))"
                 )
             } catch {
