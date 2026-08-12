@@ -61,6 +61,82 @@ struct AppTextField: View {
     }
 }
 
+/// Ô nhập số dùng bàn phím TỰ VẼ (`PlainNumericKeypad`) thay bàn phím hệ thống.
+///
+/// Không phải `TextField`: chỉ cần một `TextField` tồn tại và được focus là iOS bật bàn phím
+/// hệ thống lên chồng với bàn phím tự vẽ. Nên ô này chỉ HIỂN THỊ — nền, viền, caret nháy đều
+/// tự vẽ cho giống hệt `AppTextField`, còn ký tự do nơi gọi bơm vào qua binding.
+///
+/// Tiêu điểm cũng do nơi gọi giữ (`isFocused`), vì nó là thứ quyết định bàn phím hiện cho ô
+/// nào — chỉ ô này biết thì màn không điều phối được nhiều ô.
+struct KeypadTextField: View {
+    let text: String
+    let placeholder: String
+    var hasError: Bool = false
+    var textAlignment: TextAlignment = .leading
+    /// Hiện chấm tròn thay chữ số — cho ô mật khẩu.
+    var isSecure: Bool = false
+    let isFocused: Bool
+    let onTap: () -> Void
+
+    /// Nhịp nháy chạy độc lập với vòng đời view, cùng 0.5s với `PinDotsField` để nhiều ô trên
+    /// một màn không lệch pha. Không dùng `withAnimation(.repeatForever)` vì animation đó bị
+    /// huỷ mỗi lần view render lại — gõ thêm một số là caret đứng im.
+    @State private var caretVisible = true
+    private let caretTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    private var alignment: Alignment {
+        textAlignment == .center ? .center : .leading
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            if textAlignment == .center { Spacer(minLength: 0) }
+
+            if text.isEmpty && !isFocused {
+                Text(placeholder)
+                    .font(AppFont.beVietnamPro(18))
+                    .foregroundStyle(AppColor.payPlaceholder)
+            } else {
+                Text(isSecure ? String(repeating: "●", count: text.count) : text)
+                    .font(AppFont.beVietnamPro(18, .medium))
+                    .foregroundStyle(AppColor.payInk)
+                if isFocused {
+                    Rectangle()
+                        .fill(AppColor.brand)
+                        .frame(width: 2, height: 24)
+                        .opacity(caretVisible ? 1 : 0)
+                        .padding(.leading, 2)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: alignment)
+        .background(hasError ? AppColor.errorSoft : Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(hasError ? AppColor.error : AppColor.payInputBorder, lineWidth: 1)
+        }
+        .inputShadow()
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .onReceive(caretTimer) { _ in
+            guard isFocused else {
+                caretVisible = false
+                return
+            }
+            caretVisible.toggle()
+        }
+        .onChangeNewCompat(of: text) { _ in
+            // Vừa gõ/xoá thì caret sáng lại ngay, không phải chờ nhịp timer kế tiếp.
+            if isFocused { caretVisible = true }
+        }
+    }
+}
+
 /// Nhãn phía trên input — 14sp/w600/`PayInk`, cách input 8.dp (Login) hoặc 13sp (Register).
 struct FieldLabel: View {
     let text: String

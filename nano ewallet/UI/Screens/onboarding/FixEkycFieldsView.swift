@@ -25,6 +25,14 @@ struct FixEkycFieldsView: View {
     /// đỏ hết thì trông như đang báo lỗi người dùng chưa hề gây ra.
     @State private var attemptedSubmit = false
 
+    /// Ô SỐ nào đang nhận phím từ bàn phím tự vẽ. `nil` = ẩn bàn phím. Ô chữ (địa chỉ, tên
+    /// chủ TK) vẫn dùng bàn phím hệ thống nên không đi qua biến này.
+    @State private var focusedNumericKey: String?
+    /// Đang gọi API tra tên chủ tài khoản.
+    @State private var isLookingUpAccount = false
+    /// Lỗi tra tên — hiện ngay dưới ô số tài khoản, không lẫn vào lỗi submit chung.
+    @State private var lookupError: String?
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -62,6 +70,21 @@ struct FixEkycFieldsView: View {
             .padding(.bottom, 16)
         }
         .padding(.horizontal, 24)
+        // Bàn phím tự vẽ cho các ô SỐ (số tài khoản, mã BIN). Bản KHÔNG có phím "000": đây là
+        // số đếm từng chữ, gõ tắt hàng nghìn là sai.
+        //
+        // Ở ô số tài khoản, phím "Xong" tra luôn tên chủ TK rồi mới ẩn bàn phím.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let key = focusedNumericKey {
+                PlainNumericKeypad(
+                    onDigit: { appendDigit($0, to: key) },
+                    onBackspace: { backspace(from: key) },
+                    onNext: { finishEditing(key) },
+                    nextTitle: "Xong",
+                    nextEnabled: !(values[key] ?? "").isEmpty
+                )
+            }
+        }
         .screenBackground(Color.white)
         .onAppear {
             // Điền sẵn giá trị Bảo Kim đang giữ để người dùng sửa chứ không gõ lại từ đầu.
@@ -117,19 +140,35 @@ struct FixEkycFieldsView: View {
                 )
             } else {
                 HStack(spacing: 8) {
-                    TextField(
-                        "",
-                        text: Binding(
-                            get: { values[field.key] ?? "" },
-                            set: { values[field.key] = $0 }
-                        ),
-                        prompt: .appPlaceholder("Nhập \(meta.label.lowercased())")
-                    )
-                    .font(AppFont.beVietnamPro(14))
-                    .foregroundStyle(AppColor.payInk)
-                    .tint(AppColor.brand)
-                    .keyboardType(meta.isNumeric ? .numberPad : .default)
-                    .autocorrectionDisabled()
+                    if meta.isNumeric {
+                        // Ô SỐ: hiển thị thuần, gõ bằng bàn phím tự vẽ. Không dùng `TextField`
+                        // vì chỉ cần nó được focus là iOS bật bàn phím hệ thống lên chồng lên.
+                        Text(value.isEmpty ? "Nhập \(meta.label.lowercased())" : value)
+                            .font(AppFont.beVietnamPro(14))
+                            .foregroundStyle(value.isEmpty ? AppColor.payPlaceholder : AppColor.payInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .onTapGesture { focusedNumericKey = field.key }
+                    } else {
+                        TextField(
+                            "",
+                            text: Binding(
+                                get: { values[field.key] ?? "" },
+                                set: { values[field.key] = $0 }
+                            ),
+                            prompt: .appPlaceholder("Nhập \(meta.label.lowercased())")
+                        )
+                        .font(AppFont.beVietnamPro(14))
+                        .foregroundStyle(AppColor.payInk)
+                        .tint(AppColor.brand)
+                        .autocorrectionDisabled()
+                        // Chạm ô chữ thì tắt bàn phím tự vẽ, không thì hai bàn phím cùng ở đáy.
+                        .onTapGesture { focusedNumericKey = nil }
+                    }
+
+                    if meta.isNumeric, isLookingUpAccount, field.key == Self.accNoKey {
+                        ProgressView().scaleEffect(0.8)
+                    }
 
                     // Nút "Dán" CHỈ cho ô số (số tài khoản, CCCD, mã BIN): bàn phím số không
                     // có menu Paste khi long-press nên không có nút thì phải gõ tay cả chuỗi.
@@ -142,6 +181,10 @@ struct FixEkycFieldsView: View {
                             // Lọc chữ số: nội dung copy về hay kèm khoảng trắng hoặc dấu
                             // chấm, dán thô vào thì BE từ chối vì sai định dạng.
                             values[field.key] = clip.filter(\.isNumber)
+                            // Dán xong là đã có đủ số -> tra tên luôn và KHÔNG mở bàn phím:
+                            // người dùng vừa đưa cả chuỗi vào, không có gì để gõ thêm.
+                            focusedNumericKey = nil
+                            if field.key == Self.accNoKey { lookupAccountName() }
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.on.clipboard")
@@ -169,6 +212,15 @@ struct FixEkycFieldsView: View {
                 }
             }
 
+            // Lỗi tra tên chủ TK — gắn ngay dưới ô số tài khoản chứ không dồn xuống lỗi
+            // submit chung ở cuối màn, để thấy ngay nó thuộc về ô nào.
+            if field.key == Self.accNoKey, let lookupError {
+                Text(lookupError)
+                    .font(AppFont.beVietnamPro(11))
+                    .foregroundStyle(AppColor.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             // Lý do Bảo Kim trả về — quan trọng hơn nhãn, vì nó nói CỤ THỂ sai chỗ nào.
             if let message = field.message, !message.isEmpty {
                 Text(message)
@@ -183,6 +235,60 @@ struct FixEkycFieldsView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+        }
+    }
+
+    // MARK: - Nhập bằng bàn phím tự vẽ
+
+    private func appendDigit(_ digit: String, to key: String) {
+        values[key] = (values[key] ?? "") + digit
+        // Sửa lại số tài khoản thì tên vừa tra được không còn đúng nữa.
+        if key == Self.accNoKey { lookupError = nil }
+    }
+
+    private func backspace(from key: String) {
+        guard var current = values[key], !current.isEmpty else { return }
+        current.removeLast()
+        values[key] = current
+        if key == Self.accNoKey { lookupError = nil }
+    }
+
+    /// Phím "Xong": ẩn bàn phím, và nếu là ô SỐ TÀI KHOẢN thì tra luôn tên chủ TK.
+    private func finishEditing(_ key: String) {
+        focusedNumericKey = nil
+        guard key == Self.accNoKey else { return }
+        lookupAccountName()
+    }
+
+    // MARK: - Tra tên chủ tài khoản
+
+    static let accNoKey = "accNo"
+    static let accNameKey = "accName"
+    static let bankNoKey = "bankNo"
+
+    /// Tra tên chủ TK rồi điền sẵn vào ô "Tên chủ tài khoản".
+    ///
+    /// Cần CẢ số tài khoản lẫn mã BIN. Bảo Kim chỉ trả về những ô nó thấy thiếu, nên có hồ sơ
+    /// không có ô BIN trên màn — lúc đó `values["bankNo"]` rỗng và không tra được. Im lặng bỏ
+    /// qua thay vì báo lỗi: người dùng không thiếu gì cả, chỉ là màn này không có dữ liệu.
+    private func lookupAccountName() {
+        let accNo = (values[Self.accNoKey] ?? "").trimmingCharacters(in: .whitespaces)
+        let bin = (values[Self.bankNoKey] ?? "").trimmingCharacters(in: .whitespaces)
+        guard !accNo.isEmpty, !bin.isEmpty else { return }
+
+        lookupError = nil
+        isLookingUpAccount = true
+        Task {
+            defer { isLookingUpAccount = false }
+            do {
+                let name = try await BankService.lookupAccount(bin: bin, accountNumber: accNo)
+                values[Self.accNameKey] = name
+            } catch {
+                // Giữ nguyên tên đang có (nếu người dùng đã tự gõ) — xoá đi thì họ mất công
+                // nhập lại chỉ vì một lần mạng chập chờn.
+                lookupError = (error as? LocalizedError)?.errorDescription
+                    ?? "Không tra được tên chủ tài khoản, bạn có thể nhập tay."
+            }
         }
     }
 

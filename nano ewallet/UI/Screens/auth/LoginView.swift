@@ -24,10 +24,6 @@ struct LoginView: View {
     /// Số điện thoại VN dài nhất 10 số.
     private static let phoneMaxLength = 10
 
-    /// Caret nháy của ô sĐT. Cùng nhịp 0.5s với `PinDotsField` để hai ô không lệch pha.
-    @State private var caretVisible = true
-    private let caretTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -132,17 +128,6 @@ struct LoginView: View {
         }
         .screenBackground(Color.white)
         .scrollDismissesKeyboard(.interactively)
-        .onReceive(caretTimer) { _ in
-            guard focusedField == .phone else {
-                caretVisible = false
-                return
-            }
-            caretVisible.toggle()
-        }
-        .onChangeNewCompat(of: vm.phone) { _ in
-            // Vừa gõ/xoá thì caret sáng lại ngay, không phải chờ nhịp timer kế tiếp.
-            if focusedField == .phone { caretVisible = true }
-        }
         .sheet(isPresented: $vm.showDeviceConflict) {
             DeviceConflictDialog(
                 sending: vm.sendingDeviceOtp,
@@ -185,43 +170,16 @@ struct LoginView: View {
 
     // MARK: - Ô số điện thoại
 
-    /// Hiển thị thuần, KHÔNG phải `TextField`: có `TextField` thật là iOS bật bàn phím hệ
-    /// thống lên chồng với bàn phím tự vẽ. Trông vẫn như ô nhập bình thường (nền, viền,
-    /// caret nháy) nhưng mọi ký tự đến từ `PlainNumericKeypad`.
+    /// Dùng `KeypadTextField` chung thay vì tự dựng: cùng một ô hiển thị thuần với màn Đăng
+    /// ký và Quên mật khẩu, giữ ba bản sao thì sửa hình dáng một chỗ là lệch hai chỗ kia.
     private var phoneField: some View {
-        let focused = focusedField == .phone
-        let hasError = vm.errors["phone"] != nil
-        return HStack(spacing: 0) {
-            if vm.phone.isEmpty && !focused {
-                Text("Nhập số điện thoại")
-                    .font(AppFont.beVietnamPro(18))
-                    .foregroundStyle(AppColor.payPlaceholder)
-            } else {
-                Text(vm.phone)
-                    .font(AppFont.beVietnamPro(18, .medium))
-                    .foregroundStyle(AppColor.payInk)
-                // Caret nháy ngay sau số cuối, dùng chung nhịp với `PinDotsField`.
-                if focused {
-                    Rectangle()
-                        .fill(AppColor.brand)
-                        .frame(width: 2, height: 24)
-                        .opacity(caretVisible ? 1 : 0)
-                        .padding(.leading, 2)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-        .background(hasError ? AppColor.errorSoft : Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(hasError ? AppColor.error : AppColor.payInputBorder, lineWidth: 1)
-        }
-        .inputShadow()
-        .contentShape(Rectangle())
-        .onTapGesture { focusedField = .phone }
+        KeypadTextField(
+            text: vm.phone,
+            placeholder: "Nhập số điện thoại",
+            hasError: vm.errors["phone"] != nil,
+            isFocused: focusedField == .phone,
+            onTap: { focusedField = .phone }
+        )
     }
 
     // MARK: - Nhập bằng bàn phím tự vẽ

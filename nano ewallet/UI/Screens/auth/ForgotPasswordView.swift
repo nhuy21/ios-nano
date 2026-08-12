@@ -18,7 +18,9 @@ struct ForgotPasswordView: View {
     let onBackToLogin: () -> Void
 
     @StateObject private var vm = ForgotPasswordViewModel()
-    @FocusState private var focusedField: Field?
+    /// `@State` chứ không `@FocusState`: các ô dùng bàn phím TỰ VẼ nên không có `TextField`
+    /// thật nào để focus — biến này thuần là "ô nào đang nhận phím", `nil` = ẩn bàn phím.
+    @State private var focusedField: Field?
 
     private enum Field: Hashable { case phone, otp, newPassword, confirm }
 
@@ -66,7 +68,22 @@ struct ForgotPasswordView: View {
                 }
                 .padding(.horizontal, 24)
             }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
+            // Bàn phím tự vẽ thay chỗ dải chừa 24pt khi có ô đang nhập. Bản KHÔNG có phím
+            // "000": cả 4 ô đều là số đếm từng chữ (sĐT, mã OTP, mật khẩu), gõ tắt hàng
+            // nghìn là vô nghĩa.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let field = focusedField {
+                    PlainNumericKeypad(
+                        onDigit: { appendDigit($0, to: field) },
+                        onBackspace: { backspace(from: field) },
+                        onNext: { advance(from: field) },
+                        nextTitle: nextTitle(for: field),
+                        nextEnabled: canAdvance(from: field)
+                    )
+                } else {
+                    Color.clear.frame(height: 24)
+                }
+            }
             .screenBackground(Color.white)
             .scrollDismissesKeyboard(.interactively)
 
@@ -93,15 +110,10 @@ struct ForgotPasswordView: View {
         VStack(spacing: 0) {
             forgotField(
                 placeholder: "Số điện thoại",
-                text: $vm.phone,
-                keyboardType: .phonePad,
-                submitLabel: .done,
-                maxLength: 11,
+                text: vm.phone,
+                field: .phone,
                 error: vm.errors["phone"]
-            ) {
-                if !vm.codeSent { sendCode() }
-            }
-            .focused($focusedField, equals: .phone)
+            )
             .disabled(vm.codeSent)
             .opacity(vm.codeSent ? 0.6 : 1)
 
@@ -119,43 +131,28 @@ struct ForgotPasswordView: View {
 
                 forgotField(
                     placeholder: "Mã xác nhận (6 số)",
-                    text: $vm.otp,
-                    keyboardType: .numberPad,
-                    submitLabel: .next,
-                    maxLength: 6,
+                    text: vm.otp,
+                    field: .otp,
                     error: vm.errors["otp"]
-                ) {
-                    focusedField = .newPassword
-                }
-                .focused($focusedField, equals: .otp)
+                )
 
                 Spacer().frame(height: 12)
 
                 forgotField(
                     placeholder: "Mật khẩu mới (6 số)",
-                    text: $vm.newPassword,
-                    keyboardType: .numberPad,
-                    submitLabel: .next,
-                    maxLength: 6,
+                    text: vm.newPassword,
+                    field: .newPassword,
                     error: vm.errors["newPassword"]
-                ) {
-                    focusedField = .confirm
-                }
-                .focused($focusedField, equals: .newPassword)
+                )
 
                 Spacer().frame(height: 12)
 
                 forgotField(
                     placeholder: "Xác nhận mật khẩu mới",
-                    text: $vm.confirmPassword,
-                    keyboardType: .numberPad,
-                    submitLabel: .done,
-                    maxLength: 6,
+                    text: vm.confirmPassword,
+                    field: .confirm,
                     error: vm.errors["confirmPassword"]
-                ) {
-                    submitReset()
-                }
-                .focused($focusedField, equals: .confirm)
+                )
 
                 if let submitError = vm.errors["submit"] {
                     FieldError(message: submitError)
@@ -222,31 +219,93 @@ struct ForgotPasswordView: View {
 
     // MARK: - Field riêng của màn này (placeholder canh giữa, không có label riêng)
 
+    /// Cả 4 ô của màn này đều là số nên dùng chung ô bàn phím tự vẽ. `field` thay cho
+    /// `.focused(...)` trước đây — tiêu điểm giờ do `focusedField` giữ.
     @ViewBuilder
     private func forgotField(
         placeholder: String,
-        text: Binding<String>,
-        keyboardType: UIKeyboardType,
-        submitLabel: SubmitLabel,
-        maxLength: Int,
-        error: String?,
-        onSubmit: @escaping () -> Void
+        text: String,
+        field: Field,
+        error: String?
     ) -> some View {
         VStack(spacing: 0) {
-            AppTextField(
+            KeypadTextField(
                 text: text,
                 placeholder: placeholder,
-                keyboardType: keyboardType,
-                submitLabel: submitLabel,
                 hasError: error != nil,
                 textAlignment: .center,
-                maxLength: maxLength,
-                digitsOnly: keyboardType == .numberPad || keyboardType == .phonePad,
-                onSubmit: onSubmit
+                isFocused: focusedField == field,
+                onTap: { focusedField = field }
             )
             if let error {
                 FieldError(message: error)
             }
+        }
+    }
+
+    // MARK: - Nhập bằng bàn phím tự vẽ
+
+    /// Độ dài tối đa từng ô, đúng bằng `maxLength` của bản `AppTextField` trước đây.
+    private func maxLength(of field: Field) -> Int {
+        switch field {
+        case .phone: return 11
+        case .otp, .newPassword, .confirm: return 6
+        }
+    }
+
+    private func binding(for field: Field) -> String {
+        switch field {
+        case .phone: return vm.phone
+        case .otp: return vm.otp
+        case .newPassword: return vm.newPassword
+        case .confirm: return vm.confirmPassword
+        }
+    }
+
+    private func setValue(_ value: String, for field: Field) {
+        switch field {
+        case .phone: vm.phone = value
+        case .otp: vm.otp = value
+        case .newPassword: vm.newPassword = value
+        case .confirm: vm.confirmPassword = value
+        }
+    }
+
+    private func appendDigit(_ digit: String, to field: Field) {
+        let next = binding(for: field) + digit
+        setValue(String(next.prefix(maxLength(of: field))), for: field)
+    }
+
+    private func backspace(from field: Field) {
+        var current = binding(for: field)
+        guard !current.isEmpty else { return }
+        current.removeLast()
+        setValue(current, for: field)
+    }
+
+    /// Phím hành động: nhảy sang ô kế, ô cuối thì chạy luôn hành động của bước đó.
+    private func advance(from field: Field) {
+        switch field {
+        case .phone:
+            focusedField = nil
+            if !vm.codeSent { sendCode() }
+        case .otp: focusedField = .newPassword
+        case .newPassword: focusedField = .confirm
+        case .confirm:
+            focusedField = nil
+            submitReset()
+        }
+    }
+
+    private func canAdvance(from field: Field) -> Bool {
+        !binding(for: field).isEmpty
+    }
+
+    private func nextTitle(for field: Field) -> String {
+        switch field {
+        case .phone: return "Gửi mã"
+        case .otp, .newPassword: return "Tiếp"
+        case .confirm: return "Xong"
         }
     }
 
