@@ -111,13 +111,7 @@ struct TransactionDetailView: View {
     ///     nối + đồng xu biến mất khỏi ảnh. Bản tĩnh vẽ thẳng vạch nối, không cần đo.
     ///   - showsSaveButton: `false` khi render — nút bấm không nên nằm trong biên lai gửi đi
     ///     (bản Android cũng đặt nút này ngoài vùng chụp).
-    ///   - showsStatusBadge: `false` khi render — huy hiệu trạng thái chỉ để người dùng xem
-    ///     trên màn, không đưa vào ảnh gửi cho người khác.
-    private func receiptBody(
-        animated: Bool,
-        showsSaveButton: Bool,
-        showsStatusBadge: Bool
-    ) -> some View {
+    private func receiptBody(animated: Bool, showsSaveButton: Bool) -> some View {
         VStack(spacing: 0) {
             Text("Tổng tiền")
                 .font(AppFont.beVietnamPro(14))
@@ -129,10 +123,8 @@ struct TransactionDetailView: View {
                 .foregroundStyle(TransactionDisplay.amountColor(for: tx))
                 .padding(.top, 6)
 
-            if showsStatusBadge {
-                statusBadge
-                    .padding(.top, 10)
-            }
+            statusBadge
+                .padding(.top, 10)
 
             TxPartyCard(
                 tx: tx,
@@ -166,7 +158,7 @@ struct TransactionDetailView: View {
     }
 
     private var receipt: some View {
-        receiptBody(animated: true, showsSaveButton: true, showsStatusBadge: true)
+        receiptBody(animated: true, showsSaveButton: true)
     }
 
     private var infoRows: some View {
@@ -328,7 +320,7 @@ struct TransactionDetailView: View {
             await Task.yield()
             defer { isRendering = false }
             let renderer = ImageRenderer(
-                content: receiptBody(animated: false, showsSaveButton: false, showsStatusBadge: false)
+                content: receiptBody(animated: false, showsSaveButton: false)
                     .frame(width: 360)
                     .padding(16)
                     .background(Color.white)
@@ -409,8 +401,7 @@ private struct TxPartyCard: View {
     let myWalletNumber: String?
     let dateText: String
     let timeText: String
-    /// `false` khi đang render ra ảnh — xem
-    /// `receiptBody(animated:showsSaveButton:showsStatusBadge:)`.
+    /// `false` khi đang render ra ảnh — xem `receiptBody(animated:showsSaveButton:)`.
     var animated: Bool = true
 
     /// Tâm hai vòng tròn, đo thật vì chiều cao hàng đổi theo cỡ chữ hệ thống và độ dài tên.
