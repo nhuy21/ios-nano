@@ -51,10 +51,18 @@ struct SettingsView: View {
     @StateObject private var appState = AppState.shared
     @StateObject private var authStore = AuthStore.shared
 
+    @StateObject private var walletStore = WalletStore.shared
+
     @State private var comingSoonFeature: String?
     @State private var isLoggingOut = false
     @State private var showLogoutConfirm = false
     @State private var showSupportDialog = false
+    // Huỷ liên kết ví: cảnh báo -> nhập mật khẩu (BE tự xác thực) -> gọi API -> về màn chọn ví.
+    @State private var showUnlinkConfirm = false
+    @State private var showUnlinkPin = false
+    @State private var unlinkPin = ""
+    @State private var unlinkError: String?
+    @State private var isUnlinking = false
 
     @State private var pushEnabled = NotificationPrefs.isEnabled
     @State private var speakOnReceiveEnabled = NotificationPrefs.speakOnReceiveEnabled
@@ -98,6 +106,30 @@ struct SettingsView: View {
         } message: {
             Text("Bạn có chắc muốn đăng xuất?")
         }
+        .alert("Huỷ liên kết ví Bảo Kim", isPresented: $showUnlinkConfirm) {
+            Button("Huỷ", role: .cancel) {}
+            Button("Tiếp tục", role: .destructive) {
+                unlinkPin = ""
+                unlinkError = nil
+                showUnlinkPin = true
+            }
+        } message: {
+            Text(
+                "Ví và số dư bên Bảo Kim vẫn giữ nguyên, bạn đăng nhập app Bảo Kim dùng bình " +
+                "thường. Sau khi huỷ, bạn cần liên kết lại (nhập OTP Bảo Kim) mới dùng được ví " +
+                "trong ứng dụng này."
+            )
+        }
+        .sheet(isPresented: $showUnlinkPin) {
+            UnlinkWalletSheet(
+                pin: $unlinkPin,
+                errorText: $unlinkError,
+                isSubmitting: isUnlinking,
+                onSubmit: { unlink(password: $0) },
+                onCancel: { if !isUnlinking { showUnlinkPin = false } }
+            )
+            .presentationDetents([.height(320)])
+        }
         .sheet(isPresented: $showSupportDialog) {
             SupportSheet(onDismiss: { showSupportDialog = false })
                 .presentationDetents([.height(320)])
@@ -129,6 +161,14 @@ struct SettingsView: View {
                     navMenuRow(title: "Bảo mật & Mật khẩu", systemImage: "lock.fill", route: .security)
                     divider
                     navMenuRow(title: "Ngưỡng xác thực PIN", systemImage: "slider.horizontal.3", route: .pinLimit)
+                    // Chỉ ví ĐỒNG BỘ từ ví Bảo Kim có sẵn mới huỷ liên kết được; ví mở mới qua
+                    // eKYC thì BE trả canUnlink=false -> ẩn hẳn, không hiện rồi bấm mới báo lỗi.
+                    if walletStore.canUnlink {
+                        divider
+                        menuRow(title: "Huỷ liên kết ví Bảo Kim", systemImage: "link.badge.plus") {
+                            showUnlinkConfirm = true
+                        }
+                    }
                 }
 
                 Spacer().frame(height: 18)
@@ -484,6 +524,26 @@ struct SettingsView: View {
         Task {
             await appState.logout()
             isLoggingOut = false
+        }
+    }
+
+    /// Huỷ liên kết ví: BE tự xác thực mật khẩu rồi dọn liên kết + đưa users.status về
+    /// KYC_PENDING. App dọn cache ví (số dư/số ví cũ không còn đúng) rồi điều hướng về màn chọn
+    /// phương thức mở ví — người dùng VẪN đăng nhập, chỉ là chưa có ví.
+    private func unlink(password: String) {
+        guard !isUnlinking else { return }
+        isUnlinking = true
+        unlinkError = nil
+        Task {
+            defer { isUnlinking = false }
+            do {
+                try await WalletService.unlinkWallet(password: password)
+                WalletStore.shared.clear()
+                showUnlinkPin = false
+                appState.route(status: UserStatus.kycPending.rawValue, phone: authStore.userPhone)
+            } catch {
+                unlinkError = (error as? APIError)?.message ?? "Huỷ liên kết thất bại, vui lòng thử lại"
+            }
         }
     }
 

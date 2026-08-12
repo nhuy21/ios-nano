@@ -30,6 +30,11 @@ final class WalletStore: ObservableObject {
     @Published private(set) var accName: String?
     @Published private(set) var limitPin: Int64?
     @Published private(set) var bankLinkedAt: String?
+    /// Ví đồng bộ từ ví Bảo Kim CÓ SẴN -> cho huỷ liên kết (màn Cài đặt). Ví mở mới qua eKYC thì
+    /// `false`. KHÔNG persist xuống đĩa như các field khác: đây là cờ điều khiển hiển thị một nút
+    /// nhạy cảm, đọc nhầm giá trị cũ (vd vừa liên kết lại kiểu khác) sẽ hiện sai — để mặc định
+    /// `false` cho tới khi `refresh()` lấy được giá trị thật từ server.
+    @Published private(set) var canUnlink = false
 
     private var isLoading = false
 
@@ -63,6 +68,7 @@ final class WalletStore: ObservableObject {
             accName = wallet.accName
             limitPin = wallet.limitPinAmount ?? Self.defaultLimitPin
             bankLinkedAt = wallet.bankLinkedAt
+            canUnlink = wallet.canUnlink ?? false
             persist()
         } catch {
             // Lỗi mạng: giữ nguyên cache đang có. Chưa từng có gì (lần đầu mở app mất
@@ -114,6 +120,7 @@ final class WalletStore: ObservableObject {
         accName = nil
         limitPin = nil
         bankLinkedAt = nil
+        canUnlink = false
         Key.allCases.forEach { UserDefaults.standard.removeObject(forKey: $0.rawValue) }
     }
 

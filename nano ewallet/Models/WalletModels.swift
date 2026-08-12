@@ -22,6 +22,10 @@ struct WalletInfo: Decodable {
     let accNo: String?
     let accName: String?
     let bankLinkedAt: String?
+    /// `true` = ví ĐỒNG BỘ từ ví Bảo Kim có sẵn -> cho huỷ liên kết. `false` = ví mở mới qua eKYC
+    /// (BE cũng từ chối huỷ). Mặc định `false` để bản BE cũ chưa trả field này thì app ẩn nút —
+    /// an toàn hơn là hiện rồi bấm vào mới báo lỗi.
+    let canUnlink: Bool?
 
     /// `cachedBalance` ép về Int64 để tính toán/hiển thị. `nil` nếu BE trả chuỗi bất thường.
     var balance: Int64? { Int64(cachedBalance) }
