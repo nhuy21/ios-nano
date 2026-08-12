@@ -115,15 +115,37 @@ extension UIApplication {
     /// bù lại khoảng đó cho nội dung — lúc ấy không còn cách nào lấy được số này từ layout.
     /// Đọc từ window thật chứ không ghim hằng số: tai thỏ, Dynamic Island và máy không tai
     /// mỗi loại một chiều cao khác nhau. `UIScreen.main` đã bị khai tử từ iOS 26 nên đi qua
-    /// scene; không tìm được scene nào thì lấy 47pt (Dynamic Island) làm mức đoán.
+    /// scene.
+    ///
+    /// Quét MỌI window của mọi scene rồi lấy số lớn nhất, thay vì chỉ hỏi key window: lúc
+    /// `body` dựng lần đầu, key window có thể chưa layout xong và trả 0. Số 0 đó lọt qua mọi
+    /// `??` (nó không phải `nil`) nên vùng bù cao 0pt và header đè thẳng lên tai thỏ — chỉ
+    /// hiện trên một số máy vì thứ tự dựng window không giống nhau giữa các đời.
+    ///
+    /// Không còn window nào cho số dương thì đoán theo chiều cao màn: 47pt cho Dynamic
+    /// Island, 44pt cho tai thỏ. Đoán 47 cho máy tai thỏ là dôi 3pt, nhìn ra ngay.
     var topSafeAreaInset: CGFloat {
-        let scene = connectedScenes
+        let measured = connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }
-            ?? connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let inset = scene?.windows.first { $0.isKeyWindow }?.safeAreaInsets.top
-            ?? scene?.windows.first?.safeAreaInsets.top
-        return inset ?? 47
+            .flatMap(\.windows)
+            .map(\.safeAreaInsets.top)
+            .max() ?? 0
+        if measured > 0 { return measured }
+
+        // Máy có tai thỏ/Dynamic Island đều cao >= 812pt; nhỏ hơn là máy có nút Home,
+        // status bar 20pt. Lấy chiều cao từ window (không dùng `UIScreen.main` lẫn
+        // `UIWindowScene.screen` — cả hai đều đã bị khai tử ở iOS 26).
+        let height = connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .map(\.bounds.height)
+            .max() ?? 0
+        switch height {
+        case 0: return 47          // chưa có window nào — đoán đời mới
+        case ..<812: return 20     // nút Home
+        case ..<845: return 44     // X / XS / 11 Pro / 12 mini / 13 mini
+        default: return 47         // Dynamic Island và các đời sau
+        }
     }
 }
 
