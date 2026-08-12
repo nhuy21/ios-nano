@@ -44,3 +44,29 @@ struct CreateBeneficiaryRequest: Encodable {
 struct UpdateBeneficiaryRequest: Encodable {
     let nickname: String?
 }
+
+/// Số điện thoại gửi đi để đối chiếu. Tối đa 200 số mỗi lượt (BE khai `ArrayMaxSize`).
+///
+/// `description` ghi đè để log KHÔNG BAO GIỜ in ra số điện thoại — đây là dữ liệu của người
+/// thứ ba, họ không đồng ý gì với app này.
+struct MatchContactsRequest: Encodable, CustomStringConvertible {
+    let phones: [String]
+
+    var description: String { "MatchContactsRequest(\(phones.count) số)" }
+}
+
+/// Một người trong danh bạ máy đang có ví nano hoạt động.
+///
+/// `description` ghi đè vì lý do y hệt `MatchContactsRequest`.
+struct MatchedFriend: Decodable, Identifiable, CustomStringConvertible {
+    /// Dạng `0xxxxxxxxx` — BE đã chuẩn hoá.
+    let phone: String
+    /// Tên chủ ví theo hồ sơ nano (không phải tên trong danh bạ máy).
+    let accName: String
+    /// Số ví, dùng để chuyển tiền.
+    let benUsername: String
+
+    var id: String { benUsername }
+
+    var description: String { "MatchedFriend(\(benUsername))" }
+}

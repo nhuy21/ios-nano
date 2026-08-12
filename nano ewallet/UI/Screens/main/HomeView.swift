@@ -294,7 +294,13 @@ struct HomeView: View {
                 },
                 onPickForRequest: { name, bkUsername in
                     path.append(.conversation(otherName: name, otherBkUsername: bkUsername))
-                }
+                },
+                onFindFriends: { path.append(.findFriends) }
+            )
+        case .findFriends:
+            FindFriendsView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onTransfer: { draft in path.append(.walletTransferAmount(draft)) }
             )
         case .bankTransfer(let draft):
             BankTransferView(

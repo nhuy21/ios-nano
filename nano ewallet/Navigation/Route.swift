@@ -39,6 +39,9 @@ enum HomeRoute: Hashable {
     /// `filter != nil`: mở từ một luồng chuyển tiền cụ thể — khoá cứng đúng loại đó, vì
     /// chọn nhầm loại người nhận sẽ đưa vào màn chuyển tiền sai.
     case contacts(filter: BeneficiaryType?)
+    /// "Tìm bạn trong danh bạ" — đối chiếu số điện thoại trong danh bạ máy với người đã dùng
+    /// nano. Màn riêng vì phải xin quyền đọc danh bạ, không nhét chung vào màn Danh bạ.
+    case findFriends
     /// Hộp thư thông báo — mirror NotificationScreen.kt.
     case notifications
     /// Nút "Liên kết" trên balance card — Android mở thẳng màn ngân hàng liên kết
