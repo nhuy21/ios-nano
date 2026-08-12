@@ -111,7 +111,7 @@ struct QrScanView: View {
         // `.background(...ignoresSafeArea())` — thiếu bước ép giãn thì nền không có gì để
         // tràn ra, vẫn hở hai dải sáng ở status bar / home indicator.
         .screenBackground(Color.black, alignment: .center)
-        .fullScreenCover(item: $choiceList) { pick in
+        .instantOverlayCover(item: $choiceList) { pick in
             ActionChooserSheet(
                 title: pick.title,
                 subtitle: "Chọn tài khoản bạn muốn chuyển tới",
@@ -137,7 +137,6 @@ struct QrScanView: View {
                     scanner.resumeScanning()
                 }
             )
-            .transparentSheetBackground()
         }
         .task {
             await scanner.requestPermissionAndStart()
@@ -562,7 +561,9 @@ struct QrScanView: View {
         case .wallet(let draft):
             onWalletRecipient(draft)
         case .choose(let title, let options):
-            choiceList = OneTouchChoiceList(title: title, options: options)
+            withoutPresentationAnimation {
+                choiceList = OneTouchChoiceList(title: title, options: options)
+            }
         case .failure(let message):
             errorMessage = message
             // Cho phép quét lại mã vừa thất bại — cả state ở view (lastHandledValue) lẫn cờ

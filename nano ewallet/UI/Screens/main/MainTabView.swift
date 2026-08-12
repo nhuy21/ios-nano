@@ -165,7 +165,7 @@ struct MainTabView: View {
         // Che Home trong lúc bóc tách: nhận diện QR/OCR + gọi API mất vài giây, không che thì
         // người dùng thấy Home hiện ra rồi bị đẩy sang màn chuyển tiền, nhìn như app tự nhảy.
         .overlay { if isResolvingSharedImage { OneTouchWaitingOverlay(message: sharedImageStage) } }
-        .fullScreenCover(item: $sharedImageChoice) { pick in
+        .instantOverlayCover(item: $sharedImageChoice) { pick in
             ActionChooserSheet(
                 title: pick.title,
                 subtitle: "Chọn tài khoản bạn muốn chuyển tới",
@@ -179,7 +179,6 @@ struct MainTabView: View {
                 },
                 onDismiss: { sharedImageChoice = nil }
             )
-            .transparentSheetBackground()
         }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
         // ngân hàng" — mirror Shortcuts.ACTION_WALLET_TRANSFER/nhánh ngân hàng bên Android.
@@ -255,7 +254,9 @@ struct MainTabView: View {
         case .wallet(let draft):
             openOnHome(.walletTransferAmount(draft))
         case .choose(let title, let options):
-            sharedImageChoice = OneTouchChoiceList(title: title, options: options)
+            withoutPresentationAnimation {
+                sharedImageChoice = OneTouchChoiceList(title: title, options: options)
+            }
         case .failure(let message):
             payLinkError = message
         }

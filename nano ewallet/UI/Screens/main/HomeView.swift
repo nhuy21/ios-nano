@@ -77,7 +77,7 @@ struct HomeView: View {
         // Deep link (pay link / push xin tiền) KHÔNG quan sát ở đây — xem MainTabView.
         // Dialog tuỳ biến (không dùng confirmationDialog) để giữ icon + dòng mô tả
         // như Android — menu hệ thống chỉ hiện được mỗi tiêu đề nút.
-        .fullScreenCover(isPresented: $showTopupWithdrawChooser) {
+        .instantOverlayCover(isPresented: $showTopupWithdrawChooser) {
             ActionChooserSheet(
                 title: "Nạp/Rút ví",
                 subtitle: "Chọn thao tác",
@@ -91,10 +91,14 @@ struct HomeView: View {
                         // bấm vào chỉ thấy hộp chọn biến mất chứ không có gì hiện lên.
                         // Các mục còn lại không cần vì `path.append` là đẩy màn, không
                         // phải trình bày lớp phủ.
+                        //
+                        // 120ms chứ không phải 350ms như trước: từ khi lớp phủ bỏ animation
+                        // trượt thì việc đóng gần như tức thời, chờ nguyên 350ms sẽ thành
+                        // một quãng đơ thấy rõ giữa hai hộp.
                         handler: {
                             Task {
-                                try? await Task.sleep(nanoseconds: 350_000_000)
-                                showQuickTopUp = true
+                                try? await Task.sleep(nanoseconds: 120_000_000)
+                                withoutPresentationAnimation { showQuickTopUp = true }
                             }
                         }
                     ),
@@ -113,19 +117,17 @@ struct HomeView: View {
                 ],
                 onDismiss: { showTopupWithdrawChooser = false }
             )
-            .transparentSheetBackground()
         }
-        .fullScreenCover(isPresented: $showQuickTopUp) {
+        .instantOverlayCover(isPresented: $showQuickTopUp) {
             QuickTopUpSheet(
                 onDismiss: { showQuickTopUp = false },
                 onOpenedBankApp: {
                     DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
                 }
             )
-            .transparentSheetBackground()
         }
         // OneTouch — chọn nguồn nội dung, mirror dialog PasteSourceRow bên Kotlin.
-        .fullScreenCover(isPresented: $showOneTouchChooser) {
+        .instantOverlayCover(isPresented: $showOneTouchChooser) {
             ActionChooserSheet(
                 title: "OneTouch",
                 subtitle: "Chọn nguồn nội dung chuyển khoản",
@@ -153,7 +155,6 @@ struct HomeView: View {
                 ],
                 onDismiss: { showOneTouchChooser = false }
             )
-            .transparentSheetBackground()
         }
         .photosPicker(isPresented: $showOneTouchPhotoPicker, selection: $oneTouchPhoto, matching: .images)
         .onChangeNewCompat(of: oneTouchPhoto) { item in
@@ -742,7 +743,7 @@ struct HomeView: View {
             // có hai cách khác hẳn nhau (mở app ngân hàng điền sẵn / tự quét QR), nhảy
             // thẳng vào một cách là giấu mất cách còn lại — mà đây lại là nút nạp tiền dễ
             // thấy nhất trên Trang chủ.
-            showTopupWithdrawChooser = true
+            withoutPresentationAnimation { showTopupWithdrawChooser = true }
         } label: {
             // Cỡ chữ/icon lấy đúng theo Kotlin: tiêu đề 16 bold, phụ đề 13, icon 20,
             // mũi tên 22 — trước đây iOS để 13/11/16/13 nên cụm này nhỏ và mỏng hơn hẳn.
@@ -863,9 +864,9 @@ struct HomeView: View {
                         case .transferArrows:
                             path.append(.walletTransfer(draft: nil))
                         case .walletTopup:
-                            showTopupWithdrawChooser = true
+                            withoutPresentationAnimation { showTopupWithdrawChooser = true }
                         case .pasteCk:
-                            showOneTouchChooser = true
+                            withoutPresentationAnimation { showOneTouchChooser = true }
                         default:
                             comingSoonFeature = service.title
                         }

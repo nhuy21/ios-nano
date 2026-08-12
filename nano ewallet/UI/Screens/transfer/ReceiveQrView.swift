@@ -98,14 +98,13 @@ struct ReceiveQrView: View {
         // navigation bar hệ thống (dù ẩn UI) vẫn chừa khoảng trên, khiến `brandBackground`
         // dù đã `.ignoresSafeArea()` cũng không tràn hết lên được status bar.
         .hidesSystemNavigationBar()
-        .fullScreenCover(isPresented: $showQuickTopUp) {
+        .instantOverlayCover(isPresented: $showQuickTopUp) {
             QuickTopUpSheet(
                 onDismiss: { showQuickTopUp = false },
                 onOpenedBankApp: {
                     DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
                 }
             )
-            .transparentSheetBackground()
         }
         .task { await wallet.refresh() }
         // Dialog phủ TOÀN màn (nền tối riêng) thay vì sheet 240pt — sheet thấp vẫn để lộ
@@ -307,7 +306,7 @@ struct ReceiveQrView: View {
             .padding(.vertical, 8)
             .background(Color.white.opacity(0.18), in: Capsule())
             .contentShape(Capsule())
-            .pressable { showQuickTopUp = true }
+            .pressable { withoutPresentationAnimation { showQuickTopUp = true } }
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 10)
