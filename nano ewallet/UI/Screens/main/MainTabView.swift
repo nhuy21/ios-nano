@@ -112,11 +112,18 @@ struct MainTabView: View {
                     .tag(Tab.settings)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            // Vuốt quá trang đầu/cuối không nảy ra dải xám ở đáy. Mở CẢ `.top`: `TabView`
-            // clip từng trang theo bounds của nó, chỉ mở đáy thì nền của Home/Cá nhân bị
-            // chặn đúng mép trên safe area — hở dải trắng ở status bar (các màn ngoài
-            // TabView như Login không dính vì không bị clip như vậy).
-            .ignoresSafeArea(.container, edges: [.top, .bottom])
+            // CHỈ mở đáy, để vuốt quá trang đầu/cuối không nảy ra dải xám.
+            //
+            // KHÔNG mở `.top`: mở là mọi màn bên trong `TabView` mất safe area trên, header
+            // của Home (và của màn push từ Home, như QR nhận tiền) trèo lên đè đồng hồ/pin.
+            // Máy tai thỏ lộ rõ nhất vì safe area trên mỏng hơn Dynamic Island.
+            //
+            // Vấn đề "hở dải trắng ở status bar" mà việc mở `.top` từng định chữa thì mỗi màn
+            // tự lo, và lo đúng hơn: `screenBackground` mở safe area CHỈ cho lớp nền, giữ nội
+            // dung trong vùng an toàn. Tab Cá nhân cần banner chạm đỉnh màn nên mở thêm cho
+            // nội dung ngay tại nó (`SettingsView.settingsContent`) rồi tự cộng bù chiều cao
+            // status bar vào banner — thứ mà mở ở đây, cho cả hai tab, không làm được.
+            .ignoresSafeArea(.container, edges: .bottom)
         }
         // Hộp chọn của Home/Cá nhân vẽ Ở ĐÂY chứ không trong màn phát ra chúng: thanh tab nổi
         // được xếp SAU nội dung trong `ZStack` của `page()`, nên `.overlay` gắn bên trong màn
