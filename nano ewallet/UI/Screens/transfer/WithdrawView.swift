@@ -55,7 +55,9 @@ struct WithdrawView: View {
     @State private var lastLookedUp: (bin: String, account: String, accType: Int)?
     @State private var showAllBanks = false
 
-    @FocusState private var isAmountFocused: Bool
+    /// Bàn phím số tự vẽ của ô SỐ TIỀN đang hiện hay không. Không phải `@FocusState` vì bàn
+    /// phím này là SwiftUI thuần — không có `TextField` nào để mà focus.
+    @State private var isAmountFocused = false
     @FocusState private var isAccountFocused: Bool
 
     private let idempotencyKey = TransferService.newIdempotencyKey()
@@ -105,10 +107,24 @@ struct WithdrawView: View {
                 .padding(16)
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
-            continueBar
+
+            // Bàn phím số tự vẽ thay cho nút "Xác nhận" rời — nút hành động nằm luôn trong
+            // bàn phím, giống màn chuyển ví. Bản CÓ phím "000" vì đây là ô nhập TIỀN.
+            if isAmountFocused {
+                NumericKeypad(
+                    onDigit: appendDigits,
+                    onBackspace: backspaceDigit,
+                    onNext: { Task { await submitWithdraw() } },
+                    nextTitle: "Xác nhận",
+                    nextEnabled: canContinue && !isSubmitting
+                )
+            } else {
+                continueBar
+            }
         }
         // Kotlin để nền TRẮNG cho màn này (khác các màn chuyển tiền dùng xám nhạt).
         .screenBackground(Color.white)
+        .dismissesCustomKeypadOnTap { isAmountFocused = false }
         .task {
             await wallet.refresh()
             _ = await bankCache.get()
@@ -381,16 +397,32 @@ struct WithdrawView: View {
             }
 
             HStack(spacing: 8) {
-                TextField("", text: $amountText, prompt: Text("Nhập số tiền")
-                    .font(AppFont.beVietnamPro(18))
-                    .foregroundColor(WdColor.muted))
-                    .font(AppFont.beVietnamPro(22, .bold))
-                    .foregroundStyle(WdColor.ink)
-                    .keyboardType(.numberPad)
-                    .tint(WdColor.green)
-                    .focused($isAmountFocused)
-                    .thousandsSeparated($amountText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Hiển thị thuần + con trỏ nháy tự vẽ, KHÔNG phải `TextField`: ô này dùng bàn
+                // phím số tự vẽ (có phím "000" để gõ tắt hàng nghìn) nên không được để bàn
+                // phím hệ thống bật lên đè lên nó.
+                HStack(spacing: 1) {
+                    if amountText.isEmpty {
+                        Text("Nhập số tiền")
+                            .font(AppFont.beVietnamPro(18))
+                            .foregroundStyle(WdColor.muted)
+                    } else {
+                        Text(Int(amount).vndGrouped)
+                            .font(AppFont.beVietnamPro(22, .bold))
+                            .foregroundStyle(WdColor.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    if isAmountFocused {
+                        BlinkingCaret(color: WdColor.ink, height: 22)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    KeypadDismissGuard.markHandled()
+                    isAmountFocused = true
+                }
 
                 Text("VNĐ")
                     .font(AppFont.beVietnamPro(16, .bold))
@@ -414,7 +446,59 @@ struct WithdrawView: View {
                     .font(AppFont.beVietnamPro(12))
                     .foregroundStyle(WdColor.error)
             }
+
+            amountSuggestionChips
         }
+    }
+
+    /// Gợi ý theo số ĐANG GÕ, đỡ phải gõ hết số 0 — sao đúng cách màn chuyển ví làm:
+    /// gõ "1" -> 1.000 / 10.000 / 100.000, gõ "15" -> 15.000 / 150.000 / 1.500.000.
+    private var amountSuggestions: [Int64] {
+        // Chưa gõ gì -> mệnh giá mặc định để chạm 1 phát là xong.
+        guard amount > 0 else { return [10_000, 100_000, 1_000_000] }
+        // Gõ quá 3 chữ số coi như đang nhập số tiền đầy đủ, không gợi ý nữa.
+        guard amount <= 999 else { return [] }
+        return [amount * 1_000, amount * 10_000, amount * 100_000]
+            .filter { $0 <= TransferLimits.faceFixed }
+    }
+
+    @ViewBuilder
+    private var amountSuggestionChips: some View {
+        if !amountSuggestions.isEmpty {
+            HStack(spacing: 8) {
+                ForEach(amountSuggestions, id: \.self) { value in
+                    Button {
+                        amountText = String(value)
+                    } label: {
+                        Text("\(Int(value).vndGrouped)đ")
+                            .font(AppFont.beVietnamPro(13, .bold))
+                            .foregroundStyle(WdColor.ink)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .overlay {
+                                Capsule().strokeBorder(WdColor.line, lineWidth: 1.5)
+                            }
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                }
+            }
+        }
+    }
+
+    // MARK: - Nhập số tiền (bàn phím tự vẽ)
+
+    private func appendDigits(_ digits: String) {
+        // Chặn số 0 dẫn đầu và giới hạn 9 chữ số, giống các màn nhập tiền khác.
+        let combined = amountText.isEmpty && digits.allSatisfy { $0 == "0" }
+            ? ""
+            : amountText + digits
+        amountText = String(combined.prefix(9))
+    }
+
+    private func backspaceDigit() {
+        guard !amountText.isEmpty else { return }
+        amountText.removeLast()
     }
 
 

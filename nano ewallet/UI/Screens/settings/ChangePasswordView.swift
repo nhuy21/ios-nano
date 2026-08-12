@@ -12,7 +12,9 @@ struct ChangePasswordView: View {
     let onBack: () -> Void
 
     @StateObject private var vm = ChangePasswordViewModel()
-    @FocusState private var focusedField: Field?
+    /// `@State` chứ không `@FocusState`: bốn ô đều dùng bàn phím TỰ VẼ nên không có
+    /// `TextField` thật nào để focus — biến này thuần là "ô nào đang nhận phím".
+    @State private var focusedField: Field?
 
     private enum Field: Hashable { case current, new, confirm, otp }
 
@@ -54,7 +56,21 @@ struct ChangePasswordView: View {
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
+        // Bàn phím số tự vẽ, bản KHÔNG có phím "000": mật khẩu và mã OTP là 6 chữ số rời,
+        // gõ tắt hàng nghìn là vô nghĩa.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let field = focusedField {
+                PlainNumericKeypad(
+                    onDigit: { appendDigit($0, to: field) },
+                    onBackspace: { backspace(from: field) },
+                    onNext: { advance(from: field) },
+                    nextTitle: field == .otp ? "Xác nhận" : "Tiếp",
+                    nextEnabled: value(of: field).count == Self.codeLength
+                )
+            }
+        }
         .screenBackground(Color(hex: 0xF7F8FA))
+        .dismissesCustomKeypadOnTap { focusedField = nil }
         .alert("Đổi mật khẩu thành công", isPresented: $vm.showSuccess) {
             Button("Xong") { onBack() }
         } message: {
@@ -69,11 +85,14 @@ struct ChangePasswordView: View {
                     value: $vm.currentPassword,
                     placeholder: "Nhập mật khẩu hiện tại",
                     hasError: vm.currentError != nil,
-                    submitLabel: .next
+                    submitLabel: .next,
+                    usesCustomKeypad: true,
+                    externalFocus: focusedField == .current,
+                    onTapWhenCustom: { focusedField = .current }
                 ) {
                     focusedField = .new
                 }
-                .focused($focusedField, equals: .current)
+
             }
 
             fieldBlock(label: "Mật khẩu mới", error: vm.newError) {
@@ -81,11 +100,14 @@ struct ChangePasswordView: View {
                     value: $vm.newPassword,
                     placeholder: "Nhập mật khẩu mới",
                     hasError: vm.newError != nil,
-                    submitLabel: .next
+                    submitLabel: .next,
+                    usesCustomKeypad: true,
+                    externalFocus: focusedField == .new,
+                    onTapWhenCustom: { focusedField = .new }
                 ) {
                     focusedField = .confirm
                 }
-                .focused($focusedField, equals: .new)
+
             }
 
             fieldBlock(label: "Xác nhận mật khẩu mới", error: vm.confirmError) {
@@ -93,11 +115,14 @@ struct ChangePasswordView: View {
                     value: $vm.confirmPassword,
                     placeholder: "Nhập lại mật khẩu mới",
                     hasError: vm.confirmError != nil,
-                    submitLabel: .done
+                    submitLabel: .done,
+                    usesCustomKeypad: true,
+                    externalFocus: focusedField == .confirm,
+                    onTapWhenCustom: { focusedField = .confirm }
                 ) {
                     Task { await vm.sendOtp() }
                 }
-                .focused($focusedField, equals: .confirm)
+
             }
         }
         .padding(16)
@@ -113,7 +138,10 @@ struct ChangePasswordView: View {
                 placeholder: "Nhập mã 6 số",
                 hasError: vm.otpError != nil,
                 dotsAlignment: .center,
-                submitLabel: .done
+                submitLabel: .done,
+                usesCustomKeypad: true,
+                externalFocus: focusedField == .otp,
+                onTapWhenCustom: { focusedField = .otp }
             ) {
                 Task { await vm.confirmChange() }
             }
@@ -146,6 +174,56 @@ struct ChangePasswordView: View {
             if let error {
                 FieldError(message: error, alignment: .leading)
             }
+        }
+    }
+
+    // MARK: - Nhập bằng bàn phím tự vẽ
+
+    /// Mật khẩu và OTP đều 6 chữ số, khớp `PinDotsField.maxLength`.
+    private static let codeLength = 6
+
+    private func value(of field: Field) -> String {
+        switch field {
+        case .current: return vm.currentPassword
+        case .new: return vm.newPassword
+        case .confirm: return vm.confirmPassword
+        case .otp: return vm.otp
+        }
+    }
+
+    private func setValue(_ newValue: String, for field: Field) {
+        switch field {
+        case .current: vm.currentPassword = newValue
+        case .new: vm.newPassword = newValue
+        case .confirm: vm.confirmPassword = newValue
+        case .otp: vm.otp = newValue
+        }
+    }
+
+    private func appendDigit(_ digit: String, to field: Field) {
+        let current = value(of: field)
+        guard current.count < Self.codeLength else { return }
+        setValue(current + digit, for: field)
+    }
+
+    private func backspace(from field: Field) {
+        var current = value(of: field)
+        guard !current.isEmpty else { return }
+        current.removeLast()
+        setValue(current, for: field)
+    }
+
+    /// Phím hành động: nhảy sang ô kế; ô cuối của mỗi bước thì chạy luôn việc của bước đó.
+    private func advance(from field: Field) {
+        switch field {
+        case .current: focusedField = .new
+        case .new: focusedField = .confirm
+        case .confirm:
+            focusedField = nil
+            Task { await vm.sendOtp() }
+        case .otp:
+            focusedField = nil
+            Task { await vm.confirmChange() }
         }
     }
 

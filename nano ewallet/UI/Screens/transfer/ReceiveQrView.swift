@@ -33,6 +33,11 @@ struct ReceiveQrView: View {
     @State private var shareTextItem: ShareableText?
     @State private var showQuickTopUp = false
 
+    /// Ô số tiền trong hai dialog dùng bàn phím số TỰ VẼ (có phím "000"), nên tiêu điểm chỉ
+    /// là cờ `@State` — không có `TextField` thật để mà `@FocusState`.
+    @State private var isAmountKeypadOpen = false
+    @State private var isPayLinkKeypadOpen = false
+
     private var qrContent: String? {
         guard let bin = wallet.vaBankNo, !bin.isEmpty,
               let number = wallet.vaNumber, !number.isEmpty else { return nil }
@@ -350,17 +355,71 @@ struct ReceiveQrView: View {
 
     // MARK: - Amount sheet
 
+    /// Ô số tiền hiển thị thuần cho hai dialog — KHÔNG phải `TextField`: chúng dùng bàn phím
+    /// số tự vẽ, để `TextField` được focus là iOS bật bàn phím hệ thống lên đè lên.
+    ///
+    /// Không có chips gợi ý ở đây (khác màn rút tiền / chuyển ví): hai dialog này chỉ gắn số
+    /// tiền vào QR hoặc link, không phải luồng chuyển tiền có mệnh giá quen thuộc.
+    private func keypadAmountField(
+        text: String,
+        isFocused: Bool,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 1) {
+            if text.isEmpty {
+                Text("0")
+                    .font(AppFont.beVietnamPro(18))
+                    .foregroundStyle(AppColor.payPlaceholder)
+            } else {
+                Text(Int(text.amountValue).vndGrouped)
+                    .font(AppFont.beVietnamPro(18, .medium))
+                    .foregroundStyle(AppColor.payInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            if isFocused {
+                BlinkingCaret(color: AppColor.payInk, height: 20)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+        }
+        .inputShadow()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            KeypadDismissGuard.markHandled()
+            onTap()
+        }
+    }
+
+    // MARK: - Nhập số tiền (bàn phím tự vẽ)
+
+    /// Chặn số 0 dẫn đầu và giới hạn 9 chữ số, giống các màn nhập tiền khác.
+    private func appendDigits(_ digits: String, to text: inout String) {
+        let combined = text.isEmpty && digits.allSatisfy { $0 == "0" } ? "" : text + digits
+        text = String(combined.prefix(9))
+    }
+
+    private func backspaceDigit(from text: inout String) {
+        guard !text.isEmpty else { return }
+        text.removeLast()
+    }
+
     private var amountSheet: some View {
         VStack(spacing: 16) {
             Text("Thêm số tiền vào mã QR")
                 .font(AppFont.beVietnamPro(16, .bold))
                 .foregroundStyle(AppColor.payInk)
 
-            AppTextField(
-                text: $amountInput, placeholder: "0",
-                keyboardType: .numberPad, submitLabel: .done
-            )
-            .thousandsSeparated($amountInput)
+            keypadAmountField(text: amountInput, isFocused: isAmountKeypadOpen) {
+                isAmountKeypadOpen = true
+            }
             .padding(.horizontal, 20)
 
             HStack(spacing: 12) {
@@ -410,8 +469,23 @@ struct ReceiveQrView: View {
         .background(
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
-                .onTapGesture { showAmountSheet = false }
-        )
+                .onTapGesture {
+                    // Bàn phím đang mở thì chạm nền chỉ cất bàn phím, chạm lần nữa mới
+                    // đóng dialog — như mọi ô nhập khác.
+                    if isAmountKeypadOpen { isAmountKeypadOpen = false } else { showAmountSheet = false }
+                }
+)
+        // Bàn phím số tự vẽ, bản CÓ phím "000" vì đây là ô nhập TIỀN.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isAmountKeypadOpen {
+                NumericKeypad(
+                    onDigit: { appendDigits($0, to: &amountInput) },
+                    onBackspace: { backspaceDigit(from: &amountInput) },
+                    onNext: { isAmountKeypadOpen = false },
+                    nextTitle: "Xong"
+                )
+            }
+        }
     }
 
 
@@ -431,11 +505,9 @@ struct ReceiveQrView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
 
-            AppTextField(
-                text: $payLinkAmountInput, placeholder: "0",
-                keyboardType: .numberPad, submitLabel: .done
-            )
-            .thousandsSeparated($payLinkAmountInput)
+            keypadAmountField(text: payLinkAmountInput, isFocused: isPayLinkKeypadOpen) {
+                isPayLinkKeypadOpen = true
+            }
             .padding(.horizontal, 20)
 
             if let payLinkError {
@@ -495,8 +567,23 @@ struct ReceiveQrView: View {
         .background(
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
-                .onTapGesture { showPayLinkSheet = false }
-        )
+                .onTapGesture {
+                    // Bàn phím đang mở thì chạm nền chỉ cất bàn phím, chạm lần nữa mới
+                    // đóng dialog — như mọi ô nhập khác.
+                    if isPayLinkKeypadOpen { isPayLinkKeypadOpen = false } else { showPayLinkSheet = false }
+                }
+)
+        // Bàn phím số tự vẽ, bản CÓ phím "000" vì đây là ô nhập TIỀN.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isPayLinkKeypadOpen {
+                NumericKeypad(
+                    onDigit: { appendDigits($0, to: &payLinkAmountInput) },
+                    onBackspace: { backspaceDigit(from: &payLinkAmountInput) },
+                    onNext: { isPayLinkKeypadOpen = false },
+                    nextTitle: "Xong"
+                )
+            }
+        }
     }
 
 

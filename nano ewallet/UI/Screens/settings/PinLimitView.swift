@@ -13,7 +13,9 @@ struct PinLimitView: View {
     let onBack: () -> Void
 
     @StateObject private var vm = PinLimitViewModel()
-    @FocusState private var otpFocused: Bool
+    /// `@State` chứ không `@FocusState`: ô OTP dùng bàn phím TỰ VẼ nên không có `TextField`
+    /// thật nào để focus.
+    @State private var otpFocused = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +46,24 @@ struct PinLimitView: View {
             }
             .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 24) }
         }
+        // Bàn phím số tự vẽ, bản KHÔNG có phím "000": mã OTP là 6 chữ số rời, gõ tắt hàng
+        // nghìn là vô nghĩa.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if otpFocused {
+                PlainNumericKeypad(
+                    onDigit: appendOtpDigit,
+                    onBackspace: backspaceOtpDigit,
+                    onNext: {
+                        otpFocused = false
+                        Task { await confirm() }
+                    },
+                    nextTitle: "Xác nhận",
+                    nextEnabled: vm.otp.count == 6
+                )
+            }
+        }
         .screenBackground(Color(hex: 0xF7F8FA))
+        .dismissesCustomKeypadOnTap { otpFocused = false }
     }
 
     private var explanationBox: some View {
@@ -181,11 +200,13 @@ struct PinLimitView: View {
                 placeholder: "Nhập mã 6 số",
                 hasError: vm.error != nil,
                 dotsAlignment: .center,
-                submitLabel: .done
+                submitLabel: .done,
+                usesCustomKeypad: true,
+                externalFocus: otpFocused,
+                onTapWhenCustom: { otpFocused = true }
             ) {
                 Task { await confirm() }
             }
-            .focused($otpFocused)
 
             if let error = vm.error {
                 FieldError(message: error)
@@ -214,6 +235,18 @@ struct PinLimitView: View {
             .buttonStyle(PressableButtonStyle())
             .disabled(vm.isLoading)
         }
+    }
+
+    // MARK: - Nhập OTP bằng bàn phím tự vẽ
+
+    private func appendOtpDigit(_ digit: String) {
+        guard vm.otp.count < 6 else { return }
+        vm.otp += digit
+    }
+
+    private func backspaceOtpDigit() {
+        guard !vm.otp.isEmpty else { return }
+        vm.otp.removeLast()
     }
 
     private func confirm() async {
