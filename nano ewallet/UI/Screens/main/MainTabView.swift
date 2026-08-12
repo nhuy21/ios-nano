@@ -116,20 +116,18 @@ struct MainTabView: View {
             // clip từng trang theo bounds của nó, chỉ mở đáy thì nền của Home/Cá nhân bị
             // chặn đúng mép trên safe area — hở dải trắng ở status bar (các màn ngoài
             // TabView như Login không dính vì không bị clip như vậy).
-            .ignoresSafeArea(.container, edges: [.top, .bottom])
-            // Mở safe area trên thì phải TRẢ LẠI vùng đó cho nội dung, nếu không header của
-            // mọi màn bên trong (Home và cả chục màn push từ nó) đè lên đồng hồ/pin.
+            // CHỈ mở đáy, KHÔNG mở đỉnh. Mở đỉnh thì nền từng trang tràn được lên status bar,
+            // nhưng `NavigationStack` của mỗi tab bọc `UINavigationController` mà UIKit không
+            // thấy modifier safe area của SwiftUI: trên iOS 16→18.x mọi màn trong stack nhận
+            // top inset = 0 và header đè lên đồng hồ (iOS 26 Apple đã sửa nên máy mới không
+            // thấy lỗi). Mọi cách bù lại đều lệ thuộc phiên bản — bù hằng số thì iOS 26 đẩy
+            // xuống gấp đôi, còn đo rồi bù thì có nguy cơ đo lại chính phần mình vừa thêm và
+            // sinh vòng layout (màn nháy liên tục).
             //
-            // KHÔNG trả ở đây bằng `safeAreaInset`: `NavigationStack` của mỗi tab bọc
-            // `UINavigationController`, mà UIKit không thấy modifier safe area của SwiftUI —
-            // trên iOS 16→18.x phần trả lại bị bỏ qua hoàn toàn và header vẫn đè lên đồng hồ
-            // (iOS 26 thì lại nhận, nên chỗ này còn che mất lỗi khi test máy mới).
-            //
-            // Việc bù chuyển vào TRONG từng `NavigationStack` bằng `fillsMissingTopSafeArea()`
-            // — nó đo phần còn thiếu nên đúng ở mọi phiên bản. Xem HomeView/SettingsView.
-            //
-            // Màn nào MUỐN tràn lên status bar (banner tab Cá nhân) thì tự
-            // `.ignoresSafeArea(edges: .top)` ở màn đó và tự bù — chỗ này không cản.
+            // Nên để hệ thống tự cấp safe area trên: không có gì để mất, không có gì để đo,
+            // đúng trên mọi phiên bản. Đổi lại nền của trang không tràn lên status bar được
+            // nữa (`TabView` clip từng trang) — dải trên sẽ là nền phía sau `TabView`.
+            .ignoresSafeArea(.container, edges: .bottom)
         }
         // Hộp chọn của Home/Cá nhân vẽ Ở ĐÂY chứ không trong màn phát ra chúng: thanh tab nổi
         // được xếp SAU nội dung trong `ZStack` của `page()`, nên `.overlay` gắn bên trong màn

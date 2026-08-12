@@ -67,15 +67,10 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            // `settingsContent` KHÔNG bù: nó tự `ignoresSafeArea(edges: .top)` rồi tự cộng
-            // `topSafeAreaInset` vào chiều cao banner (xem `profileHeader`) — bù thêm ở đây là
-            // cộng hai lần. Các màn con thì không tự lo nên phải bù, nếu không header của
-            // chúng đè lên đồng hồ trên iOS 16→18.x.
             settingsContent
                 .hidesSystemNavigationBar()
                 .navigationDestination(for: SettingsRoute.self) { route in
                     destination(for: route)
-                        .fillsMissingTopSafeArea()
                         .hidesSystemNavigationBar()
                 }
         }
@@ -96,12 +91,6 @@ struct SettingsView: View {
     private var settingsContent: some View {
         settingsScrollContent
         .screenBackground(SettingsColor.screenBg)
-        // Cho NỘI DUNG (không chỉ nền) tràn lên status bar, để banner chạm tới đỉnh màn.
-        // `screenBackground` chỉ mở safe area cho lớp nền phía sau, còn `.frame` của nó vẫn
-        // giữ nội dung trong vùng an toàn — nên đặt `.ignoresSafeArea` bên trong ScrollView
-        // là vô ích, phải đặt ở NGOÀI, sau `screenBackground`. Banner tự cộng bù chiều cao
-        // status bar (xem `profileHeader`) nên chữ và avatar không bị đôn lên dưới đồng hồ.
-        .ignoresSafeArea(edges: .top)
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
             Button("Huỷ", role: .cancel) {}
@@ -252,17 +241,15 @@ struct SettingsView: View {
         static let avatarRing: CGFloat = 4
     }
 
-    /// Banner tràn lên status bar + card trắng bo góc trên đè lên banner + avatar tròn đè
-    /// đúng đường nối banner/card. Avatar phải là SIBLING của card (không phải con) vì card
-    /// có `.clipShape` sẽ cắt mất nửa trên avatar — mirror đúng cảnh báo trong
-    /// `SettingsScreen.kt` (Box "avatar phải SIBLING, không phải con của ô trắng").
+    /// Banner + card trắng bo góc trên đè lên banner + avatar tròn đè đúng đường nối
+    /// banner/card. Avatar phải là SIBLING của card (không phải con) vì card có `.clipShape`
+    /// sẽ cắt mất nửa trên avatar — mirror đúng cảnh báo trong `SettingsScreen.kt`
+    /// (Box "avatar phải SIBLING, không phải con của ô trắng").
     private var profileHeader: some View {
-        // Chiều cao status bar — `ScrollView` đã bỏ qua safe area trên nên banner phải TỰ
-        // cộng phần này vào, nếu không avatar và tên sẽ bị đôn lên nằm ngay dưới đồng hồ.
-        // Đọc từ window thật thay vì hằng số cứng: tai thỏ, Dynamic Island và máy không tai
-        // mỗi loại một chiều cao khác nhau.
-        let topInset = UIApplication.shared.topSafeAreaInset
-        let bannerHeight = ProfileHeaderMetrics.bannerHeight + topInset
+        // KHÔNG cộng chiều cao status bar vào banner nữa: `MainTabView` đã trả safe area trên
+        // cho hệ thống lo (xem chú thích ở đó), nên `ScrollView` này bắt đầu ngay DƯỚI đồng hồ
+        // rồi. Cộng thêm là đẩy avatar và tên xuống thừa đúng một status bar.
+        let bannerHeight = ProfileHeaderMetrics.bannerHeight
 
         return ZStack(alignment: .top) {
             // `Color.clear` là view quyết định kích thước (tự co theo khung chứa, KHÔNG có

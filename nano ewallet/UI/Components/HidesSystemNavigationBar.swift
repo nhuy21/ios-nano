@@ -63,34 +63,6 @@ extension View {
         }
     }
 
-    /// Bù lại phần safe area TRÊN mà `NavigationStack` không thừa hưởng.
-    ///
-    /// `MainTabView` mở safe area trên cho cả `TabView` để nền từng màn tràn được lên status
-    /// bar. Nhưng `NavigationStack` bọc `UINavigationController`, mà UIKit KHÔNG thấy các
-    /// modifier safe area của SwiftUI: trên iOS 16→18.x nó báo cho màn bên trong top inset = 0
-    /// nên header trôi lên nằm dưới đồng hồ (đo được: cùng cấu trúc mà bỏ `NavigationStack` ra
-    /// thì đúng 44pt, để vào thì thành 0). Từ iOS 26 Apple sửa: nó báo đúng số thật.
-    ///
-    /// Nên KHÔNG cộng một hằng số — làm vậy thì iOS 26 bị đẩy xuống gấp đôi. Phải ĐO rồi bù
-    /// đúng phần còn thiếu. `GeometryReader` nằm NGOÀI phần bù nên nó không đo lại chính phần
-    /// mình vừa thêm, không có vòng lặp layout.
-    ///
-    /// Chỉ dùng cho màn NẰM TRONG `NavigationStack` của tab (Home và các màn push từ Home/Cá
-    /// nhân). Màn tự quản safe area trên như `SettingsView` gốc (banner tự cộng
-    /// `topSafeAreaInset`) thì KHÔNG dùng, sẽ cộng hai lần.
-    func fillsMissingTopSafeArea() -> some View {
-        GeometryReader { geo in
-            // `max(0, ...)`: iOS 26 đã báo đủ nên hiệu số ra 0 và không bù gì.
-            let missing = max(0, UIApplication.shared.topSafeAreaInset - geo.safeAreaInsets.top)
-            self.safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear.frame(height: missing)
-            }
-            // `GeometryReader` KHÔNG tự lấp khung nó đo (con bị dồn lên góc trên-trái), nên ép
-            // giãn hết để mọi màn vẫn chiếm trọn màn hình y như khi chưa bọc.
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
     /// Tô nền cho cả màn, tràn phủ luôn vùng safe area trên/dưới — dùng thay
     /// `.background(...)` ở modifier NGOÀI CÙNG của mỗi màn, để không hở dải trắng/xám của
     /// hệ thống ở status bar và home indicator.

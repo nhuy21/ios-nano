@@ -55,15 +55,9 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             homeContent
-                // Bù safe area trên NGAY TRONG stack: `MainTabView` mở safe area cho TabView
-                // nhưng `NavigationStack` (UIKit) không thừa hưởng phần bù đặt ở ngoài — xem
-                // `fillsMissingTopSafeArea()`. Nền vẫn tràn lên status bar như cũ vì
-                // `screenBackground` tự `ignoresSafeArea`.
-                .fillsMissingTopSafeArea()
                 .hidesSystemNavigationBar()
                 .navigationDestination(for: HomeRoute.self) { route in
                     destination(for: route)
-                        .fillsMissingTopSafeArea()
                         .hidesSystemNavigationBar()
                 }
         }
