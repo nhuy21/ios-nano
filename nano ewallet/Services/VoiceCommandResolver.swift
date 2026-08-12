@@ -83,6 +83,10 @@ enum VoiceCommandResolver {
         return (amount < 1_000 && !saidDong) ? amount * 1_000 : amount
     }
 
+    /// Điểm cộng cho contact khớp TÊN GỢI NHỚ. Đặt lớn hơn mọi độ dài từ có thể gặp để ưu
+    /// tiên là tuyệt đối — tên người Việt không có từ nào dài tới 1000 ký tự.
+    nonisolated private static let nicknameBonus = 1000
+
     /// Khớp người nhận theo TỪ (không phải chuỗi con) nên không nhầm "mẹ" với "mến".
     /// So cả tên gợi nhớ LẪN từng từ của tên thật: nói "Đức" khớp contact tên
     /// "Nguyen Van Duc" dù chưa đặt tên gợi nhớ.
@@ -101,28 +105,33 @@ enum VoiceCommandResolver {
         let spoken = Set(candidates.flatMap(words))
         guard !spoken.isEmpty else { return nil }
 
-        /// (khớp tên gợi nhớ chưa, độ dài từ khớp dài nhất) — so theo thứ tự này nên mọi
-        /// contact khớp tên gợi nhớ đều đứng trên nhóm chỉ khớp tên thật.
-        func score(_ contact: Beneficiary) -> (Bool, Int) {
+        /// 0 = không khớp. Khớp tên gợi nhớ được cộng `nicknameBonus` nên LUÔN đứng trên mọi
+        /// contact chỉ khớp tên thật, bất kể từ khớp bên kia dài bao nhiêu; phần dư bên dưới
+        /// vẫn là độ dài từ khớp nên trong cùng hạng thì tên riêng ("duc") thắng họ đệm
+        /// ("van", "nguyen").
+        ///
+        /// Gộp vào MỘT số thay vì tuple `(Bool, Int)`: Swift không cấp `<`/`>` cho tuple
+        /// (chỉ có `==`), viết `current > bestScore` là lỗi biên dịch.
+        func score(_ contact: Beneficiary) -> Int {
             func longestMatch(_ value: String?) -> Int {
                 guard let value else { return 0 }
                 return words(value).filter(spoken.contains).map(\.count).max() ?? 0
             }
             let byNickname = longestMatch(contact.nickname)
-            return (byNickname > 0, max(byNickname, longestMatch(contact.accName)))
+            let best = max(byNickname, longestMatch(contact.accName))
+            guard best > 0 else { return 0 }
+            return best + (byNickname > 0 ? nicknameBonus : 0)
         }
 
         var best: Beneficiary?
-        var bestScore = (false, 0)
+        var bestScore = 0
         for contact in contacts {
             let current = score(contact)
-            // Bỏ qua contact không khớp từ nào: `(false, 0)` cũng là giá trị khởi tạo, không
-            // chặn ở đây thì màn hình nói một câu vu vơ vẫn ra người nhận đầu danh sách.
-            guard current.1 > 0 else { continue }
-            if best == nil || current > bestScore {
-                bestScore = current
-                best = contact
-            }
+            // Bỏ qua contact không khớp từ nào — không chặn thì nói một câu vu vơ vẫn ra
+            // người nhận đầu danh sách.
+            guard current > bestScore else { continue }
+            bestScore = current
+            best = contact
         }
         return best
     }
