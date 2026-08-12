@@ -141,11 +141,36 @@ struct BankTransferView: View {
     private var recipientReady: Bool {
         recipientLocked || (selectedBin != nil && !accountNumber.isEmpty && !holderName.isEmpty)
     }
-    private var canContinue: Bool { amount > 0 && recipientReady }
+    /// Số tiền chuyển tối thiểu. Chặn ở đây thay vì để backend từ chối: người dùng gõ số rồi
+    /// bấm Tiếp tục, chờ một lượt gọi API mới biết là không được — mà lỗi từ server lại là
+    /// câu chung chung.
+    ///
+    /// LƯU Ý cho ai sửa sau: hiện KHÔNG có ngưỡng này ở backend, nên đây là chặn CHỈ Ở APP.
+    /// Các đường vào khác — trợ lý giọng nói, OneTouch điền sẵn, link nhận tiền — nếu không
+    /// đi qua màn này thì vẫn gửi được số nhỏ hơn. Muốn chắc thì phải đặt ở backend.
+    private static let minAmount: Int64 = 2_000
+
+    /// Chuyển được khi số tiền ĐẠT MỨC TỐI THIỂU và đã có người nhận. Phải chặn cả nút chứ
+    /// không chỉ hiện chữ đỏ: để nút bấm được thì cảnh báo thành ra trang trí, người dùng vẫn
+    /// đi tiếp rồi bị server từ chối bằng một câu chung chung.
+    private var canContinue: Bool { amount >= Self.minAmount && recipientReady }
+
+    /// Dưới mức tối thiểu. Chỉ tính khi ĐÃ gõ số: lúc ô còn trống thì chưa có gì sai, hiện
+    /// cảnh báo ngay là mắng người dùng trước khi họ kịp làm gì.
+    private var belowMin: Bool { amount > 0 && amount < Self.minAmount }
 
     private var overLimit: Bool {
         guard amount > 0, let balance = wallet.balance else { return false }
         return amount > balance
+    }
+
+    /// Ưu tiên cảnh báo TỐI THIỂU khi cả hai cùng đúng. Hai điều kiện này chồng nhau được: số
+    /// dư dưới 2.000đ thì gõ số nào cũng vừa dưới mức tối thiểu vừa vượt số dư. Lúc đó "Số
+    /// tiền tối thiểu" nói đúng việc phải làm hơn là "Vượt số dư".
+    private var amountWarning: String? {
+        if belowMin { return "Số tiền tối thiểu là \(Int(Self.minAmount).vndFormatted)" }
+        if overLimit { return "Vượt số dư" }
+        return nil
     }
 
     private var defaultContent: String {
@@ -174,7 +199,10 @@ struct BankTransferView: View {
     /// Gõ số ngắn (1-3 chữ số) -> gợi ý thêm số 0 thay vì phải gõ hết, mirror Kotlin.
     private var amountSuggestions: [Int64] {
         guard (1...999).contains(amount) else { return [] }
-        return [amount * 1_000, amount * 10_000, amount * 100_000].filter { $0 <= Self.maxAmount }
+        // Lọc CẢ HAI đầu: gợi ý dưới mức tối thiểu thì app tự đề xuất một số rồi tự chặn —
+        // gõ "1" sẽ gợi ý 1.000, mà 1.000 nay dưới ngưỡng, nhìn như app lỗi.
+        return [amount * 1_000, amount * 10_000, amount * 100_000]
+            .filter { $0 >= Self.minAmount && $0 <= Self.maxAmount }
     }
 
     private var bankSheetBinding: Binding<String?> {
@@ -601,11 +629,11 @@ struct BankTransferView: View {
                     .font(AppFont.beVietnamPro(13, .semibold))
                     .foregroundStyle(AppColor.payMuted)
                 Spacer()
-                if overLimit {
+                if let amountWarning {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 12))
-                        Text("Vượt số dư")
+                        Text(amountWarning)
                             .font(AppFont.beVietnamPro(12, .medium))
                     }
                     .foregroundStyle(AppColor.error)
