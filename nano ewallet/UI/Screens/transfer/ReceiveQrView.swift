@@ -100,7 +100,7 @@ struct ReceiveQrView: View {
         .hidesSystemNavigationBar()
         .instantOverlayCover(isPresented: $showQuickTopUp) {
             QuickTopUpSheet(
-                onDismiss: { showQuickTopUp = false },
+                onDismiss: { withoutPresentationAnimation { showQuickTopUp = false } },
                 onOpenedBankApp: {
                     DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
                 }

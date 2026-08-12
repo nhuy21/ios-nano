@@ -177,7 +177,7 @@ struct MainTabView: View {
                         handler: { openSharedChoice(choice) }
                     )
                 },
-                onDismiss: { sharedImageChoice = nil }
+                onDismiss: { withoutPresentationAnimation { sharedImageChoice = nil } }
             )
         }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản

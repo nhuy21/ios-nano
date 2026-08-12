@@ -115,12 +115,12 @@ struct HomeView: View {
                         handler: { path.append(.withdraw) }
                     ),
                 ],
-                onDismiss: { showTopupWithdrawChooser = false }
+                onDismiss: { withoutPresentationAnimation { showTopupWithdrawChooser = false } }
             )
         }
         .instantOverlayCover(isPresented: $showQuickTopUp) {
             QuickTopUpSheet(
-                onDismiss: { showQuickTopUp = false },
+                onDismiss: { withoutPresentationAnimation { showQuickTopUp = false } },
                 onOpenedBankApp: {
                     DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
                 }
@@ -153,7 +153,7 @@ struct HomeView: View {
                         handler: { showOneTouchPhotoPicker = true }
                     ),
                 ],
-                onDismiss: { showOneTouchChooser = false }
+                onDismiss: { withoutPresentationAnimation { showOneTouchChooser = false } }
             )
         }
         .photosPicker(isPresented: $showOneTouchPhotoPicker, selection: $oneTouchPhoto, matching: .images)

@@ -129,7 +129,7 @@ struct QrScanView: View {
                     )
                 },
                 onDismiss: {
-                    choiceList = nil
+                    withoutPresentationAnimation { choiceList = nil }
                     // Mở lại việc quét: bỏ qua hộp chọn mà không reset thì camera vẫn coi
                     // như đã xong việc và không xử lý frame nào nữa. Phải reset CẢ hai —
                     // state ở view lẫn cờ bên trong controller.
