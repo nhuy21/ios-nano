@@ -116,18 +116,16 @@ struct MainTabView: View {
             // clip từng trang theo bounds của nó, chỉ mở đáy thì nền của Home/Cá nhân bị
             // chặn đúng mép trên safe area — hở dải trắng ở status bar (các màn ngoài
             // TabView như Login không dính vì không bị clip như vậy).
-            // CHỈ mở đáy, KHÔNG mở đỉnh. Mở đỉnh thì nền từng trang tràn được lên status bar,
-            // nhưng `NavigationStack` của mỗi tab bọc `UINavigationController` mà UIKit không
-            // thấy modifier safe area của SwiftUI: trên iOS 16→18.x mọi màn trong stack nhận
-            // top inset = 0 và header đè lên đồng hồ (iOS 26 Apple đã sửa nên máy mới không
-            // thấy lỗi). Mọi cách bù lại đều lệ thuộc phiên bản — bù hằng số thì iOS 26 đẩy
-            // xuống gấp đôi, còn đo rồi bù thì có nguy cơ đo lại chính phần mình vừa thêm và
-            // sinh vòng layout (màn nháy liên tục).
+            // Mở CẢ đỉnh: `TabView` kiểu page KẸP từng trang vào vùng an toàn, nên không mở thì
+            // nền của màn KHÔNG THỂ tràn lên status bar bằng bất kỳ cách nào (đo trên iOS 16.0 và
+            // 26.5: bỏ `TabView` ra thì nền tràn, để vào thì không; `NavigationStack` vô can).
             //
-            // Nên để hệ thống tự cấp safe area trên: không có gì để mất, không có gì để đo,
-            // đúng trên mọi phiên bản. Đổi lại nền của trang không tràn lên status bar được
-            // nữa (`TabView` clip từng trang) — dải trên sẽ là nền phía sau `TabView`.
-            .ignoresSafeArea(.container, edges: .bottom)
+            // Hệ quả duy nhất: SwiftUI xoá safe area trên cho cả subtree, nên trên iOS 16→18.x
+            // `NavigationStack` báo top inset = 0 và header trôi lên dưới đồng hồ. Đó là việc của
+            // `restoresTopSafeArea()` — nó hỏi UIKit xem safe area có bị xoá thật không rồi mới
+            // bù, nên đúng ở mọi phiên bản và không sinh vòng layout. Xem
+            // `TopSafeAreaInNavigationStack.swift` và chỗ gọi ở HomeView/SettingsView.
+            .ignoresSafeArea(.container, edges: [.top, .bottom])
         }
         // Hộp chọn của Home/Cá nhân vẽ Ở ĐÂY chứ không trong màn phát ra chúng: thanh tab nổi
         // được xếp SAU nội dung trong `ZStack` của `page()`, nên `.overlay` gắn bên trong màn

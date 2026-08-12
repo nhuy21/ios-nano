@@ -55,9 +55,14 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             homeContent
+                // `MainTabView` mở safe area trên cho `TabView` (để nền màn tràn lên status
+                // bar được), nên phải trả lại phần đó cho nội dung — xem `restoresTopSafeArea`.
+                // Nền vẫn tràn vì `screenBackground` tự `ignoresSafeArea`.
+                .restoresTopSafeArea()
                 .hidesSystemNavigationBar()
                 .navigationDestination(for: HomeRoute.self) { route in
                     destination(for: route)
+                        .restoresTopSafeArea()
                         .hidesSystemNavigationBar()
                 }
         }
