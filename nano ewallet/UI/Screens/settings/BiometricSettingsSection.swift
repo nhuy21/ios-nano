@@ -237,8 +237,14 @@ struct BiometricSettingsSection: View {
             case .transfer:
                 let result = try await BiometricService.enableForTransfer(password: password)
                 transferEnabled = true
-                // Cooling-off: BE chặn xác thực bằng sinh trắc trong 24h đầu. Nói trước để người
-                // dùng không tưởng tính năng lỗi khi lần chuyển tiền đầu vẫn đòi mật khẩu.
+                // Cooling-off: BE chặn xác thực bằng sinh trắc một khoảng sau khi bật. Nói
+                // trước để người dùng không tưởng tính năng lỗi khi lần chuyển tiền đầu vẫn
+                // đòi mật khẩu.
+                //
+                // `register` trả về MỐC hết cooling-off chứ không phải cờ bật/tắt, nên phải
+                // tự kiểm mốc đó còn ở TƯƠNG LAI không: gán thẳng thì khi BE tắt cooling-off
+                // (`COOLING_OFF_MS = 0`, mốc = đúng lúc đăng ký nên đã ở quá khứ) app vẫn báo
+                // "phải chờ" dù giao dịch ký được ngay.
                 infoMessage = Self.coolingOffNote(until: result.coolingOffUntil, label: label)
             }
             password = ""
@@ -297,11 +303,26 @@ struct BiometricSettingsSection: View {
         }
     }
 
-    private static func coolingOffNote(until iso: String, label: String) -> String {
-        let base = "Vì mới bật, giao dịch trong 24 giờ đầu vẫn cần nhập mật khẩu."
-        guard let date = ISO8601DateFormatter.withFractionalSeconds.date(from: iso)
-            ?? ISO8601DateFormatter.standard.date(from: iso) else { return base }
+    /// Ghi chú cooling-off, hoặc `nil` khi mốc đã qua (BE tắt cooling-off) — lúc đó không có
+    /// gì để báo cả.
+    ///
+    /// KHÔNG viết cứng "24 giờ": khoảng chờ do backend quyết (`COOLING_OFF_MS`), app ghi cứng
+    /// một con số nó không kiểm soát thì đổi hằng bên kia là app nói sai.
+    private static func coolingOffNote(until iso: String, label: String) -> String? {
+        guard let date = parseIso(iso) else {
+            // Parse lỗi thì coi như KHÔNG còn chờ: nơi chặn thật là backend
+            // (`verify-transfer-biometric`), thà để nút sinh trắc hiện ra rồi backend từ chối,
+            // hơn là doạ người dùng phải chờ vì một chuỗi thời gian sai định dạng.
+            return nil
+        }
+        guard date > Date() else { return nil }
         let formatter = DateFormatter.app("HH:mm dd/MM")
-        return "\(base) \(label) dùng được cho mọi giao dịch từ \(formatter.string(from: date))."
+        return "Vì mới bật, giao dịch vẫn cần nhập mật khẩu tới \(formatter.string(from: date)). "
+            + "Sau đó \(label) dùng được cho mọi giao dịch."
+    }
+
+    private static func parseIso(_ iso: String) -> Date? {
+        ISO8601DateFormatter.withFractionalSeconds.date(from: iso)
+            ?? ISO8601DateFormatter.standard.date(from: iso)
     }
 }

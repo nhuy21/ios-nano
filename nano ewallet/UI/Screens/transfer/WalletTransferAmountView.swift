@@ -926,7 +926,7 @@ struct WalletTransferAmountView: View {
         } catch let error as BiometricKeyError {
             biometricError = error.localizedDescription
         } catch let error as APIError {
-            // 403 = BE nói "đừng quét lại nữa" (cooling-off 24h, thiết bị chưa đăng ký khoá,
+            // 403 = BE nói "đừng quét lại nữa" (còn cooling-off, thiết bị chưa đăng ký khoá,
             // sinh trắc bị khoá do thất bại nhiều lần). Chuyển thẳng sang mật khẩu thay vì để
             // người dùng bấm "Thử lại" mãi không được. Xem quy ước ở đầu `verifyTransfer` bên BE.
             // 400 và các lỗi khác: quét lại có thể được.

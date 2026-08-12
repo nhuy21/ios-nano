@@ -536,7 +536,7 @@ struct WithdrawView: View {
         } catch let error as BiometricKeyError {
             biometricError = error.localizedDescription
         } catch let error as APIError {
-            // 403 = không thể sửa bằng quét lại (cooling-off 24h, chưa đăng ký, bị khoá).
+            // 403 = không thể sửa bằng quét lại (còn cooling-off, chưa đăng ký, bị khoá).
             if case .server(let code, let message) = error, code == 403 {
                 useBiometric = false
                 pinError = message

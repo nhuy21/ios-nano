@@ -20,7 +20,10 @@ struct RegisterBiometricRequest: Encodable {
 
 struct RegisterBiometricResult: Decodable {
     let registeredAt: String
-    /// Trong 24h đầu sau khi đăng ký, giao dịch vẫn phải nhập mật khẩu (cooling-off).
+    /// MỐC hết cooling-off, không phải cờ bật/tắt: trong khoảng từ lúc đăng ký tới mốc này,
+    /// giao dịch vẫn phải nhập mật khẩu. Khoảng chờ do BE quyết (`COOLING_OFF_MS`) và hiện
+    /// đang là 0, tức mốc rơi vào quá khứ ngay khi đăng ký — nơi dùng phải kiểm mốc còn ở
+    /// tương lai không, chứ đừng cứ có mốc là báo "phải chờ".
     let coolingOffUntil: String
 }
 

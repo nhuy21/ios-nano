@@ -4,8 +4,9 @@
 //
 //  Mirror TransferScreen.kt (nhánh chuyển khoản ngân hàng) — MỘT màn gộp người
 //  nhận + số tiền + nội dung, thay cho 2 màn tách rời trước đây (chọn bank/STK rồi
-//  mới sang màn nhập tiền). Khác Kotlin ở chỗ: số tài khoản dùng bàn phím HỆ THỐNG
-//  (không phải bàn phím số tự vẽ) — chỉ ô số tiền mới dùng NumericKeypad tự vẽ.
+//  mới sang màn nhập tiền). Cả hai ô số đều dùng bàn phím TỰ VẼ, nhưng khác bản: số
+//  tài khoản dùng `PlainNumericKeypad` (không có phím "000" — số đếm từng chữ), số
+//  tiền dùng `NumericKeypad` (có "000" để gõ tắt hàng nghìn).
 //
 //  2 chế độ trên cùng màn (mirror `recipientLocked` bên Kotlin):
 //   - `initialDraft == nil`: nhập tay — chọn bank (mở sheet), gõ STK, tự tra tên.
@@ -58,8 +59,8 @@ struct BankTransferView: View {
     /// Dùng bàn phím tự vẽ thay bàn phím hệ thống để có phím "Tiếp" ngay trong bàn phím.
     @State private var isAccountFocused = false
 
-    /// Chỉ điều khiển bàn phím số tự vẽ của Ô SỐ TIỀN — số tài khoản dùng bàn
-    /// phím hệ thống qua `isAccountFocused` riêng, không dùng chung bàn phím này.
+    /// Chỉ điều khiển bàn phím số tự vẽ của Ô SỐ TIỀN — số tài khoản có bàn phím riêng qua
+    /// `isAccountFocused`, và là bản `Plain` không có phím "000".
     @State private var isAmountFocused = false
 
     @State private var amount: Int64
@@ -1124,7 +1125,7 @@ struct BankTransferView: View {
         } catch let error as BiometricKeyError {
             biometricError = error.localizedDescription
         } catch let error as APIError {
-            // 403 = BE nói "đừng quét lại nữa" (cooling-off 24h, chưa đăng ký khoá, bị khoá).
+            // 403 = BE nói "đừng quét lại nữa" (còn cooling-off, chưa đăng ký khoá, bị khoá).
             // 400 và lỗi khác: quét lại có thể được. Xem quy ước ở `verifyTransfer` bên BE.
             if case .server(let code, let message) = error, code == 403 {
                 useBiometric = false
