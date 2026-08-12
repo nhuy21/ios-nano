@@ -41,8 +41,6 @@ struct MainTabView: View {
     /// lúc đó sẽ không có chỗ nào để đẩy màn vào.
     @State private var homePath: [HomeRoute] = []
     @State private var payLinkError: String?
-    /// Màu dải status bar, do màn đang hiển thị khai qua `ScreenTopBackdropKey`.
-    @State private var topBackdrop: Color?
 
     private var payLinkErrorBinding: Binding<Bool> {
         Binding(get: { payLinkError != nil }, set: { if !$0 { payLinkError = nil } })
@@ -90,25 +88,6 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        ZStack {
-            // Dải nền tràn lên status bar. Vẽ Ở ĐÂY — phía sau `TabView` — vì trong tab thì
-            // vùng status bar không thuộc khung của trang nữa, nền của màn không với tới được.
-            // Màn tự khai màu qua `screenBackground`/`screenTopBackdrop`, nhờ vậy NỀN tràn mà
-            // NỘI DUNG vẫn giữ khoảng trống dưới đồng hồ. Xem `ScreenTopBackdropKey`.
-            //
-            // Phủ cả màn chứ không chỉ dải trên: các trang của `TabView` có nền riêng đè kín
-            // phần dưới, nên thực tế chỉ dải status bar là thấy lớp này.
-            (topBackdrop ?? Color.white)
-                .ignoresSafeArea()
-
-            tabs
-        }
-        .onPreferenceChange(ScreenTopBackdropKey.self) { color in
-            topBackdrop = color
-        }
-    }
-
-    private var tabs: some View {
         Group {
             // `TabView` kiểu page thay `switch`: cho vuốt ngang qua lại giữa 2 tab.
             //

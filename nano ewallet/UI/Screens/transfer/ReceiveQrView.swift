@@ -98,10 +98,6 @@ struct ReceiveQrView: View {
         // navigation bar hệ thống (dù ẩn UI) vẫn chừa khoảng trên, khiến `brandBackground`
         // dù đã `.ignoresSafeArea()` cũng không tràn hết lên được status bar.
         .hidesSystemNavigationBar()
-        // Nền là GRADIENT nên không đi qua `screenBackground` — phải tự khai màu ở mép TRÊN
-        // của gradient để `MainTabView` tô dải status bar cho khớp khi màn này được push từ
-        // Home (mở từ màn quét QR thì nằm ngoài tab, không cần). Xem `ScreenTopBackdropKey`.
-        .screenTopBackdrop(Color(hex: 0x00A85E))
         .instantOverlayCover(isPresented: $showQuickTopUp) {
             QuickTopUpSheet(
                 onDismiss: { showQuickTopUp = false },

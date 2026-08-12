@@ -76,10 +76,6 @@ extension View {
     func screenBackground(_ color: Color, alignment: Alignment = .top) -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .background(color.ignoresSafeArea())
-            // Báo màu này lên `MainTabView` để nó tô luôn dải status bar phía sau `TabView`.
-            // Trong tab, vùng status bar không thuộc khung của trang nên `ignoresSafeArea` ở
-            // trên chỉ với tới mép safe area — xem `ScreenTopBackdropKey`.
-            .screenTopBackdrop(color)
     }
 
     /// Chạm vào là nhún nhẹ rồi bật lại — phản hồi chung cho mọi thứ bấm được trong app.

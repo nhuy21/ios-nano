@@ -91,11 +91,6 @@ struct SettingsView: View {
     private var settingsContent: some View {
         settingsScrollContent
         .screenBackground(SettingsColor.screenBg)
-        // Đỉnh màn này là ẢNH banner, không phải màu nền — nên ghi đè màu mà `screenBackground`
-        // vừa khai (modifier ngoài thắng). `0x73BB36` là màu hàng trên cùng của `banner_home`,
-        // và banner cao 170pt nên tỉ lệ `.fill` giữ đúng hàng đó ở mép trên: dải status bar nối
-        // liền với banner. Xem `ScreenTopBackdropKey`.
-        .screenTopBackdrop(Color(hex: 0x73BB36))
         .comingSoonSheet(isPresented: showingComingSoon, feature: comingSoonFeature ?? "Tính năng")
         .alert("Đăng xuất", isPresented: $showLogoutConfirm) {
             Button("Huỷ", role: .cancel) {}
