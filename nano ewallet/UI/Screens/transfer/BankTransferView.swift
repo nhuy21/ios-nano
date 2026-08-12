@@ -828,7 +828,10 @@ struct BankTransferView: View {
                 // sang ô số tiền — trước đây phải chạm ra ngoài mới tra được.
                 //
                 // KHÔNG chèn số 0 dẫn đầu như ô tiền: số tài khoản có thể bắt đầu bằng 0.
-                NumericKeypad(
+                //
+                // Bản `Plain` (không có phím "000"): số tài khoản là số đếm từng chữ, gõ tắt
+                // hàng nghìn là sai. Ô SỐ TIỀN bên dưới vẫn dùng `NumericKeypad` có "000".
+                PlainNumericKeypad(
                     onDigit: pushAccountDigit,
                     onBackspace: backspaceAccountDigit,
                     onNext: {

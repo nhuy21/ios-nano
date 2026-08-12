@@ -270,7 +270,10 @@ struct WalletTransferAmountView: View {
                 // (`runVerifyIfNeeded` tự bật `isAmountFocused` khi tra ra tên).
                 //
                 // KHÔNG chặn số 0 dẫn đầu như ô tiền: số ví có thể bắt đầu bằng 0.
-                NumericKeypad(
+                //
+                // Bản `Plain` (không có phím "000"): số ví là số đếm từng chữ, gõ tắt hàng
+                // nghìn là sai. Ô SỐ TIỀN bên dưới vẫn dùng `NumericKeypad` có "000".
+                PlainNumericKeypad(
                     onDigit: pushUsernameDigit,
                     onBackspace: backspaceUsernameDigit,
                     onNext: {
