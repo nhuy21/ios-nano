@@ -33,6 +33,10 @@ struct QuickTopUpSheet: View {
     }
 
     @State private var step: Step = .pickBank
+    /// Bàn phím số có đang mở không. Mở SẴN khi vừa sang bước nhập tiền (việc đầu tiên và
+    /// duy nhất ở đó là gõ số), phím "Tiếp" đóng lại để thấy trọn nút "Mở app ngân hàng",
+    /// chạm lại ô tiền thì mở ra.
+    @State private var isAmountFocused = false
     @State private var amountText = ""
     @State private var errorMessage: String?
 
@@ -62,16 +66,19 @@ struct QuickTopUpSheet: View {
         // chuyển ví/chuyển khoản. Để bên trong thẻ thì nó bị thẻ kéo lên giữa màn và thụt vào
         // 28pt hai bên, trông như một khối trôi lơ lửng.
         //
-        // Hiện suốt bước nhập tiền, không cần bấm vào ô mới mở: cả bước này chỉ có mỗi việc
-        // nhập số.
+        // Phím hành động chỉ ĐÓNG bàn phím ("Tiếp"), không mở app ngân hàng: việc đó thuộc
+        // về nút trong thẻ. Hai chỗ cùng gọi một hành động thì người dùng không biết chỗ nào
+        // mới là bước cuối.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if case .amount = step {
+            if isAmountFocused {
                 NumericKeypad(
                     onDigit: appendDigits,
                     onBackspace: backspaceDigit,
-                    onNext: openBankApp,
-                    nextTitle: "Mở app ngân hàng",
-                    nextEnabled: canContinue
+                    onNext: { isAmountFocused = false },
+                    nextTitle: "Tiếp",
+                    // KHÔNG khoá theo số tiền: phím này chỉ đóng bàn phím, khoá nó thì người
+                    // dùng chưa gõ gì sẽ không có cách nào cất bàn phím đi.
+                    nextEnabled: true
                 )
             }
         }
@@ -135,6 +142,7 @@ struct QuickTopUpSheet: View {
         .pressable {
             errorMessage = nil
             step = .amount(appId: bank.appId)
+            isAmountFocused = true
         }
     }
 
@@ -168,8 +176,10 @@ struct QuickTopUpSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Self.brand, lineWidth: 1.5)
+                    .strokeBorder(isAmountFocused ? Self.brand : Color.clear, lineWidth: 1.5)
             }
+            .contentShape(Rectangle())
+            .pressable { isAmountFocused = true }
             .padding(.top, 16)
 
             if let errorMessage {
@@ -179,18 +189,32 @@ struct QuickTopUpSheet: View {
                     .padding(.top, 8)
             }
 
-            // Quay lại chọn bank khác. Phím hành động "Mở app ngân hàng" nằm trên bàn phím
-            // số nên ở đây chỉ cần đúng nút lùi này.
-            Button(action: backOrDismiss) {
+            Button(action: openBankApp) {
+                Text("Mở app ngân hàng")
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Self.brand.opacity(canContinue ? 1 : 0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(PressableButtonStyle())
+            .disabled(!canContinue)
+            .padding(.top, 16)
+
+            // Gọi `backToBankPicker` chứ KHÔNG `backOrDismiss`: hàm kia ưu tiên đóng bàn phím
+            // nên bấm lần đầu sẽ chỉ cất bàn phím, không khớp với nhãn nút.
+            Button(action: backToBankPicker) {
                 Text("Chọn ngân hàng khác")
                     .font(AppFont.beVietnamPro(14, .semibold))
                     .foregroundStyle(AppColor.payMuted)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 46)
+                    .frame(height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressableButtonStyle())
-            .padding(.top, 6)
+            .padding(.top, 4)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -215,14 +239,25 @@ struct QuickTopUpSheet: View {
         amountText.removeLast()
     }
 
-    /// Ở bước nhập tiền thì lùi về chọn bank; đang ở bước chọn bank rồi thì đóng hẳn.
+    /// Chạm ra ngoài: bàn phím đang mở thì đóng bàn phím trước (như mọi ô nhập liệu khác),
+    /// rồi mới tới lùi về chọn bank, cuối cùng mới đóng hẳn.
     private func backOrDismiss() {
         guard case .amount = step else {
             onDismiss()
             return
         }
+        if isAmountFocused {
+            isAmountFocused = false
+            return
+        }
+        backToBankPicker()
+    }
+
+    /// Lùi hẳn về bước chọn ngân hàng, bỏ số tiền đang gõ dở.
+    private func backToBankPicker() {
         amountText = ""
         errorMessage = nil
+        isAmountFocused = false
         step = .pickBank
     }
 
