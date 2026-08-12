@@ -182,6 +182,8 @@ struct QuickTopUpSheet: View {
             .pressable { isAmountFocused = true }
             .padding(.top, 16)
 
+            suggestionRow
+
             if let errorMessage {
                 Text(errorMessage)
                     .font(AppFont.beVietnamPro(12, .medium))
@@ -221,6 +223,77 @@ struct QuickTopUpSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Gợi ý số tiền
+
+    /// Số mức gợi ý hiện cùng lúc.
+    private static let suggestionCount = 4
+    /// Gợi ý luôn từ hàng nghìn trở lên — nạp ví vài trăm đồng là vô nghĩa.
+    private static let minSuggestion: Int64 = 1_000
+    /// Chưa gõ gì thì bày các mức nạp hay dùng.
+    private static let defaultSuggestions: [Int64] = [10_000, 20_000, 50_000, 100_000]
+
+    /// Trần số tiền, khớp giới hạn 9 chữ số của `appendDigits` — gợi ý vượt trần thì bấm vào
+    /// sẽ điền một số mà gõ tay không bao giờ nhập được.
+    private static let maxSuggestion: Int64 = 999_999_999
+
+    /// Gợi ý theo số ĐANG GÕ: nhân dần với 10 rồi bỏ các mức dưới 1.000, lấy 4 mức đầu.
+    ///
+    /// Gõ "25" -> 2.500 / 25.000 / 250.000 / 2.500.000 (bắt đầu từ ×100).
+    /// Gõ "5"  -> ×100 mới được 500, chưa đủ 4 chữ số nên bị bỏ, dãy thành
+    ///            5.000 / 50.000 / 500.000 / 5.000.000.
+    private var suggestions: [Int64] {
+        let typed = amountText.amountValue
+        guard typed > 0 else { return Self.defaultSuggestions }
+
+        var result: [Int64] = []
+        // Bắt đầu từ ×100 cho MỌI số, rồi mới lọc mức dưới 1.000. Nếu để ×10 làm mốc thì
+        // "100" ra 1.000 (đủ 1.000 ngay từ bước đầu) trong khi "25" ra 2.500 — cùng một
+        // thao tác gõ mà bậc nhảy khác nhau.
+        var value = typed * 100
+        // Trần 12 vòng: đủ để leo từ 1 lên hàng nghìn tỷ, và chặn lặp vô hạn nếu số vào quá
+        // lớn khiến không mức nào lọt qua bộ lọc.
+        for _ in 0..<12 where result.count < Self.suggestionCount {
+            guard value <= Self.maxSuggestion else { break }
+            if value >= Self.minSuggestion { result.append(value) }
+            value *= 10
+        }
+        return result
+    }
+
+    @ViewBuilder
+    private var suggestionRow: some View {
+        let values = suggestions
+        // Gõ số quá lớn thì không còn mức nào hợp lệ — ẩn hẳn hàng, để lại `padding` là chừa
+        // một dải trống không rõ vì sao.
+        if !values.isEmpty {
+            // Cuộn ngang: 4 mức tiền hàng triệu là quá rộng so với thẻ trên máy nhỏ.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(values, id: \.self) { value in
+                        Text(Int(value).vndGrouped)
+                            .font(AppFont.beVietnamPro(13, .semibold))
+                            .foregroundStyle(AppColor.payInk)
+                            .padding(.horizontal, 12)
+                            .frame(height: 34)
+                            .background(AppColor.bgSoft)
+                            .clipShape(Capsule())
+                            .contentShape(Capsule())
+                            .pressable { pickSuggestion(value) }
+                    }
+                }
+            }
+            .padding(.top, 10)
+        }
+    }
+
+    private func pickSuggestion(_ value: Int64) {
+        amountText = String(value)
+        errorMessage = nil
+        // Cất bàn phím luôn: chọn xong một mức là đã có số tiền, việc kế tiếp là bấm nút mở
+        // app chứ không gõ thêm.
+        isAmountFocused = false
     }
 
     // MARK: - Nhập số
