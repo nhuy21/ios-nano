@@ -75,10 +75,10 @@ struct WalletTransferAmountView: View {
     @State private var isVerifying = false
     @State private var lookupError: String?
     @State private var lastVerified: String?
-    /// Bàn phím số tự vẽ của ô SỐ VÍ đang hiện hay không. Không phải `@FocusState` vì bàn phím
-    /// này là SwiftUI thuần — `endEditing` ở tầng UIWindow không đụng tới được. Dùng bàn phím
-    /// tự vẽ thay bàn phím hệ thống để có phím "Tiếp" ngay trong bàn phím.
-    @State private var isUsernameFocused = false
+    /// Ô SỐ VÍ dùng `TextField` với bàn phím HỆ THỐNG (tài khoản Bảo Kim có thể có chữ), nên
+    /// đây là `@FocusState` thật — khác ô số tiền vốn dùng bàn phím tự vẽ và chỉ cần một cờ
+    /// `@State` thường.
+    @FocusState private var isUsernameFocused: Bool
 
     /// Popup hotline — Kotlin để nút Hỗ trợ ở header màn này.
     @State private var showSupport = false
@@ -265,25 +265,10 @@ struct WalletTransferAmountView: View {
 
             // Bàn phím số tự vẽ thay cho nút "Tiếp tục" rời — nút hành động nằm luôn
             // trong bàn phím. Ẩn khi đang gõ lời nhắn để nhường bàn phím hệ thống.
-            if isUsernameFocused && !isMessageFocused {
-                // Bàn phím của ô SỐ VÍ. Phím "Tiếp" tra tên chủ ví rồi chuyển sang ô số tiền
-                // (`runVerifyIfNeeded` tự bật `isAmountFocused` khi tra ra tên).
-                //
-                // KHÔNG chặn số 0 dẫn đầu như ô tiền: số ví có thể bắt đầu bằng 0.
-                //
-                // Bản `Plain` (không có phím "000"): số ví là số đếm từng chữ, gõ tắt hàng
-                // nghìn là sai. Ô SỐ TIỀN bên dưới vẫn dùng `NumericKeypad` có "000".
-                PlainNumericKeypad(
-                    onDigit: pushUsernameDigit,
-                    onBackspace: backspaceUsernameDigit,
-                    onNext: {
-                        isUsernameFocused = false
-                        runVerifyIfNeeded()
-                    },
-                    nextTitle: "Tiếp",
-                    nextEnabled: username.trimmingCharacters(in: .whitespaces).count >= 6
-                )
-            } else if isAmountFocused && !isMessageFocused {
+            //
+            // Ô SỐ VÍ không có nhánh ở đây: nó dùng bàn phím HỆ THỐNG (tài khoản Bảo Kim có
+            // thể là email hoặc tên có chữ), tra cứu chạy khi bấm "Xong" hoặc rời ô.
+            if isAmountFocused && !isMessageFocused && !isUsernameFocused {
                 NumericKeypad(
                     onDigit: appendDigits,
                     onBackspace: backspaceDigit,
@@ -302,8 +287,8 @@ struct WalletTransferAmountView: View {
         // Bàn phím HỆ THỐNG đã tự ẩn nhờ cử chỉ gắn ở tầng UIWindow (xem
         // DismissKeyboardOnTap). Ở đây chỉ cần lo bàn phím số tự vẽ.
         .contentShape(Rectangle())
-        // Chạm ra ngoài thì cất CẢ HAI bàn phím tự vẽ. Cất bàn phím ô số ví cũng là lúc tra
-        // tên (xem `onChange` của `isUsernameFocused` trong `usernameSection`).
+        // Chạm ra ngoài thì cất bàn phím số tự vẽ của ô tiền VÀ nhả ô số ví (bàn phím hệ
+        // thống). Nhả ô số ví cũng là lúc tra tên — xem `onChange` của `isUsernameFocused`.
         .onTapGesture {
             isAmountFocused = false
             isUsernameFocused = false
@@ -513,31 +498,25 @@ struct WalletTransferAmountView: View {
             }
 
             HStack(spacing: 8) {
-                // Ô hiển thị + con trỏ nháy tự vẽ, KHÔNG phải `TextField`: ô này dùng bàn phím
-                // số tự vẽ (có phím "Tiếp") nên không được để bàn phím hệ thống bật lên.
-                HStack(spacing: 1) {
-                    if username.isEmpty {
-                        Text("Nhập số ví")
-                            .font(AppFont.beVietnamPro(15))
-                            .foregroundStyle(AppColor.payMuted)
-                    } else {
-                        Text(username)
-                            .font(AppFont.beVietnamPro(15, .semibold))
-                            .foregroundStyle(AppColor.payInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                // `TextField` với bàn phím THƯỜNG (không phải `.numberPad`): tài khoản Bảo Kim
+                // có thể là email hoặc tên đăng nhập có chữ — khoá bàn phím số thì những tài
+                // khoản đó không gõ nổi. Cùng lý do với ô "Tên đăng nhập" ở màn liên kết ví.
+                TextField("", text: $username, prompt: .appPlaceholder("Nhập số ví"))
+                    .font(AppFont.beVietnamPro(15, .semibold))
+                    .foregroundStyle(AppColor.payInk)
+                    .tint(AppColor.brand)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .lineLimit(1)
+                    .focused($isUsernameFocused)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Bấm "Xong" trên bàn phím là tra luôn, khỏi phải chạm ra ngoài.
+                    .onSubmit {
+                        isUsernameFocused = false
+                        runVerifyIfNeeded()
                     }
-                    // Cùng điều kiện với nhánh bàn phím ở footer: đang gõ lời nhắn thì bàn
-                    // phím số ví đã bị ẩn, để con trỏ nháy tiếp là chỉ sai ô đang nhập.
-                    if isUsernameFocused && !isMessageFocused {
-                        BlinkingCaret(color: AppColor.payInk, height: 17)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { isUsernameFocused = true }
-                .onChangeCompat(of: isUsernameFocused) { wasFocused, focusedNow in
+                    .onChangeCompat(of: isUsernameFocused) { wasFocused, focusedNow in
                     if wasFocused && !focusedNow { runVerifyIfNeeded() }
                     // Mở bàn phím ô số ví thì cất bàn phím ô số tiền và nhả ô lời nhắn (bàn
                     // phím hệ thống), không thì hai bàn phím nằm đè nhau.
@@ -555,12 +534,13 @@ struct WalletTransferAmountView: View {
 
                 Button {
                     guard let clip = UIPasteboard.general.string else { return }
-                    // Lọc lấy chữ số: số ví copy từ tin nhắn/chat hay kèm khoảng trắng hoặc
-                    // ký tự thừa, dán thô vào là tra cứu trượt. Cắt 20 chữ số cho khớp giới
-                    // hạn của bàn phím tự vẽ (`pushUsernameDigit`).
-                    username = String(clip.filter(\.isNumber).prefix(20))
-                    // Đóng bàn phím ô số ví: nhánh bàn phím này được xét TRƯỚC bàn phím ô
-                    // tiền, để mở thì tra xong vẫn thấy bàn phím số ví chứ không thấy ô tiền.
+                    // CHỈ cắt khoảng trắng hai đầu, KHÔNG lọc bỏ chữ: tài khoản Bảo Kim có
+                    // thể là email hoặc tên đăng nhập có chữ — lọc `isNumber` như trước thì
+                    // dán "a@b.com" vào ra chuỗi rỗng.
+                    username = String(
+                        clip.trimmingCharacters(in: .whitespacesAndNewlines).prefix(64)
+                    )
+                    // Đóng bàn phím để tra xong là thấy ngay tên chủ ví.
                     isUsernameFocused = false
                     // Xoá mốc tra trước để `runVerifyIfNeeded` không bỏ qua lần này (dán lại
                     // đúng số vừa tra mà lần đó lỗi thì vẫn phải cho tra lại).
@@ -631,21 +611,8 @@ struct WalletTransferAmountView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Nhập số ví (bàn phím tự vẽ)
-
-    /// Giới hạn 20 chữ số theo `AmountParser.isBareNumber` (6→20 là khoảng app coi là số ví).
-    /// KHÔNG chặn số 0 dẫn đầu — khác ô số tiền, số ví bắt đầu bằng 0 là bình thường.
-    private func pushUsernameDigit(_ digits: String) {
-        username = String((username + digits).prefix(20))
-    }
-
-    private func backspaceUsernameDigit() {
-        guard !username.isEmpty else { return }
-        username.removeLast()
-    }
-
-    /// Người dùng vừa sửa số ví -> dọn tên cũ. KHÔNG tự tra ở đây: chỉ tra khi bấm "Tiếp"
-    /// trong bàn phím hoặc khi rời ô.
+    /// Người dùng vừa sửa số ví -> dọn tên cũ. KHÔNG tự tra ở đây: chỉ tra khi bấm "Xong"
+    /// trên bàn phím, khi rời ô, hoặc khi bấm nút Dán.
     private func clearVerifiedName(for newValue: String) {
         let trimmed = newValue.trimmingCharacters(in: .whitespaces)
         // Đúng số đang tra / vừa tra xong: nút "Dán" gán text RỒI gọi tra ngay, mà `onChange`
@@ -714,8 +681,8 @@ struct WalletTransferAmountView: View {
             }
             .frame(height: 62)
             .contentShape(Rectangle())
-            // Đóng bàn phím ô số ví: nhánh của nó được xét TRƯỚC ở footer, để mở thì chạm vào
-            // ô tiền sẽ như không có tác dụng gì (vẫn thấy bàn phím số ví).
+            // Nhả ô số ví: nó dùng bàn phím HỆ THỐNG, không cất đi thì bàn phím đó vẫn nằm
+            // đè lên bàn phím số tự vẽ của ô tiền.
             .onTapGesture {
                 isUsernameFocused = false
                 isMessageFocused = false
