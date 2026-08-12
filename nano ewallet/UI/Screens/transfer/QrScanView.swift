@@ -35,7 +35,11 @@ struct QrScanView: View {
 
     @StateObject private var scanner = QrScannerController()
 
+    /// Đang bóc tách nội dung do người dùng CHỦ ĐỘNG đưa vào (dán bộ nhớ tạm, chọn ảnh) —
+    /// có lớp phủ chặn màn vì họ vừa bấm nút và cần biết app đang chờ.
     @State private var isParsing = false
+    /// Đang bóc mã camera vừa bắt được — KHÔNG hiện lớp phủ, xem `handleQrDetected`.
+    @State private var isScanningQr = false
     @State private var errorMessage: String?
     /// Ảnh chọn từ thư viện có nhiều người nhận -> hỏi chọn, không đoán hộ.
     @State private var choiceList: OneTouchChoiceList?
@@ -570,11 +574,14 @@ struct QrScanView: View {
     }
 
     private func handleQrDetected(_ rawValue: String) {
-        guard !isParsing else { return }
+        guard !isParsing, !isScanningQr else { return }
         errorMessage = nil
-        isParsing = true
+        // Cờ RIÊNG, không dùng `isParsing`: camera bắt mã liên tục nên mã mờ/không hợp lệ sẽ
+        // làm lớp phủ đen bật-tắt dồn dập, nhìn như màn hình nháy. Quét là hành động tự động
+        // — lỗi thì chỉ cần báo rồi cho quét lại, không cần chặn màn.
+        isScanningQr = true
         Task {
-            defer { isParsing = false }
+            defer { isScanningQr = false }
             route(await OneTouchResolver.resolveQr(rawValue))
         }
     }

@@ -149,7 +149,13 @@ final class APIClient {
             switch urlError.code {
             case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
                 throw APIError.offline
+            case .timedOut:
+                // KHÔNG gộp vào "mất kết nối": timeout thường là server/BE xử lý lâu chứ mạng
+                // vẫn tốt. Báo mất mạng thì người dùng đi kiểm tra WiFi/4G vô ích.
+                throw APIError.unknown("Máy chủ phản hồi quá lâu, vui lòng thử lại")
             default:
+                // Lỗi TLS/DNS/server đóng kết nối giữa chừng — giữ nguyên mô tả gốc để còn
+                // chẩn đoán được, thay vì đè thành một câu chung chung.
                 throw APIError.unknown(urlError.localizedDescription)
             }
         } catch {
