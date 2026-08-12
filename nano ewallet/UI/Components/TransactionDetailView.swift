@@ -390,8 +390,8 @@ private struct Line: Shape {
 
 // MARK: - Thẻ hai đầu gửi/nhận
 
-/// Hai đầu của giao dịch (nhận ở trên, gửi ở dưới) nối nhau bằng một vạch dọc có đồng xu
-/// chạy từ dưới lên — mirror `TxPartyCard` bên Kotlin.
+/// Hai đầu của giao dịch (gửi ở trên, nhận ở dưới) nối nhau bằng một vạch dọc có đồng xu
+/// chạy từ trên xuống — cùng chiều đọc, tiền rời người gửi rồi tới người nhận.
 ///
 /// Nhãn vai trò đổi theo loại giao dịch chứ không cứng "Người gửi/Người nhận": nạp tiền và
 /// rút tiền có một đầu là ngân hàng hoặc chính ví mình, gọi là "người" thì sai.
@@ -414,11 +414,13 @@ private struct TxPartyCard: View {
     var body: some View {
         VStack(spacing: 0) {
             TxPartyRow(
-                party: destParty,
-                label: labels.dest,
-                isDestination: true,
-                dateText: dateText,
-                timeText: timeText,
+                party: srcParty,
+                label: labels.src,
+                isDestination: false,
+                // Chỉ MỘT hàng hiện thời gian, hai hàng cùng hiện là lặp. Thời gian gắn với
+                // hàng đích (lúc tiền tới) nên nằm ở hàng dưới.
+                dateText: "",
+                timeText: "",
                 animated: animated,
                 onCenter: { topCenter = $0 }
             )
@@ -428,12 +430,11 @@ private struct TxPartyCard: View {
                 .frame(height: 1)
 
             TxPartyRow(
-                party: srcParty,
-                label: labels.src,
-                isDestination: false,
-                // Chỉ hàng trên hiện thời gian — mirror Kotlin, hai hàng cùng hiện là lặp.
-                dateText: "",
-                timeText: "",
+                party: destParty,
+                label: labels.dest,
+                isDestination: true,
+                dateText: dateText,
+                timeText: timeText,
                 animated: animated,
                 onCenter: { bottomCenter = $0 }
             )
@@ -443,7 +444,9 @@ private struct TxPartyCard: View {
             // Vẽ SAU lưng nội dung để vạch không đè lên chữ.
             if animated {
                 if let topCenter, let bottomCenter {
-                    CoinFlowConnector(from: bottomCenter, to: topCenter)
+                    // `from`/`to` là toạ độ thuần: xu nội suy from.y -> to.y. Nguồn ở trên
+                    // nên `from` là tâm hàng trên, xu chạy xuống hàng đích.
+                    CoinFlowConnector(from: topCenter, to: bottomCenter)
                 }
             } else {
                 // Bản tĩnh cho ảnh: không đo được toạ độ (view nằm ngoài màn hình) nên vẽ
@@ -686,21 +689,27 @@ private struct CoinFlowConnector: View {
         let stroke = StrokeStyle(lineWidth: 2, lineCap: .round)
         let shading = GraphicsContext.Shading.color(Self.green.opacity(0.35))
 
+        // Kẹp theo mút TRÊN/DƯỚI chứ không theo `from`/`to`: xu chạy xuôi hay ngược đều
+        // dùng chung hàm này, mà bám vào `from`/`to` thì một chiều sẽ cho đoạn dài âm và
+        // mất sạch vạch nối.
+        let topY = min(from.y, to.y)
+        let bottomY = max(from.y, to.y)
+
         // Chỉ vẽ khi đoạn còn đủ dài: đầu nét bo tròn nên đoạn dài 0 vẫn ra một chấm 2pt
         // lơ lửng ở đầu vạch lúc đồng xu chạy tới sát hai mút.
-        let upperEnd = max(to.y, coinY - gap)
-        if upperEnd - to.y > 0.5 {
+        let upperEnd = max(topY, coinY - gap)
+        if upperEnd - topY > 0.5 {
             var upper = Path()
-            upper.move(to: CGPoint(x: x, y: to.y))
+            upper.move(to: CGPoint(x: x, y: topY))
             upper.addLine(to: CGPoint(x: x, y: upperEnd))
             context.stroke(upper, with: shading, style: stroke)
         }
 
-        let lowerStart = min(from.y, coinY + gap)
-        if from.y - lowerStart > 0.5 {
+        let lowerStart = min(bottomY, coinY + gap)
+        if bottomY - lowerStart > 0.5 {
             var lower = Path()
             lower.move(to: CGPoint(x: x, y: lowerStart))
-            lower.addLine(to: CGPoint(x: x, y: from.y))
+            lower.addLine(to: CGPoint(x: x, y: bottomY))
             context.stroke(lower, with: shading, style: stroke)
         }
 
