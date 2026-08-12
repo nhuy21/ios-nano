@@ -147,7 +147,11 @@ struct TransferSuccessView: View {
 
     // MARK: - Bill
 
-    private var bill: some View {
+    private var bill: some View { billBody(showsCompletedNote: true) }
+
+    /// - Parameter showsCompletedNote: `false` khi render ra ảnh — dòng "đã hoàn thành trong
+    ///   X giây" chỉ để người vừa chuyển xem trên màn, không thuộc về biên lai gửi đi.
+    private func billBody(showsCompletedNote: Bool) -> some View {
         VStack(spacing: 0) {
             checkBadge
 
@@ -209,7 +213,7 @@ struct TransferSuccessView: View {
 
                 // Chỉ hiện khi đo được thời gian thật, và chỉ khi GD đã chốt — đang xử
                 // lý mà khoe "hoàn thành trong X giây" là mâu thuẫn.
-                if !info.isProcessing, let completedText {
+                if showsCompletedNote, !info.isProcessing, let completedText {
                     Text("Giao dịch đã được hoàn thành trong \(completedText) giây")
                         .font(AppFont.beVietnamPro(12.5, .medium))
                         .foregroundStyle(WsColor.green)
@@ -311,7 +315,7 @@ struct TransferSuccessView: View {
     /// nền trắng đặc và bo góc thường thay vì răng cưa, để ảnh gửi đi là khối phẳng gọn.
     private func renderReceipt() -> UIImage? {
         let renderer = ImageRenderer(
-            content: bill
+            content: billBody(showsCompletedNote: false)
                 .frame(width: 360)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
