@@ -75,86 +75,30 @@ struct HomeView: View {
             if !active { path.removeAll() }
         }
         // Deep link (pay link / push xin tiền) KHÔNG quan sát ở đây — xem MainTabView.
-        // Dialog tuỳ biến (không dùng confirmationDialog) để giữ icon + dòng mô tả
-        // như Android — menu hệ thống chỉ hiện được mỗi tiêu đề nút.
-        .instantOverlayCover(isPresented: $showTopupWithdrawChooser) {
-            ActionChooserSheet(
-                title: "Nạp/Rút ví",
-                subtitle: "Chọn thao tác",
-                actions: [
-                    .init(
-                        systemImage: "bolt.fill",
-                        title: "Nạp ví nhanh",
-                        subtitle: "Mở thẳng app ngân hàng, điền sẵn số tài khoản",
-                        // Chờ hộp chọn đóng xong rồi mới mở sheet kế: iOS bỏ qua yêu cầu
-                        // trình bày khi còn một lớp đang đóng dở, bật cờ ngay tại đây thì
-                        // bấm vào chỉ thấy hộp chọn biến mất chứ không có gì hiện lên.
-                        // Các mục còn lại không cần vì `path.append` là đẩy màn, không
-                        // phải trình bày lớp phủ.
-                        //
-                        // 120ms chứ không phải 350ms như trước: từ khi lớp phủ bỏ animation
-                        // trượt thì việc đóng gần như tức thời, chờ nguyên 350ms sẽ thành
-                        // một quãng đơ thấy rõ giữa hai hộp.
-                        handler: {
-                            Task {
-                                try? await Task.sleep(nanoseconds: 120_000_000)
-                                withoutPresentationAnimation { showQuickTopUp = true }
-                            }
-                        }
-                    ),
-                    .init(
-                        systemImage: "qrcode",
-                        title: "Nạp tiền",
-                        subtitle: "Quét mã QR để chuyển tiền vào ví",
-                        handler: { path.append(.receiveQr) }
-                    ),
-                    .init(
-                        systemImage: "building.columns",
-                        title: "Rút tiền",
-                        subtitle: "Chuyển tiền từ ví về tài khoản ngân hàng liên kết",
-                        handler: { path.append(.withdraw) }
-                    ),
-                ],
-                onDismiss: { withoutPresentationAnimation { showTopupWithdrawChooser = false } }
-            )
-        }
-        .instantOverlayCover(isPresented: $showQuickTopUp) {
-            QuickTopUpSheet(
-                onDismiss: { withoutPresentationAnimation { showQuickTopUp = false } },
-                onOpenedBankApp: {
-                    DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
-                }
-            )
-        }
-        // OneTouch — chọn nguồn nội dung, mirror dialog PasteSourceRow bên Kotlin.
-        .instantOverlayCover(isPresented: $showOneTouchChooser) {
-            ActionChooserSheet(
-                title: "OneTouch",
-                subtitle: "Chọn nguồn nội dung chuyển khoản",
-                actions: [
-                    .init(
-                        systemImage: "doc.on.clipboard",
-                        title: "Dán từ bộ nhớ tạm",
-                        subtitle: "Nội dung hoặc ảnh đã copy",
-                        handler: {
-                            Task {
-                                await runOneTouch {
-                                    await OneTouchResolver.resolveClipboard(
-                                        onProgress: { oneTouchStage = $0 }
-                                    )
-                                }
-                            }
-                        }
-                    ),
-                    .init(
-                        systemImage: "photo.on.rectangle",
-                        title: "Chọn ảnh trong thư viện",
-                        subtitle: "Ảnh QR hoặc ảnh chụp tin nhắn CK",
-                        handler: { showOneTouchPhotoPicker = true }
-                    ),
-                ],
-                onDismiss: { withoutPresentationAnimation { showOneTouchChooser = false } }
-            )
+        //
+        // Ba hộp chọn gộp trong MỘT `tabBarOverlay` chứ không ba lời gọi riêng: nhiều
+        // `.preference` cùng key trên cùng một view sẽ ghi đè nhau chứ không cộng dồn
+        // (`reduce` chỉ gộp giữa các view khác nhau trong cây). Gộp được vì ba hộp loại trừ
+        // nhau — không bao giờ mở cùng lúc.
+        //
+        // Dùng `tabBarOverlay` chứ không `instantOverlayCover`: thanh tab nổi do MainTabView
+        // vẽ SAU nội dung, nên `.overlay` gắn trong màn này sẽ bị nó đè, hở một mảng ở đáy.
+        .tabBarOverlay(
+            "home.chooser",
+            isPresented: showTopupWithdrawChooser || showQuickTopUp || showOneTouchChooser
+        ) {
+            if showTopupWithdrawChooser {
+                topupWithdrawChooser
+            } else if showQuickTopUp {
+                QuickTopUpSheet(
+                    onDismiss: { showQuickTopUp = false },
+                    onOpenedBankApp: {
+                        DeepLinkStore.shared.markTopUpStarted(balanceBefore: wallet.balance)
+                    }
+                )
+            } else if showOneTouchChooser {
+                oneTouchChooser
+            }
         }
         .photosPicker(isPresented: $showOneTouchPhotoPicker, selection: $oneTouchPhoto, matching: .images)
         .onChangeNewCompat(of: oneTouchPhoto) { item in
@@ -361,6 +305,76 @@ struct HomeView: View {
         async let txTask: Void = transactions.refreshRecent()
         async let notifTask: Bool = notifications.refresh()
         _ = await (txTask, notifTask)
+    }
+
+    /// Hộp "Nạp/Rút ví" — dialog tuỳ biến (không dùng `confirmationDialog`) để giữ icon +
+    /// dòng mô tả như Kotlin; menu hệ thống chỉ hiện được mỗi tiêu đề nút.
+    private var topupWithdrawChooser: some View {
+        ActionChooserSheet(
+            title: "Nạp/Rút ví",
+            subtitle: "Chọn thao tác",
+            actions: [
+                .init(
+                    systemImage: "bolt.fill",
+                    title: "Nạp ví nhanh",
+                    subtitle: "Mở thẳng app ngân hàng, điền sẵn số tài khoản",
+                    // Không còn phải `Task.sleep` chờ hộp trước đóng như hồi dùng
+                    // `fullScreenCover`: hai hộp giờ dùng CHUNG một lớp phủ SwiftUI, đổi cờ
+                    // là đổi nhánh `if` ngay trong cùng một nhịp dựng.
+                    //
+                    // Tắt cờ cũ cho tường minh, dù `ActionChooserSheet` đã gọi `onDismiss()`
+                    // trước `handler()`: nhánh `if` đầu mà còn `true` thì nó vẫn thắng.
+                    handler: {
+                        showTopupWithdrawChooser = false
+                        showQuickTopUp = true
+                    }
+                ),
+                .init(
+                    systemImage: "qrcode",
+                    title: "Nạp tiền",
+                    subtitle: "Quét mã QR để chuyển tiền vào ví",
+                    handler: { path.append(.receiveQr) }
+                ),
+                .init(
+                    systemImage: "building.columns",
+                    title: "Rút tiền",
+                    subtitle: "Chuyển tiền từ ví về tài khoản ngân hàng liên kết",
+                    handler: { path.append(.withdraw) }
+                ),
+            ],
+            onDismiss: { showTopupWithdrawChooser = false }
+        )
+    }
+
+    /// OneTouch — chọn nguồn nội dung, mirror dialog `PasteSourceRow` bên Kotlin.
+    private var oneTouchChooser: some View {
+        ActionChooserSheet(
+            title: "OneTouch",
+            subtitle: "Chọn nguồn nội dung chuyển khoản",
+            actions: [
+                .init(
+                    systemImage: "doc.on.clipboard",
+                    title: "Dán từ bộ nhớ tạm",
+                    subtitle: "Nội dung hoặc ảnh đã copy",
+                    handler: {
+                        Task {
+                            await runOneTouch {
+                                await OneTouchResolver.resolveClipboard(
+                                    onProgress: { oneTouchStage = $0 }
+                                )
+                            }
+                        }
+                    }
+                ),
+                .init(
+                    systemImage: "photo.on.rectangle",
+                    title: "Chọn ảnh trong thư viện",
+                    subtitle: "Ảnh QR hoặc ảnh chụp tin nhắn CK",
+                    handler: { showOneTouchPhotoPicker = true }
+                ),
+            ],
+            onDismiss: { showOneTouchChooser = false }
+        )
     }
 
     private var homeContent: some View {
@@ -743,7 +757,7 @@ struct HomeView: View {
             // có hai cách khác hẳn nhau (mở app ngân hàng điền sẵn / tự quét QR), nhảy
             // thẳng vào một cách là giấu mất cách còn lại — mà đây lại là nút nạp tiền dễ
             // thấy nhất trên Trang chủ.
-            withoutPresentationAnimation { showTopupWithdrawChooser = true }
+            showTopupWithdrawChooser = true
         } label: {
             // Cỡ chữ/icon lấy đúng theo Kotlin: tiêu đề 16 bold, phụ đề 13, icon 20,
             // mũi tên 22 — trước đây iOS để 13/11/16/13 nên cụm này nhỏ và mỏng hơn hẳn.
@@ -864,9 +878,9 @@ struct HomeView: View {
                         case .transferArrows:
                             path.append(.walletTransfer(draft: nil))
                         case .walletTopup:
-                            withoutPresentationAnimation { showTopupWithdrawChooser = true }
+                            showTopupWithdrawChooser = true
                         case .pasteCk:
-                            withoutPresentationAnimation { showOneTouchChooser = true }
+                            showOneTouchChooser = true
                         default:
                             comingSoonFeature = service.title
                         }

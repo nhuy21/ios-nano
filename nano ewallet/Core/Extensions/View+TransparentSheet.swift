@@ -21,22 +21,35 @@ extension View {
         background(TransparentSheetBackground())
     }
 
-    /// Như `fullScreenCover` nhưng KHÔNG trượt từ dưới lên — dialog hiện ra tại chỗ, mờ dần.
+    /// Lớp phủ dạng dialog, hiện và ẩn NGAY LẬP TỨC.
     ///
-    /// `fullScreenCover` luôn dùng `.coverVertical` của UIKit; không có tham số nào tắt được,
-    /// và bọc `withTransaction(.init(animation: nil))` quanh chỗ bật cờ cũng vô hiệu vì cú
-    /// trượt do UIKit chạy chứ không phải SwiftUI. Cách còn lại là tắt animation ở tầng UIKit
-    /// rồi tự fade lấy — xem `withoutPresentationAnimation`, phải bọc ở nơi ĐỔI CỜ, cả lúc
-    /// bật lẫn lúc tắt.
+    /// Không dùng `fullScreenCover`/`sheet`: cả hai luôn chạy transition trượt của UIKit,
+    /// không tham số nào tắt được. Cách duy nhất chắc chắn là không đưa việc trình bày cho
+    /// UIKit — `.overlay` chỉ là một lớp trong cây view SwiftUI nên không có transition nào
+    /// để mà tắt.
     ///
-    /// Vẫn đi qua `fullScreenCover` chứ không phải `.overlay` để giữ đúng thứ hạng lớp: hộp
-    /// chọn phải phủ lên cả thanh tab và thanh điều hướng, mà `.overlay` gắn trong cây view
-    /// của tab thì nằm dưới chúng.
+    /// (Đã thử `UIView.setAnimationsEnabled(false)` quanh chỗ đổi cờ. Không ăn: đó là cờ toàn
+    /// cục, phải bọc đúng mọi đường bật/tắt, và việc bật lại ở cuối run loop lệch nhịp với
+    /// transition nên còn sinh giật.)
+    ///
+    /// LƯU Ý về thanh tab: thanh tab nổi của app được `MainTabView` vẽ SAU nội dung trong một
+    /// `ZStack`, nên lớp phủ gắn bên trong màn (Home/Cá nhân) sẽ bị nó đè lên, hở một mảng ở
+    /// đáy. Ở những màn đó phải dùng `tabBarOverlay(...)` để đẩy lớp phủ lên vẽ ở cấp
+    /// `MainTabView`. Các màn đứng ngoài `MainTabView` (màn quét QR, nhận tiền) thì dùng thẳng
+    /// modifier này.
     func instantOverlayCover<Content: View>(
         isPresented: Binding<Bool>,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        modifier(InstantOverlayCover(isPresented: isPresented, overlay: content))
+        overlay {
+            if isPresented.wrappedValue {
+                content()
+                    // Nhận chạm trên toàn màn: nội dung tự vẽ nền mờ và tự bắt tap để đóng,
+                    // thiếu dòng này thì vùng trong suốt để lọt chạm xuống màn phía dưới.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+            }
+        }
     }
 
     /// Bản `item:` của `instantOverlayCover` — cho lớp phủ mang theo dữ liệu (danh sách tài
@@ -45,112 +58,78 @@ extension View {
         item: Binding<Item?>,
         @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
-        modifier(InstantOverlayCoverItem(item: item, overlay: content))
-    }
-}
-
-/// Thời lượng fade của lớp phủ. Ngắn cỡ này để cảm giác là "hiện ra ngay" chứ không phải
-/// một animation nữa thay thế cho cú trượt.
-private let instantOverlayFade: Double = 0.18
-
-/// Xem `instantOverlayCover(isPresented:content:)`.
-private struct InstantOverlayCover<Overlay: View>: ViewModifier {
-    @Binding var isPresented: Bool
-    @ViewBuilder let overlay: () -> Overlay
-
-    /// Tách khỏi `isPresented` để fade chạy SAU khi lớp phủ đã được gắn vào cây view. Dùng
-    /// chung một biến thì nội dung xuất hiện cùng lúc với `opacity = 1`, không có gì để fade.
-    @State private var visible = false
-
-    /// Lưới chặn cho những lần đóng do CHÍNH iOS khởi xướng (vuốt xuống, hệ thống thu hồi
-    /// lớp phủ) — lúc đó không có chỗ nào của app chạy để mà bọc.
-    ///
-    /// Chặn trong setter chứ không phải `onChange` vì `onChange` chạy sau khi state đã cập
-    /// nhật, tức sau khi UIKit dựng xong transition — lúc đó tắt cũng không kịp.
-    ///
-    /// KHÔNG thay được việc bọc ở nơi gọi: `onDismiss` của app set thẳng biến `@State` gốc,
-    /// không đi qua binding này, nên đường đóng thường gặp nhất vẫn phải tự bọc.
-    private var gate: Binding<Bool> {
-        Binding(
-            get: { isPresented },
-            set: { newValue in
-                if !newValue { suppressUIKitAnimationForThisRunLoop() }
-                isPresented = newValue
+        overlay {
+            if let value = item.wrappedValue {
+                content(value)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
             }
+        }
+    }
+
+    /// Gửi một lớp phủ LÊN `MainTabView` để nó vẽ trên cùng, trên cả thanh tab nổi.
+    ///
+    /// Dùng ở màn gốc của tab (Home, Cá nhân) thay cho `instantOverlayCover`. Lý do: thanh tab
+    /// được vẽ sau nội dung trong `ZStack` của `MainTabView`, nên mọi `.overlay` gắn bên trong
+    /// màn đều nằm dưới nó.
+    ///
+    /// Vẫn là view SwiftUI thuần, không qua `fullScreenCover`, nên hiện/ẩn tức thì.
+    /// - Parameter id: định danh ỔN ĐỊNH của lớp phủ (đặt tay, ví dụ "quickTopUp"). Bắt buộc
+    ///   vì `ForEach` bên `MainTabView` dựa vào nó: id đổi mỗi lần preference tính lại thì
+    ///   SwiftUI dựng lại view và xoá sạch state — số tiền đang gõ dở sẽ bay mất.
+    func tabBarOverlay<Content: View>(
+        _ id: String,
+        isPresented: Bool,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        preference(
+            key: TopOverlayKey.self,
+            value: isPresented ? [TopOverlayEntry(id: id, content: AnyView(content()))] : []
         )
     }
 
-    func body(content: Content) -> some View {
-        content
-            .fullScreenCover(isPresented: gate) {
-                overlay()
-                    .opacity(visible ? 1 : 0)
-                    .transparentSheetBackground()
-                    .onAppear {
-                        withAnimation(.easeOut(duration: instantOverlayFade)) { visible = true }
-                    }
-                    // Tắt PHĂNG, không `withAnimation`: đóng phải là tức thì. Cũng là để lần
-                    // mở kế tiếp bắt đầu lại từ trạng thái ẩn, nếu không sẽ mất fade.
-                    .onDisappear { visible = false }
-            }
-    }
-}
-
-/// Xem `instantOverlayCover(item:content:)`.
-private struct InstantOverlayCoverItem<Item: Identifiable, Overlay: View>: ViewModifier {
-    @Binding var item: Item?
-    @ViewBuilder let overlay: (Item) -> Overlay
-
-    @State private var visible = false
-
-    /// Xem `gate` ở `InstantOverlayCover`.
-    private var gate: Binding<Item?> {
-        Binding(
-            get: { item },
-            set: { newValue in
-                if newValue == nil { suppressUIKitAnimationForThisRunLoop() }
-                item = newValue
-            }
+    /// Bản `item:` của `tabBarOverlay`.
+    func tabBarOverlay<Item: Identifiable, Content: View>(
+        _ id: String,
+        item: Item?,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        preference(
+            key: TopOverlayKey.self,
+            value: item.map { [TopOverlayEntry(id: id, content: AnyView(content($0)))] } ?? []
         )
     }
 
-    func body(content: Content) -> some View {
-        content
-            .fullScreenCover(item: gate) { value in
-                overlay(value)
-                    .opacity(visible ? 1 : 0)
-                    .transparentSheetBackground()
-                    .onAppear {
-                        withAnimation(.easeOut(duration: instantOverlayFade)) { visible = true }
-                    }
-                    .onDisappear { visible = false }
+    /// Gắn ở `MainTabView`, NGOÀI `ZStack` chứa thanh tab: vẽ mọi lớp phủ mà màn con gửi lên.
+    func drawsTopOverlays() -> some View {
+        overlayPreferenceValue(TopOverlayKey.self) { entries in
+            ForEach(entries) { entry in
+                entry.content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
             }
+        }
     }
 }
 
-/// Tắt animation của UIKit cho tới hết vòng lặp run loop hiện tại.
-///
-/// `UIView.setAnimationsEnabled` là cờ TOÀN CỤC nên bắt buộc phải bật lại, và mốc "cuối run
-/// loop hiện tại" là mốc duy nhất đúng: bật lại sớm hơn thì transition chưa kịp dựng nên cờ
-/// mất tác dụng, muộn hơn thì nuốt luôn animation của phần khác trong app.
-///
-/// Gọi lồng nhau vẫn an toàn: mỗi lần gọi xếp thêm một lượt bật lại, lượt cuối chốt về `true`.
-@MainActor
-private func suppressUIKitAnimationForThisRunLoop() {
-    UIView.setAnimationsEnabled(false)
-    DispatchQueue.main.async { UIView.setAnimationsEnabled(true) }
+/// Một lớp phủ do màn con gửi lên. `id` do nơi gọi đặt và phải ổn định giữa các lần dựng lại
+/// — xem `tabBarOverlay(_:isPresented:content:)`.
+struct TopOverlayEntry: Identifiable {
+    let id: String
+    let content: AnyView
 }
 
-/// Chạy `body` (chỗ bật HOẶC tắt cờ trình bày) mà không kèm animation trượt của UIKit.
+/// Kênh đưa lớp phủ từ màn con lên `MainTabView`.
 ///
-/// Phải bọc ở nơi gọi chứ không đặt trong modifier được: cờ cần đang tắt đúng lúc UIKit dựng
-/// transition, mà tới khi modifier thấy cờ đổi thì transition đã bắt đầu rồi.
-///
-/// Bọc CẢ hai chiều: mở lẫn đóng. Quên chiều đóng thì lớp phủ vẫn trượt xuống từ từ.
-@MainActor
-func withoutPresentationAnimation(_ body: () -> Void) {
-    suppressUIKitAnimationForThisRunLoop()
-    body()
+/// Gộp bằng cách nối danh sách, không phải "cái sau đè cái trước": hai tab cùng sống trong
+/// `TabView` nên cả hai đều phát preference, mà chỉ tab đang chọn mới có lớp phủ thật — tab
+/// còn lại phát danh sách rỗng nên nối vào là vô hại.
+struct TopOverlayKey: PreferenceKey {
+    static let defaultValue: [TopOverlayEntry] = []
+
+    static func reduce(value: inout [TopOverlayEntry], nextValue: () -> [TopOverlayEntry]) {
+        value.append(contentsOf: nextValue())
+    }
 }
 
 /// View vô hình, chỉ tồn tại để lấy `UIView` thật rồi sửa nền của sheet chứa nó.

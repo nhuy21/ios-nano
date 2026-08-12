@@ -129,7 +129,7 @@ struct QrScanView: View {
                     )
                 },
                 onDismiss: {
-                    withoutPresentationAnimation { choiceList = nil }
+                    choiceList = nil
                     // Mở lại việc quét: bỏ qua hộp chọn mà không reset thì camera vẫn coi
                     // như đã xong việc và không xử lý frame nào nữa. Phải reset CẢ hai —
                     // state ở view lẫn cờ bên trong controller.
@@ -561,9 +561,7 @@ struct QrScanView: View {
         case .wallet(let draft):
             onWalletRecipient(draft)
         case .choose(let title, let options):
-            withoutPresentationAnimation {
-                choiceList = OneTouchChoiceList(title: title, options: options)
-            }
+            choiceList = OneTouchChoiceList(title: title, options: options)
         case .failure(let message):
             errorMessage = message
             // Cho phép quét lại mã vừa thất bại — cả state ở view (lastHandledValue) lẫn cờ

@@ -118,6 +118,10 @@ struct MainTabView: View {
             // TabView như Login không dính vì không bị clip như vậy).
             .ignoresSafeArea(.container, edges: [.top, .bottom])
         }
+        // Hộp chọn của Home/Cá nhân vẽ Ở ĐÂY chứ không trong màn phát ra chúng: thanh tab nổi
+        // được xếp SAU nội dung trong `ZStack` của `page()`, nên `.overlay` gắn bên trong màn
+        // sẽ bị nó đè lên và hộp chọn hở một mảng ở đáy. Xem `tabBarOverlay`.
+        .drawsTopOverlays()
         // Mở app hàng ngày -> vào thẳng màn quét QR. CHỈ mở khi không còn deep link nào
         // chờ, nếu không sẽ đè lên link nhận tiền mà người dùng vừa bấm.
         // `initial: true` vì cờ có thể được bật TRƯỚC khi view này xuất hiện (bootstrap
@@ -177,7 +181,7 @@ struct MainTabView: View {
                         handler: { openSharedChoice(choice) }
                     )
                 },
-                onDismiss: { withoutPresentationAnimation { sharedImageChoice = nil } }
+                onDismiss: { sharedImageChoice = nil }
             )
         }
         // Home Screen Quick Action (long-press icon) "Chuyển tiền tới ví" / "Chuyển khoản
@@ -254,9 +258,7 @@ struct MainTabView: View {
         case .wallet(let draft):
             openOnHome(.walletTransferAmount(draft))
         case .choose(let title, let options):
-            withoutPresentationAnimation {
-                sharedImageChoice = OneTouchChoiceList(title: title, options: options)
-            }
+            sharedImageChoice = OneTouchChoiceList(title: title, options: options)
         case .failure(let message):
             payLinkError = message
         }
