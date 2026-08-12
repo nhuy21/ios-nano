@@ -851,7 +851,7 @@ struct HomeView: View {
             icon: .bankTransfer,
             badge: .init(text: "như gió", icon: .wind)
         ),
-        .init(title: "Chuyển tiền", icon: .transferArrows),
+        .init(title: "Chuyển tiền ví", icon: .transferArrows),
         .init(
             title: "OneTouch",
             icon: .pasteCk,

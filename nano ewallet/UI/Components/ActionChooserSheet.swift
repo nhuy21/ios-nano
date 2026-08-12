@@ -25,6 +25,9 @@ struct QuickTopUpSheet: View {
     @State private var pickedAppId: String?
     @State private var amountText = ""
     @State private var errorMessage: String?
+    /// Bàn phím số tự vẽ (giống màn chuyển tiền ví) thay bàn phím hệ thống — ô tiền chỉ
+    /// là Text bấm vào để mở, không phải TextField thật.
+    @State private var isAmountFocused = false
 
     @Environment(\.openURL) private var openURL
 
@@ -68,9 +71,22 @@ struct QuickTopUpSheet: View {
                     .padding(.top, 8)
             }
 
-            continueButton
+            // Bàn phím số tự vẽ thay nút "Mở app ngân hàng" rời — bấm phím hành động
+            // trong bàn phím là mở app luôn, không cần đóng bàn phím rồi bấm thêm nút nữa.
+            if isAmountFocused {
+                NumericKeypad(
+                    onDigit: appendDigits,
+                    onBackspace: backspaceDigit,
+                    onNext: openBankApp,
+                    nextTitle: "Mở app ngân hàng",
+                    nextEnabled: canContinue
+                )
+            } else {
+                continueButton
+            }
         }
-        .padding(.vertical, 18)
+        .padding(.top, 18)
+        .padding(.bottom, isAmountFocused ? 0 : 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -117,12 +133,11 @@ struct QuickTopUpSheet: View {
                 .foregroundStyle(AppColor.payMuted)
 
             HStack(spacing: 8) {
-                TextField("", text: $amountText, prompt: .appPlaceholder("0"))
+                Text(amountText.isEmpty ? "0" : Int(amount).vndGrouped)
                     .font(AppFont.beVietnamPro(18, .bold))
-                    .foregroundStyle(AppColor.payInk)
-                    .keyboardType(.numberPad)
-                    .tint(Self.brand)
-                    .thousandsSeparated($amountText)
+                    .foregroundStyle(amountText.isEmpty ? AppColor.payMuted : AppColor.payInk)
+
+                Spacer(minLength: 0)
 
                 Text("đ")
                     .font(AppFont.beVietnamPro(16, .semibold))
@@ -132,9 +147,31 @@ struct QuickTopUpSheet: View {
             .frame(height: 48)
             .background(AppColor.bgSoft)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(isAmountFocused ? Self.brand : Color.clear, lineWidth: 1.5)
+            }
+            .contentShape(Rectangle())
+            .pressable { isAmountFocused = true }
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
+    }
+
+    // MARK: - Nhập số
+
+    private func appendDigits(_ digits: String) {
+        // Chặn số 0 dẫn đầu và giới hạn 9 chữ số như màn chuyển tiền ví.
+        let combined = amountText.isEmpty && digits.allSatisfy { $0 == "0" }
+            ? ""
+            : amountText + digits
+        amountText = String(combined.prefix(9))
+        errorMessage = nil
+    }
+
+    private func backspaceDigit() {
+        guard !amountText.isEmpty else { return }
+        amountText.removeLast()
     }
 
     private var continueButton: some View {
