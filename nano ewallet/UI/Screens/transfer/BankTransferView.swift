@@ -748,7 +748,10 @@ struct BankTransferView: View {
                 } else {
                     HStack(spacing: 8) {
                         ForEach(Self.quickAmounts, id: \.label) { q in
-                            quickChip(q.label) { amount = min(Self.maxAmount, amount + q.value) }
+                            // THAY THẾ số tiền, không cộng dồn: bấm 100k rồi bấm 200k là muốn
+                            // chuyển 200k, không phải 300k. Cộng dồn thì bấm nhầm một cái là
+                            // phải xoá hết gõ lại, mà số hiện ra cũng không khớp nhãn vừa bấm.
+                            quickChip(q.label) { amount = min(Self.maxAmount, q.value) }
                         }
                     }
                 }
