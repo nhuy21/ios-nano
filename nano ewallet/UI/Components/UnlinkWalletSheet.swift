@@ -65,8 +65,11 @@ struct UnlinkWalletSheet: View {
                 .padding(.bottom, 16)
                 .disabled(isSubmitting)
         }
-        .frame(maxWidth: .infinity)
-        .background(Color.white)
+        // Ép giãn hết khung TRƯỚC khi tô nền, và mở cả safe area: `VStack` chỉ cao bằng nội
+        // dung nên tô nền theo nó thì phần sheet dôi ra bên dưới (và dải home indicator) vẫn
+        // để lộ nền hệ thống — xám ở light, ĐEN ở dark.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color.white.ignoresSafeArea())
     }
 
     private func submit() {
