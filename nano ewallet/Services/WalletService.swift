@@ -23,8 +23,8 @@ enum WalletService {
 
     /// `POST wallet/unlink` — huỷ liên kết ví Bảo Kim.
     ///
-    /// CHỈ dùng được với ví ĐỒNG BỘ TỪ VÍ CÓ SẴN (`WalletInfo.canUnlink`); ví mở mới qua eKYC bị
-    /// BE từ chối. Ví và số dư bên Bảo Kim giữ nguyên, người dùng liên kết lại được sau. BE tự
+    /// Áp dụng cho MỌI ví — cả ví đồng bộ từ ví có sẵn lẫn ví mở mới qua eKYC (hồ sơ eKYC phía
+    /// Bảo Kim vẫn còn nguyên nên liên kết lại được). Ví và số dư bên Bảo Kim giữ nguyên, người dùng liên kết lại được sau. BE tự
     /// xác thực `password` (6 chữ số) nên app chỉ cần forward.
     static func unlinkWallet(password: String) async throws {
         try await APIClient.shared.requestVoid(

@@ -126,9 +126,10 @@ struct SettingsView: View {
             }
         } message: {
             Text(
-                "Ví và số dư bên Bảo Kim vẫn giữ nguyên, bạn đăng nhập app Bảo Kim dùng bình " +
-                "thường. Sau khi huỷ, bạn cần liên kết lại (nhập OTP Bảo Kim) mới dùng được ví " +
-                "trong ứng dụng này."
+                "Huỷ ở đây chỉ gỡ liên kết trong ứng dụng này. Để huỷ hoàn toàn, sau đó bạn " +
+                "cần vào app Bảo Kim Ewallet huỷ tiếp.\n\n" +
+                "Ví và số dư bên Bảo Kim vẫn giữ nguyên. Sau khi huỷ, bạn cần liên kết lại " +
+                "(nhập OTP Bảo Kim) mới dùng được ví trong ứng dụng này."
             )
         }
         .sheet(isPresented: $showUnlinkPin) {
@@ -172,13 +173,9 @@ struct SettingsView: View {
                     navMenuRow(title: "Bảo mật & Mật khẩu", systemImage: "lock.fill", route: .security)
                     divider
                     navMenuRow(title: "Ngưỡng xác thực PIN", systemImage: "slider.horizontal.3", route: .pinLimit)
-                    // Chỉ ví ĐỒNG BỘ từ ví Bảo Kim có sẵn mới huỷ liên kết được; ví mở mới qua
-                    // eKYC thì BE trả canUnlink=false -> ẩn hẳn, không hiện rồi bấm mới báo lỗi.
-                    if walletStore.canUnlink {
-                        divider
-                        menuRow(title: "Huỷ liên kết ví Bảo Kim", systemImage: "link.badge.plus") {
-                            showUnlinkConfirm = true
-                        }
+                    divider
+                    menuRow(title: "Huỷ liên kết ví Bảo Kim", systemImage: "link.badge.plus") {
+                        showUnlinkConfirm = true
                     }
                 }
 
