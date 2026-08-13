@@ -30,6 +30,8 @@ struct BankTransferView: View {
     private static let quickAmounts: [(label: String, value: Int64)] = [
         ("50k", 50_000), ("100k", 100_000), ("200k", 200_000), ("500k", 500_000),
     ]
+    /// Neo cuộn tới phần số tiền khi bàn phím mở — xem `ScrollViewReader` trong `body`.
+    private static let amountAnchor = "amountSection"
     private static let contentSuggestions = ["Chuyển tiền", "Trả tiền ăn", "Gửi tặng"]
     private static let bankPriority = [
         "Vietcombank", "BIDV", "VietinBank", "Agribank", "Techcombank",
@@ -228,19 +230,37 @@ struct BankTransferView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    sourceAccountCard
-                    recipientCard
-                    amountSection
-                    contentSection
-                    // Chỉ hiện khi đã chọn đủ ngân hàng + số TK và người nhận CHƯA có trong
-                    // danh bạ — bật sẵn toggle lúc chưa biết lưu ai thì vô nghĩa.
-                    if recipientReady, !alreadySaved {
-                        saveToggle
+            // `ScrollViewReader` để cuộn tới phần số tiền khi bàn phím mở: bàn phím số tự vẽ
+            // chiếm 216pt ở đáy, không cuộn thì nó che mất hàng chips gợi ý ngay dưới ô —
+            // người dùng không biết là có gợi ý.
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        sourceAccountCard
+                        recipientCard
+                        amountSection
+                            .id(Self.amountAnchor)
+                        contentSection
+                        // Chỉ hiện khi đã chọn đủ ngân hàng + số TK và người nhận CHƯA có
+                        // trong danh bạ — bật sẵn toggle lúc chưa biết lưu ai thì vô nghĩa.
+                        if recipientReady, !alreadySaved {
+                            saveToggle
+                        }
+                    }
+                    .padding(16)
+                }
+                .onChangeNewCompat(of: isAmountFocused) { focused in
+                    guard focused else { return }
+                    // Hoãn một nhịp: `safeAreaInset` chèn bàn phím vào cùng lượt render này,
+                    // cuộn ngay thì tính theo khung CŨ (chưa trừ 216pt) nên vẫn thiếu chỗ.
+                    DispatchQueue.main.async {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            // `.bottom`: kéo đáy phần số tiền (tức hàng chips) lên sát mép
+                            // trên bàn phím. Canh `.top` thì chips vẫn nằm dưới vùng bị che.
+                            proxy.scrollTo(Self.amountAnchor, anchor: .bottom)
+                        }
                     }
                 }
-                .padding(16)
             }
             footer
         }
