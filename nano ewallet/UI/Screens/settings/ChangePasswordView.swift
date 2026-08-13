@@ -143,7 +143,6 @@ struct ChangePasswordView: View {
                 externalFocus: focusedField == .otp,
                 onTapWhenCustom: { focusedField = .otp }
             )
-            .focused($focusedField, equals: .otp)
 
             Button {
                 Task { await vm.resendOtp() }
