@@ -86,12 +86,13 @@ struct ChangePasswordView: View {
                     placeholder: "Nhập mật khẩu hiện tại",
                     hasError: vm.currentError != nil,
                     submitLabel: .next,
+                    // `onSubmit` truyền TƯỜNG MINH: trailing closure gắn vào tham số CUỐI của
+                    // hàm, mà giờ tham số cuối là `onTapWhenCustom`.
+                    onSubmit: { focusedField = .new },
                     usesCustomKeypad: true,
                     externalFocus: focusedField == .current,
                     onTapWhenCustom: { focusedField = .current }
-                ) {
-                    focusedField = .new
-                }
+                )
 
             }
 
@@ -101,12 +102,11 @@ struct ChangePasswordView: View {
                     placeholder: "Nhập mật khẩu mới",
                     hasError: vm.newError != nil,
                     submitLabel: .next,
+                    onSubmit: { focusedField = .confirm },
                     usesCustomKeypad: true,
                     externalFocus: focusedField == .new,
                     onTapWhenCustom: { focusedField = .new }
-                ) {
-                    focusedField = .confirm
-                }
+                )
 
             }
 
@@ -116,12 +116,11 @@ struct ChangePasswordView: View {
                     placeholder: "Nhập lại mật khẩu mới",
                     hasError: vm.confirmError != nil,
                     submitLabel: .done,
+                    onSubmit: { Task { await vm.sendOtp() } },
                     usesCustomKeypad: true,
                     externalFocus: focusedField == .confirm,
                     onTapWhenCustom: { focusedField = .confirm }
-                ) {
-                    Task { await vm.sendOtp() }
-                }
+                )
 
             }
         }
@@ -139,12 +138,11 @@ struct ChangePasswordView: View {
                 hasError: vm.otpError != nil,
                 dotsAlignment: .center,
                 submitLabel: .done,
+                onSubmit: { Task { await vm.confirmChange() } },
                 usesCustomKeypad: true,
                 externalFocus: focusedField == .otp,
                 onTapWhenCustom: { focusedField = .otp }
-            ) {
-                Task { await vm.confirmChange() }
-            }
+            )
             .focused($focusedField, equals: .otp)
 
             Button {

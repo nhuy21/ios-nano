@@ -33,8 +33,8 @@ struct ReceiveQrView: View {
     @State private var shareTextItem: ShareableText?
     @State private var showQuickTopUp = false
 
-    /// Ô số tiền trong hai dialog dùng bàn phím số TỰ VẼ (có phím "000"), nên tiêu điểm chỉ
-    /// là cờ `@State` — không có `TextField` thật để mà `@FocusState`.
+    /// Ô số tiền trong hai dialog dùng bàn phím số TỰ VẼ, nên tiêu điểm chỉ là cờ `@State` —
+    /// không có `TextField` thật để mà `@FocusState`.
     @State private var isAmountKeypadOpen = false
     @State private var isPayLinkKeypadOpen = false
 
@@ -112,6 +112,15 @@ struct ReceiveQrView: View {
             )
         }
         .task { await wallet.refresh() }
+        // Dọn cờ bàn phím khi dialog đóng — bắt ở đây thay vì gắn vào từng nút đóng: mỗi
+        // dialog có tới 3-4 đường đóng (nút Xong, nút Bỏ/Huỷ, chạm nền mờ, đóng sau khi tạo
+        // link xong), sót một chỗ là lần mở sau bàn phím bật sẵn dù chưa ai chạm vào ô.
+        .onChangeNewCompat(of: showAmountSheet) { shown in
+            if !shown { isAmountKeypadOpen = false }
+        }
+        .onChangeNewCompat(of: showPayLinkSheet) { shown in
+            if !shown { isPayLinkKeypadOpen = false }
+        }
         // Dialog phủ TOÀN màn (nền tối riêng) thay vì sheet 240pt — sheet thấp vẫn để lộ
         // màn QR phía sau. Cùng cách Login dựng DeviceConflictDialog/DeviceOtpDialog.
         .fullScreenCover(isPresented: $showAmountSheet) {
@@ -475,14 +484,14 @@ struct ReceiveQrView: View {
                     if isAmountKeypadOpen { isAmountKeypadOpen = false } else { showAmountSheet = false }
                 }
 )
-        // Bàn phím số tự vẽ, bản CÓ phím "000" vì đây là ô nhập TIỀN.
+        // Bàn phím số 3 cột, KHÔNG có phím hành động: dialog đã có nút "Xong" riêng — để cả
+        // hai là hai chỗ cho cùng một việc, người dùng không biết chỗ nào mới là bước cuối.
+        // Xem `CompactNumericKeypad`.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isAmountKeypadOpen {
-                NumericKeypad(
+                CompactNumericKeypad(
                     onDigit: { appendDigits($0, to: &amountInput) },
-                    onBackspace: { backspaceDigit(from: &amountInput) },
-                    onNext: { isAmountKeypadOpen = false },
-                    nextTitle: "Xong"
+                    onBackspace: { backspaceDigit(from: &amountInput) }
                 )
             }
         }
@@ -573,14 +582,14 @@ struct ReceiveQrView: View {
                     if isPayLinkKeypadOpen { isPayLinkKeypadOpen = false } else { showPayLinkSheet = false }
                 }
 )
-        // Bàn phím số tự vẽ, bản CÓ phím "000" vì đây là ô nhập TIỀN.
+        // Bàn phím số 3 cột, KHÔNG có phím hành động: dialog đã có nút "Xong" riêng — để cả
+        // hai là hai chỗ cho cùng một việc, người dùng không biết chỗ nào mới là bước cuối.
+        // Xem `CompactNumericKeypad`.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isPayLinkKeypadOpen {
-                NumericKeypad(
+                CompactNumericKeypad(
                     onDigit: { appendDigits($0, to: &payLinkAmountInput) },
-                    onBackspace: { backspaceDigit(from: &payLinkAmountInput) },
-                    onNext: { isPayLinkKeypadOpen = false },
-                    nextTitle: "Xong"
+                    onBackspace: { backspaceDigit(from: &payLinkAmountInput) }
                 )
             }
         }

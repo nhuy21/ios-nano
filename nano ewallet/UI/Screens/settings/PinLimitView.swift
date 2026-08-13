@@ -201,12 +201,13 @@ struct PinLimitView: View {
                 hasError: vm.error != nil,
                 dotsAlignment: .center,
                 submitLabel: .done,
+                // `onSubmit` truyền TƯỜNG MINH, không dùng trailing closure: trailing closure
+                // gắn vào tham số CUỐI của hàm, mà giờ tham số cuối là `onTapWhenCustom`.
+                onSubmit: { Task { await confirm() } },
                 usesCustomKeypad: true,
                 externalFocus: otpFocused,
                 onTapWhenCustom: { otpFocused = true }
-            ) {
-                Task { await confirm() }
-            }
+            )
 
             if let error = vm.error {
                 FieldError(message: error)

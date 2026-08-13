@@ -55,7 +55,14 @@ struct AddContactSheet: View {
     @State private var isSaving = false
     @State private var saveError: String?
 
-    @FocusState private var isAccountFocused: Bool
+    /// Ô số VÍ dùng bàn phím HỆ THỐNG (tài khoản Bảo Kim có thể là email hoặc tên có chữ) nên
+    /// là `@FocusState` thật. Ô số TÀI KHOẢN ngân hàng dùng bàn phím số tự vẽ — xem
+    /// `isBankAccountKeypadOpen`.
+    @FocusState private var isWalletFieldFocused: Bool
+    /// Bàn phím tự vẽ của ô số tài khoản ngân hàng đang hiện hay không.
+    @State private var isBankAccountKeypadOpen = false
+    /// Ô "Tên gợi nhớ" — phím hành động của hai ô trên nhảy xuống đây.
+    @FocusState private var isNicknameFocused: Bool
 
     /// `BankPickerSheet` nhận `Binding<String?>` theo BIN, còn form này giữ cả `Bank` để
     /// hiện logo/tên — cầu nối hai chiều, đồng thời tra lại tên chủ TK ngay khi đổi bank.
@@ -146,39 +153,10 @@ struct AddContactSheet: View {
                     }
 
                     fieldBlock(label: type == .wallet ? "Số ví" : "Số tài khoản") {
-                        TextField(
-                            "", text: $accountNumber,
-                            prompt: .appPlaceholder(
-                                type == .wallet ? "Nhập số ví..." : "Nhập số tài khoản..."
-                            )
-                        )
-                        .font(AppFont.beVietnamPro(18, .medium))
-                        .foregroundStyle(AppColor.payInk)
-                        .tint(AppColor.brand)
-                        .keyboardType(.numberPad)
-                        .submitLabel(.done)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 56)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
-                        }
-                        .focused($isAccountFocused)
-                        .onSubmit { triggerLookup() }
-                        // Chỉ tra cứu khi RỜI focus (bấm ra ngoài/chuyển ô khác) hoặc bấm
-                        // Done — không gọi API mỗi lần gõ ký tự, mirror BankTransferView.
-                        .onChangeCompat(of: isAccountFocused) { wasFocused, isFocused in
-                            if wasFocused && !isFocused { triggerLookup() }
-                        }
-                        .onChangeCompat(of: accountNumber) { _, newValue in
-                            let filtered = newValue.filter(\.isNumber)
-                            if filtered != newValue {
-                                accountNumber = filtered
-                            } else if !filtered.isEmpty {
-                                holderName = nil; lookupError = nil
-                            }
+                        if type == .wallet {
+                            walletNumberField
+                        } else {
+                            bankAccountField
                         }
                     }
 
@@ -195,6 +173,7 @@ struct AddContactSheet: View {
 
                     fieldBlock(label: "Tên gợi nhớ (tuỳ chọn)") {
                         AppTextField(text: $nickname, placeholder: "Vd: Mẹ, Tiền nhà...", maxLength: 100)
+                            .focused($isNicknameFocused)
                     }
 
                     if let saveError {
@@ -214,7 +193,41 @@ struct AddContactSheet: View {
             )
             .padding(20)
         }
+        // Bàn phím số tự vẽ của ô SỐ TÀI KHOẢN ngân hàng. Bản KHÔNG có phím "000": số tài
+        // khoản là số đếm từng chữ, gõ tắt hàng nghìn là sai.
+        //
+        // Ô số VÍ không đi qua đây — nó dùng bàn phím hệ thống vì tài khoản Bảo Kim có thể có
+        // chữ, và phím "Xong" của bàn phím đó cũng tra tên rồi nhảy xuống Tên gợi nhớ.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isBankAccountKeypadOpen {
+                PlainNumericKeypad(
+                    onDigit: appendAccountDigit,
+                    onBackspace: backspaceAccountDigit,
+                    onNext: {
+                        isBankAccountKeypadOpen = false
+                        triggerLookup()
+                        isNicknameFocused = true
+                    },
+                    nextTitle: "Tiếp",
+                    nextEnabled: !accountNumber.isEmpty
+                )
+            }
+        }
         .background(Color(hex: 0xF7F8FA))
+        .dismissesCustomKeypadOnTap {
+            // Cất bàn phím cũng là lúc tra tên — giống hành vi "rời ô" của ô số ví.
+            if isBankAccountKeypadOpen {
+                isBankAccountKeypadOpen = false
+                triggerLookup()
+            }
+        }
+        // Chọn ô Tên gợi nhớ (bàn phím hệ thống) thì cất bàn phím tự vẽ, không thì hai bàn
+        // phím cùng nằm ở đáy màn.
+        .onChangeNewCompat(of: isNicknameFocused) { focused in
+            guard focused, isBankAccountKeypadOpen else { return }
+            isBankAccountKeypadOpen = false
+            KeypadDismissGuard.markHandled()
+        }
         // `fullScreenCover` chứ KHÔNG phải `.sheet`: màn này bản thân đã là một sheet
         // (mở từ ContactsView), mà iOS không hiện sheet lồng trong sheet — bấm nút chọn
         // ngân hàng sẽ không thấy gì.
@@ -293,7 +306,9 @@ struct AddContactSheet: View {
     /// tài khoản bị đẩy khuất tận đáy.
     private var bankSelectButton: some View {
         Button {
-            isAccountFocused = false
+            // Cất cả hai loại bàn phím trước khi mở sheet chọn ngân hàng.
+            isBankAccountKeypadOpen = false
+            isWalletFieldFocused = false
             showBankSheet = true
         } label: {
             HStack(spacing: 12) {
@@ -346,6 +361,97 @@ struct AddContactSheet: View {
                     .font(AppFont.beVietnamPro(9, .bold))
                     .foregroundStyle(.white)
             }
+    }
+
+    // MARK: - Ô số ví / số tài khoản
+
+    /// Ô số VÍ: `TextField` với bàn phím HỆ THỐNG — tài khoản Bảo Kim có thể là email hoặc
+    /// tên đăng nhập có chữ, khoá bàn phím số thì những tài khoản đó không gõ nổi. Giống ô số
+    /// ví ở màn chuyển ví.
+    private var walletNumberField: some View {
+        TextField("", text: $accountNumber, prompt: .appPlaceholder("Nhập số ví..."))
+            .font(AppFont.beVietnamPro(18, .medium))
+            .foregroundStyle(AppColor.payInk)
+            .tint(AppColor.brand)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.done)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 56)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+            }
+            .focused($isWalletFieldFocused)
+            // Bấm "Xong" -> tra tên rồi nhảy xuống ô Tên gợi nhớ.
+            .onSubmit {
+                triggerLookup()
+                isNicknameFocused = true
+            }
+            // Rời ô cũng tra — không gọi API mỗi lần gõ ký tự, mirror BankTransferView.
+            .onChangeCompat(of: isWalletFieldFocused) { wasFocused, isFocused in
+                if wasFocused && !isFocused { triggerLookup() }
+            }
+            .onChangeNewCompat(of: accountNumber) { newValue in
+                // Sửa số thì dọn tên cũ. KHÔNG lọc `isNumber` như nhánh ngân hàng: số ví có
+                // thể có chữ.
+                if !newValue.isEmpty { holderName = nil; lookupError = nil }
+            }
+    }
+
+    /// Ô số TÀI KHOẢN ngân hàng: hiển thị thuần + bàn phím số tự vẽ (`PlainNumericKeypad`,
+    /// không có phím "000" vì số tài khoản là số đếm từng chữ). Không dùng `TextField` vì chỉ
+    /// cần nó được focus là iOS bật bàn phím hệ thống lên chồng với bàn phím tự vẽ.
+    private var bankAccountField: some View {
+        HStack(spacing: 1) {
+            if accountNumber.isEmpty {
+                Text("Nhập số tài khoản...")
+                    .font(AppFont.beVietnamPro(18))
+                    .foregroundStyle(AppColor.payPlaceholder)
+            } else {
+                Text(accountNumber)
+                    .font(AppFont.beVietnamPro(18, .medium))
+                    .foregroundStyle(AppColor.payInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            if isBankAccountKeypadOpen {
+                BlinkingCaret(color: AppColor.payInk, height: 20)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(AppColor.payInputBorder, lineWidth: 1)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            KeypadDismissGuard.markHandled()
+            isNicknameFocused = false
+            isBankAccountKeypadOpen = true
+        }
+    }
+
+    // MARK: - Nhập số tài khoản bằng bàn phím tự vẽ
+
+    private func appendAccountDigit(_ digit: String) {
+        accountNumber += digit
+        // Sửa số thì dọn tên vừa tra được.
+        holderName = nil
+        lookupError = nil
+    }
+
+    private func backspaceAccountDigit() {
+        guard !accountNumber.isEmpty else { return }
+        accountNumber.removeLast()
+        holderName = nil
+        lookupError = nil
     }
 
     private func triggerLookup() {

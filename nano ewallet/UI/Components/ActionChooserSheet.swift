@@ -66,19 +66,14 @@ struct QuickTopUpSheet: View {
         // chuyển ví/chuyển khoản. Để bên trong thẻ thì nó bị thẻ kéo lên giữa màn và thụt vào
         // 28pt hai bên, trông như một khối trôi lơ lửng.
         //
-        // Phím hành động chỉ ĐÓNG bàn phím ("Tiếp"), không mở app ngân hàng: việc đó thuộc
-        // về nút trong thẻ. Hai chỗ cùng gọi một hành động thì người dùng không biết chỗ nào
-        // mới là bước cuối.
+        // Bản 3 cột, KHÔNG có phím hành động: thẻ đã có nút "Mở app ngân hàng" riêng — để cả
+        // hai là hai chỗ cho cùng một việc, người dùng không biết chỗ nào mới là bước cuối.
+        // Cất bàn phím thì chạm ra ngoài thẻ. Xem `CompactNumericKeypad`.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isAmountFocused {
-                NumericKeypad(
+                CompactNumericKeypad(
                     onDigit: appendDigits,
-                    onBackspace: backspaceDigit,
-                    onNext: { isAmountFocused = false },
-                    nextTitle: "Tiếp",
-                    // KHÔNG khoá theo số tiền: phím này chỉ đóng bàn phím, khoá nó thì người
-                    // dùng chưa gõ gì sẽ không có cách nào cất bàn phím đi.
-                    nextEnabled: true
+                    onBackspace: backspaceDigit
                 )
             }
         }

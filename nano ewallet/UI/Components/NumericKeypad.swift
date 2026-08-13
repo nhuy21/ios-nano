@@ -3,15 +3,18 @@
 //  nano ewallet
 //
 //  Bàn phím số tự vẽ, thay bàn phím hệ thống để có phím hành động ("Tiếp") ngay trong bàn
-//  phím. Hai bản:
+//  phím. Ba bản:
 //
 //  - `NumericKeypad`: có phím "000" — cho các ô NHẬP TIỀN, gõ tắt hàng nghìn.
 //  - `PlainNumericKeypad`: không có "000" — cho ô mà gõ tắt là sai (số tài khoản, CCCD,
 //    OTP...). Hàng cuối là "," 0 "." — 0 vào giữa như bàn phím hệ thống, hai dấu hai bên
 //    chỉ để lấp cho kín hàng.
+//  - `CompactNumericKeypad`: 3 CỘT, không có cột phải lẫn phím hành động — cho ô nằm trong
+//    khung đã có nút bấm riêng. Phím Xoá dời xuống hàng cuối, thế chỗ dấu ",".
 //
-//  Bố cục chung: 3 cột số bên trái (1..9 rồi hàng cuối) + cột phải gồm Xoá và Tiếp, mỗi nút
-//  cao 2 hàng. Phím "." chỉ để giữ bố cục — VNĐ là số nguyên nên không nhập gì.
+//  Bố cục hai bản đầu: 3 cột số bên trái (1..9 rồi hàng cuối) + cột phải gồm Xoá và Tiếp,
+//  mỗi nút cao 2 hàng. Bản thứ ba bỏ hẳn cột phải. Phím "." (và "," ở bản Plain) chỉ để giữ
+//  bố cục — VNĐ là số nguyên nên không nhập gì.
 //
 //  Chiều cao tổng lấy theo bàn phím số của hệ thống (~216pt) để mỗi ô phím bằng cỡ ô
 //  phím hệ thống, thay vì cao như bản Android.
@@ -246,6 +249,98 @@ struct PlainNumericKeypad: View {
         }
         .buttonStyle(KeyPressStyle())
         .disabled(!nextEnabled)
+    }
+}
+
+/// Bàn phím số 3 CỘT: không có phím hành động, không có cột phải.
+///
+/// Dùng cho ô nhập nằm trong một khung đã có nút bấm riêng (dialog có nút "Xong"/"Huỷ", form
+/// có nút ở đáy) — thêm phím hành động trong bàn phím nữa là hai chỗ cho cùng một việc, mà
+/// người dùng không biết chỗ nào mới là bước cuối.
+///
+/// Bỏ cột phải nên phím Xoá dời xuống hàng cuối, thế chỗ dấu "," của `PlainNumericKeypad`:
+/// hàng đó còn đúng ba ô nên không cần ô trang trí nào để lấp. Dấu "." bên phải vẫn giữ cho
+/// cân bố cục — bấm không nhập gì.
+struct CompactNumericKeypad: View {
+    let onDigit: (String) -> Void
+    let onBackspace: () -> Void
+
+    /// Bằng chiều cao bàn phím số hệ thống trên iPhone.
+    private static let totalHeight: CGFloat = 216
+    private static let gap: CGFloat = 6
+
+    private enum KpColor {
+        static let background = Color(hex: 0xCBD0D6)
+        static let key = Color.white
+        static let keyText = Color(hex: 0x141414)
+        static let backspace = Color(hex: 0xA7AEB6)
+        static let backspaceIcon = Color(hex: 0x33383E)
+    }
+
+    /// Nhãn đặc biệt của ô Xoá — đặt trong `rows` để ba cột tự chia đều như mọi phím khác.
+    private static let backspaceLabel = "\u{232B}"
+    /// Phím có mặt cho cân bố cục nhưng không sinh ký tự nào.
+    private static let decorativeKeys: Set<String> = ["."]
+
+    private static let rows = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        ["000", "0", backspaceLabel],
+    ]
+
+    var body: some View {
+        VStack(spacing: Self.gap) {
+            ForEach(Self.rows, id: \.self) { row in
+                HStack(spacing: Self.gap) {
+                    ForEach(row, id: \.self) { label in
+                        key(label)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 8)
+        .frame(height: Self.totalHeight)
+        .frame(maxWidth: .infinity)
+        .background(KpColor.background)
+    }
+
+    @ViewBuilder
+    private func key(_ label: String) -> some View {
+        if label == Self.backspaceLabel {
+            Button {
+                KeypadDismissGuard.markHandled()
+                onBackspace()
+            } label: {
+                Image(systemName: "delete.left.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(KpColor.backspaceIcon)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(KpColor.backspace)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(KeyPressStyle())
+            .accessibilityLabel("Xoá")
+        } else {
+            Button {
+                // Bàn phím nằm trong `safeAreaInset`, VẪN thuộc phạm vi cử chỉ chạm-ra-ngoài
+                // ở cấp màn — không đánh dấu thì gõ một số là bàn phím tự tắt.
+                KeypadDismissGuard.markHandled()
+                guard !Self.decorativeKeys.contains(label) else { return }
+                onDigit(label)
+            } label: {
+                Text(label)
+                    .font(AppFont.beVietnamPro(24))
+                    .foregroundStyle(KpColor.keyText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(KpColor.key)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(KeyPressStyle())
+        }
     }
 }
 
