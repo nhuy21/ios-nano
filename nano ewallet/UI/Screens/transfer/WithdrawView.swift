@@ -454,7 +454,7 @@ struct WithdrawView: View {
     /// Gợi ý theo số ĐANG GÕ — xem `TransferLimits.amountSuggestions`.
     private var amountSuggestions: [Int64] {
         // Chưa gõ gì -> mệnh giá mặc định để chạm 1 phát là xong.
-        guard amount > 0 else { return [10_000, 100_000, 1_000_000, 10_000_000] }
+        guard amount > 0 else { return [10_000, 100_000, 1_000_000] }
         return TransferLimits.amountSuggestions(for: amount)
     }
 

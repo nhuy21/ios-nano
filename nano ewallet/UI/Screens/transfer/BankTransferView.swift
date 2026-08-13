@@ -239,6 +239,13 @@ struct BankTransferView: View {
                         sourceAccountCard
                         recipientCard
                         amountSection
+                        // Neo đặt SAU phần số tiền, không phải trên chính nó: canh `.bottom`
+                        // vào `amountSection` thì đáy chips chạm sát mép bàn phím, nhìn dính
+                        // vào nhau. Neo ở đây kéo thêm một khoảng đệm cho thoáng: cuộn tới
+                        // ĐÁY khối trống này, tức chips được đẩy lên cao hơn mép bàn phím
+                        // đúng 24pt (chiều cao khối) cộng 24pt `spacing` của `VStack`.
+                        Color.clear
+                            .frame(height: 24)
                             .id(Self.amountAnchor)
                         contentSection
                         // Chỉ hiện khi đã chọn đủ ngân hàng + số TK và người nhận CHƯA có

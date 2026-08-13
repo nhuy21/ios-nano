@@ -15,7 +15,7 @@ enum TransferLimits {
     static let faceFixed: Int64 = 10_000_000
 
     /// Số chips gợi ý số tiền hiện cùng lúc.
-    static let suggestionCount = 4
+    static let suggestionCount = 3
     /// Gợi ý luôn từ hàng nghìn trở lên — đề xuất vài trăm đồng là vô nghĩa.
     static let minSuggestion: Int64 = 1_000
 
