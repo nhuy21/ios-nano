@@ -133,9 +133,11 @@ struct PinDotsField: View {
         .inputShadow()
         .contentShape(Rectangle())
         .onTapGesture {
+            // Đặt dấu ở CẢ HAI chế độ — xem `KeypadDismissGuard`. Chế độ bàn phím hệ thống
+            // cũng cần: cử chỉ ẩn-bàn-phím ở tầng `UIWindow` chạy song song với cú chạm này,
+            // không đánh dấu thì nó `endEditing` ngay bàn phím vừa mở.
+            KeypadDismissGuard.markHandled()
             if usesCustomKeypad {
-                // Đặt dấu trước — xem `KeypadDismissGuard`.
-                KeypadDismissGuard.markHandled()
                 onTapWhenCustom()
             } else {
                 internalFocus = true
