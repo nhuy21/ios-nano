@@ -33,28 +33,11 @@ final class KeyboardDismissInstaller: NSObject, UIGestureRecognizerDelegate {
             .first { $0.isKeyWindow }
         guard let window else { return }
 
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        let tap = UITapGestureRecognizer(target: window, action: #selector(UIView.endEditing))
         tap.cancelsTouchesInView = false
         tap.delegate = self
         window.addGestureRecognizer(tap)
         installedWindow = window
-    }
-
-    /// Ẩn bàn phím, TRỪ khi cú chạm này đã có nơi xử lý (chạm trúng một ô nhập).
-    ///
-    /// Hoãn một nhịp run loop rồi mới kiểm: cử chỉ ở tầng window chạy SONG SONG với
-    /// `onTapGesture` của ô, nên phải để ô kịp đặt dấu trước. Không hoãn thì `endEditing`
-    /// đóng ngay bàn phím mà ô vừa mở — chạm vào ô nhìn như không có tác dụng gì.
-    ///
-    /// Lỗi này chỉ lộ ở ô KHÔNG có sẵn tiêu điểm lúc mở màn (sheet huỷ liên kết ví); ô đã
-    /// focus sẵn thì không ai chạm vào nên không thấy.
-    @objc private func handleTap() {
-        // `@MainActor` tường minh: `KeypadDismissGuard` là main-actor, mà lớp này là `NSObject`
-        // thường nên closure không tự thừa hưởng isolation đó.
-        DispatchQueue.main.async { @MainActor in
-            guard !KeypadDismissGuard.consumeHandledTap() else { return }
-            self.installedWindow?.endEditing(true)
-        }
     }
 
     func gestureRecognizer(
