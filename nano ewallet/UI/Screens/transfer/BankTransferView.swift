@@ -202,13 +202,13 @@ struct BankTransferView: View {
         }
     }
 
-    /// Gõ số ngắn (1-3 chữ số) -> gợi ý thêm số 0 thay vì phải gõ hết, mirror Kotlin.
+    /// Gợi ý thêm số 0 thay vì phải gõ hết — xem `TransferLimits.amountSuggestions`.
     private var amountSuggestions: [Int64] {
-        guard (1...999).contains(amount) else { return [] }
         // Lọc CẢ HAI đầu: gợi ý dưới mức tối thiểu thì app tự đề xuất một số rồi tự chặn —
         // gõ "1" sẽ gợi ý 1.000, mà 1.000 nay dưới ngưỡng, nhìn như app lỗi.
-        return [amount * 1_000, amount * 10_000, amount * 100_000]
-            .filter { $0 >= Self.minAmount && $0 <= Self.maxAmount }
+        TransferLimits.amountSuggestions(
+            for: amount, min: Self.minAmount, max: Self.maxAmount
+        )
     }
 
     private var bankSheetBinding: Binding<String?> {

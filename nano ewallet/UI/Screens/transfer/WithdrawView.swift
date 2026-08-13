@@ -451,15 +451,11 @@ struct WithdrawView: View {
         }
     }
 
-    /// Gợi ý theo số ĐANG GÕ, đỡ phải gõ hết số 0 — sao đúng cách màn chuyển ví làm:
-    /// gõ "1" -> 1.000 / 10.000 / 100.000, gõ "15" -> 15.000 / 150.000 / 1.500.000.
+    /// Gợi ý theo số ĐANG GÕ — xem `TransferLimits.amountSuggestions`.
     private var amountSuggestions: [Int64] {
         // Chưa gõ gì -> mệnh giá mặc định để chạm 1 phát là xong.
-        guard amount > 0 else { return [10_000, 100_000, 1_000_000] }
-        // Gõ quá 3 chữ số coi như đang nhập số tiền đầy đủ, không gợi ý nữa.
-        guard amount <= 999 else { return [] }
-        return [amount * 1_000, amount * 10_000, amount * 100_000]
-            .filter { $0 <= TransferLimits.faceFixed }
+        guard amount > 0 else { return [10_000, 100_000, 1_000_000, 10_000_000] }
+        return TransferLimits.amountSuggestions(for: amount)
     }
 
     @ViewBuilder
